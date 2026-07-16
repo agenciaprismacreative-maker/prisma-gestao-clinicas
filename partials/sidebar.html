@@ -1,0 +1,100 @@
+<div class="sidebar-backdrop" :class="{ 'is-open': sidebarOpen }" @click="sidebarOpen = false"></div>
+<aside class="sidebar" :class="{ 'is-open': sidebarOpen }">
+  <div class="sidebar-inner">
+
+    <div class="sidebar-logo">
+      <div class="logo-mark">P</div>
+      <div class="logo-text">
+        <strong>Prisma</strong>
+        <span>Gestão de Clínicas</span>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <a href="dashboard.html" class="nav-item" data-page="dashboard">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/>
+          <rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/>
+        </svg>
+        <span>Dashboard</span>
+      </a>
+
+      <a href="pacientes.html" class="nav-item" data-page="pacientes">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="9" cy="8" r="3.2"/><path d="M3.5 20c0-3.6 2.5-6 5.5-6s5.5 2.4 5.5 6"/>
+          <circle cx="17.5" cy="8.5" r="2.4"/><path d="M15.7 12.2c2.4.3 4.1 2.3 4.3 5.3"/>
+        </svg>
+        <span>Pacientes</span>
+      </a>
+
+      <a href="agenda.html" class="nav-item" data-page="agenda">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18"/><path d="M8 3v4"/><path d="M16 3v4"/>
+        </svg>
+        <span>Agenda</span>
+      </a>
+
+      <div class="sidebar-divider"></div>
+
+      <a href="#" class="nav-item disabled" data-page="equipe">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="5" y="4" width="14" height="17" rx="2"/><rect x="9" y="2.5" width="6" height="3" rx="1"/>
+          <path d="M8.5 11h7"/><path d="M8.5 15h7"/><path d="M8.5 19h4"/>
+        </svg>
+        <span>Equipe e tarefas</span>
+        <span class="nav-badge">em breve</span>
+      </a>
+
+      <a href="#" class="nav-item disabled" data-page="atendimento">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 12h4l2-5 3 10 2-7 2 4h5"/>
+        </svg>
+        <span>Atendimento</span>
+        <span class="nav-badge">em breve</span>
+      </a>
+
+      <a href="#" class="nav-item disabled" data-page="financeiro">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="9"/><path d="M12 7.5v9"/>
+          <path d="M15 9.8c0-1.2-1.3-2-3-2s-3 .8-3 2 1.3 1.8 3 1.8 3 .8 3 2-1.3 2-3 2-3-.8-3-2"/>
+        </svg>
+        <span>Financeiro</span>
+        <span class="nav-badge">em breve</span>
+      </a>
+
+      <a href="#" class="nav-item disabled" data-page="reativacao">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 12a8 8 0 0 1 14-5.3L20 8"/><path d="M20 4v4h-4"/>
+          <path d="M20 12a8 8 0 0 1-14 5.3L4 16"/><path d="M4 20v-4h4"/>
+        </svg>
+        <span>Pós-venda</span>
+        <span class="nav-badge">em breve</span>
+      </a>
+
+      <div class="sidebar-divider"></div>
+
+      <a href="#" class="nav-item disabled" data-page="configuracoes">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 6h9"/><circle cx="16" cy="6" r="2"/>
+          <path d="M4 12h3"/><circle cx="10" cy="12" r="2"/><path d="M13 12h7"/>
+          <path d="M4 18h9"/><circle cx="16" cy="18" r="2"/>
+        </svg>
+        <span>Configurações</span>
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="avatar">RC</div>
+      <div class="sidebar-user">
+        <strong>Recepção</strong>
+        <span>Clínica modelo</span>
+      </div>
+      <a href="index.html" class="sidebar-logout" title="Sair">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/>
+        </svg>
+      </a>
+    </div>
+
+  </div>
+</aside>

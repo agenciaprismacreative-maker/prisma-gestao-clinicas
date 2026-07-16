@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Agenda · Prisma Gestão de Clínicas</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body data-page="agenda" data-title="Agenda" data-subtitle="Clínica Alma Estética" x-data="{ sidebarOpen:false }">
+
+<div class="app-shell">
+  <div data-include="partials/sidebar.html"></div>
+
+  <div class="main">
+    <header class="topbar" data-include="partials/topbar.html"></header>
+
+    <main class="content">
+
+      <div class="page-header">
+        <div>
+          <h2>Agenda</h2>
+          <p>Visão diária por profissional · dados de demonstração</p>
+        </div>
+        <button class="btn btn-primary" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+          Novo agendamento
+        </button>
+      </div>
+
+      <div class="card card-shadow" style="padding:0;">
+
+        <div class="agenda-toolbar flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <button class="icon-btn" type="button" style="width:32px;height:32px;">
+              <svg class="icon" style="width:16px;height:16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+            </button>
+            <strong class="text-sm">Quinta-feira, 16 de julho de 2026</strong>
+            <button class="icon-btn" type="button" style="width:32px;height:32px;">
+              <svg class="icon" style="width:16px;height:16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+            </button>
+          </div>
+          <div class="agenda-legend">
+            <span class="badge badge-success"><span class="badge-dot"></span>Confirmado</span>
+            <span class="badge badge-warning"><span class="badge-dot"></span>Aguardando</span>
+            <span class="badge badge-neutral"><span class="badge-dot"></span>Sem resposta</span>
+            <span class="badge badge-danger"><span class="badge-dot"></span>Faltou</span>
+          </div>
+        </div>
+
+        <div class="agenda-wrap">
+
+          <div class="agenda-hours">
+            <div class="agenda-hours-spacer"></div>
+            <div class="agenda-hour-label" style="top:44px;">08:00</div>
+            <div class="agenda-hour-label" style="top:116px;">09:00</div>
+            <div class="agenda-hour-label" style="top:188px;">10:00</div>
+            <div class="agenda-hour-label" style="top:260px;">11:00</div>
+            <div class="agenda-hour-label" style="top:332px;">12:00</div>
+            <div class="agenda-hour-label" style="top:404px;">13:00</div>
+            <div class="agenda-hour-label" style="top:476px;">14:00</div>
+            <div class="agenda-hour-label" style="top:548px;">15:00</div>
+            <div class="agenda-hour-label" style="top:620px;">16:00</div>
+            <div class="agenda-hour-label" style="top:692px;">17:00</div>
+            <div class="agenda-hour-label" style="top:764px;">18:00</div>
+          </div>
+
+          <div class="agenda-columns">
+
+            <div class="agenda-col">
+              <div class="agenda-col-header">Dra. Camila Rocha</div>
+              <div class="agenda-col-body" style="height:792px;">
+                <div class="agenda-event status-confirmado" style="top:72px;height:72px;">
+                  <strong>Marina Ferreira</strong><span>Limpeza de pele · 09:00–10:00</span>
+                </div>
+                <div class="agenda-event status-confirmado" style="top:144px;height:36px;">
+                  <strong>Beatriz Souza</strong><span>Botox · 10:00–10:30</span>
+                </div>
+                <div class="agenda-event status-faltou" style="top:540px;height:36px;">
+                  <strong>Débora Santos</strong><span>Botox · 15:30–16:00</span>
+                </div>
+                <div class="agenda-event status-confirmado" style="top:648px;height:72px;">
+                  <strong>Larissa Martins</strong><span>Microagulhamento · 17:00–18:00</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="agenda-col">
+              <div class="agenda-col-header">Dra. Ana Beatriz Lins</div>
+              <div class="agenda-col-body" style="height:792px;">
+                <div class="agenda-event status-aguardando" style="top:162px;height:54px;">
+                  <strong>Juliana Alves</strong><span>Preenchimento labial · 10:15–11:00</span>
+                </div>
+                <div class="agenda-event status-confirmado" style="top:576px;height:36px;">
+                  <strong>Camila Nogueira</strong><span>Laser depilação · 16:00–16:30</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="agenda-col">
+              <div class="agenda-col-header">Rafaela Dias</div>
+              <div class="agenda-col-body" style="height:792px;">
+                <div class="agenda-event status-confirmado" style="top:216px;height:54px;">
+                  <strong>Patrícia Lima</strong><span>Peeling · 11:00–11:45</span>
+                </div>
+                <div class="agenda-event status-cancelado" style="top:288px;height:36px;">
+                  <strong>Rafaela Torres</strong><span>Consulta de retorno · 12:00–12:30</span>
+                </div>
+                <div class="agenda-event status-pendente" style="top:432px;height:72px;">
+                  <strong>Fernanda Costa</strong><span>Drenagem linfática · 14:00–15:00</span>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <p class="text-xs text-soft mt-3">
+        No sistema em produção, o clique em um horário vago abre o formulário de novo agendamento, e o clique em uma sessão existente abre os detalhes com opção de reagendar ou cancelar com motivo registrado.
+      </p>
+
+    </main>
+  </div>
+</div>
+
+<script src="js/include.js" defer></script>
+</body>
+</html>

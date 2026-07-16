@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Entrar · Prisma Gestão de Clínicas</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body data-page="login">
+
+<div class="auth-screen">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <div class="logo-mark" style="background:var(--color-accent);color:var(--color-primary-dark);">P</div>
+      <h1>Prisma · Gestão de Clínicas</h1>
+      <p>Acesse o painel da sua clínica</p>
+    </div>
+
+    <form x-data="{ loading:false, showPass:false }" @submit.prevent="loading=true; setTimeout(() => window.location.href='dashboard.html', 500)">
+      <div class="form-group">
+        <label class="label" for="email">E-mail</label>
+        <input class="input" type="email" id="email" placeholder="voce@clinica.com.br" required>
+      </div>
+
+      <div class="form-group">
+        <label class="label" for="senha">Senha</label>
+        <div style="position:relative;">
+          <input class="input" :type="showPass ? 'text' : 'password'" id="senha" placeholder="••••••••" required style="padding-right:56px;">
+          <button type="button" @click="showPass = !showPass" class="text-xs text-muted" style="position:absolute;right:14px;top:50%;transform:translateY(-50%);background:none;border:none;">
+            <span x-text="showPass ? 'ocultar' : 'ver'"></span>
+          </button>
+        </div>
+      </div>
+
+      <button class="btn btn-primary btn-block mt-2" type="submit" :disabled="loading">
+        <span x-show="!loading">Entrar</span>
+        <span x-show="loading" x-cloak>Entrando…</span>
+      </button>
+    </form>
+
+    <div class="auth-footer">
+      Esqueceu a senha? Fale com a administração da clínica.<br>
+      Sistema interno · Prisma Creative — ambiente de demonstração
+    </div>
+  </div>
+</div>
+
+<script src="js/include.js" defer></script>
+</body>
+</html>
