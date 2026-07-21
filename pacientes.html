@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="stylesheet" href="css/styles.css">
 </head>
-<body data-page="pacientes" data-title="Pacientes" data-subtitle="Clínica Alma Estética" x-data="{ sidebarOpen:false }">
+<body data-page="pacientes" data-title="Pacientes" data-subtitle="" x-data="{ sidebarOpen:false }">
 
 <div class="app-shell">
   <div data-include="partials/sidebar.html"></div>
@@ -14,17 +14,25 @@
   <div class="main">
     <header class="topbar" data-include="partials/topbar.html"></header>
 
-    <main class="content" x-data="pacientesApp()">
+    <main class="content" x-data="pacientesApp()" x-init="init()">
 
       <div class="page-header">
         <div>
           <h2>Pacientes</h2>
-          <p><span x-text="patients.length"></span> pacientes cadastrados · dados de demonstração</p>
+          <p><span x-text="patients.length"></span> pacientes cadastrados</p>
         </div>
-        <button class="btn btn-primary" type="button">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
-          Novo paciente
-        </button>
+        <div class="flex gap-3">
+          <input type="file" accept=".csv" x-ref="csvInput" @change="importCsv($event)" style="display:none;">
+          <button class="btn btn-secondary" type="button" @click="$refs.csvInput.click()">Importar CSV</button>
+          <button class="btn btn-primary" type="button" @click="showNewForm = true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+            Novo paciente
+          </button>
+        </div>
+      </div>
+
+      <div x-show="feedback.message" x-cloak class="card mb-4" :style="'padding:12px 16px;border-color:' + (feedback.type==='error' ? 'var(--color-danger)' : 'var(--color-success)')">
+        <span class="text-sm" x-text="feedback.message" :style="'color:' + (feedback.type==='error' ? 'var(--color-danger)' : 'var(--color-success)')"></span>
       </div>
 
       <!-- lista -->
@@ -37,25 +45,33 @@
         </div>
 
         <div class="card card-shadow" style="padding:0;">
-          <div class="table-wrap">
+          <div x-show="loading" class="text-sm text-muted" style="padding:24px;">Carregando pacientes…</div>
+          <div x-show="!loading && patients.length === 0" class="empty-note" style="margin:20px;">
+            Nenhum paciente cadastrado ainda. Use "Novo paciente" ou "Importar CSV" para começar.
+          </div>
+          <div class="table-wrap" x-show="!loading && patients.length > 0">
             <table class="table">
               <thead>
-                <tr><th>Paciente</th><th>WhatsApp</th><th>Último procedimento</th><th>Próxima sessão</th><th>Status</th><th></th></tr>
+                <tr><th>Paciente</th><th>WhatsApp</th><th>Nascimento</th><th>LGPD</th><th></th></tr>
               </thead>
               <tbody>
                 <template x-for="p in filtered" :key="p.id">
-                  <tr @click="selected = p" style="cursor:pointer;">
+                  <tr @click="selectPatient(p)" style="cursor:pointer;">
                     <td>
                       <div class="row-name">
-                        <div class="avatar" x-text="p.initials"></div>
-                        <div><strong x-text="p.name"></strong><span x-text="p.tag"></span></div>
+                        <div class="avatar" x-text="initials(p.full_name)"></div>
+                        <div><strong x-text="p.full_name"></strong></div>
                       </div>
                     </td>
-                    <td x-text="p.phone"></td>
-                    <td x-text="p.lastProcedure"></td>
-                    <td x-text="p.nextSession"></td>
-                    <td><span class="badge" :class="p.statusClass"><span class="badge-dot"></span><span x-text="p.statusLabel"></span></span></td>
-                    <td><a href="#" class="btn btn-ghost btn-sm" @click.stop="selected = p">Ver ficha</a></td>
+                    <td x-text="p.phone || '—'"></td>
+                    <td x-text="formatDate(p.birth_date)"></td>
+                    <td>
+                      <span class="badge" :class="p.lgpd_consent_at ? 'badge-success' : 'badge-warning'">
+                        <span class="badge-dot"></span>
+                        <span x-text="p.lgpd_consent_at ? 'Assinado' : 'Pendente'"></span>
+                      </span>
+                    </td>
+                    <td><a href="#" class="btn btn-ghost btn-sm" @click.stop="selectPatient(p)">Ver ficha</a></td>
                   </tr>
                 </template>
               </tbody>
@@ -77,65 +93,98 @@
 
             <div class="card card-shadow">
               <div class="flex items-center gap-4 mb-4">
-                <div class="avatar avatar-lg" x-text="selected && selected.initials"></div>
+                <div class="avatar avatar-lg" x-text="selected && initials(selected.full_name)"></div>
                 <div>
-                  <h3 style="font-size:19px;" x-text="selected && selected.name"></h3>
-                  <p class="text-muted text-sm" x-text="selected && selected.phone"></p>
+                  <h3 style="font-size:19px;" x-text="selected && selected.full_name"></h3>
+                  <p class="text-muted text-sm" x-text="selected && (selected.phone || 'sem telefone cadastrado')"></p>
                 </div>
-                <span class="badge ml-auto" :class="selected && selected.statusClass" style="margin-left:auto;">
-                  <span class="badge-dot"></span><span x-text="selected && selected.statusLabel"></span>
+                <span class="badge" style="margin-left:auto;" :class="selected && selected.lgpd_consent_at ? 'badge-success' : 'badge-warning'">
+                  <span class="badge-dot"></span>
+                  <span x-text="selected && selected.lgpd_consent_at ? 'LGPD assinado' : 'LGPD pendente'"></span>
                 </span>
               </div>
               <hr class="divider">
-              <h4 class="text-sm text-muted mb-2">Anamnese resumida</h4>
-              <p class="text-sm" x-text="selected && selected.anamnese"></p>
-              <div class="mt-4">
+              <h4 class="text-sm text-muted mb-2">Anamnese</h4>
+              <p class="text-sm mb-3" x-text="(selected && selected.anamnesis) || 'Não preenchida.'"></p>
+              <h4 class="text-sm text-muted mb-2">Alergias</h4>
+              <p class="text-sm" x-text="(selected && selected.allergies) || 'Nenhuma registrada.'"></p>
+              <div class="mt-4" x-show="selected && selected.lgpd_consent_at">
                 <span class="badge badge-info">
-                  LGPD: consentimento assinado em <span x-text="selected && selected.consentDate"></span>
+                  Consentimento assinado em <span x-text="selected && formatDate(selected.lgpd_consent_at)"></span>
                 </span>
               </div>
             </div>
 
             <div class="card card-shadow">
-              <div class="card-header"><div><h3>Comparador de evolução</h3><p>Primeira sessão × sessão mais recente</p></div></div>
-              <div class="grid grid-2 gap-3">
-                <div>
-                  <div style="aspect-ratio:1/1;background:var(--color-surface-alt);border-radius:var(--radius-md);display:flex;align-items:center;justify-content:center;color:var(--color-text-soft);border:1px solid var(--color-border);">
-                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="width:30px;height:30px;">
-                      <path d="M4 8a2 2 0 0 1 2-2h1.2l1-1.6h7.6l1 1.6H18a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><circle cx="12" cy="13" r="3.4"/>
-                    </svg>
-                  </div>
-                  <p class="text-xs text-muted mt-2" style="text-align:center;">1ª sessão</p>
-                </div>
-                <div>
-                  <div style="aspect-ratio:1/1;background:var(--color-surface-alt);border-radius:var(--radius-md);display:flex;align-items:center;justify-content:center;color:var(--color-text-soft);border:1px solid var(--color-border);">
-                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="width:30px;height:30px;">
-                      <path d="M4 8a2 2 0 0 1 2-2h1.2l1-1.6h7.6l1 1.6H18a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><circle cx="12" cy="13" r="3.4"/>
-                    </svg>
-                  </div>
-                  <p class="text-xs text-muted mt-2" style="text-align:center;">Sessão mais recente</p>
-                </div>
-              </div>
-              <p class="text-xs text-soft mt-3">Fotos ilustrativas. No sistema real, ficam armazenadas no Supabase Storage com autorização de uso registrada por paciente.</p>
+              <div class="card-header"><div><h3>Fotos de evolução</h3><p>Comparador antes / depois</p></div></div>
+              <p class="text-sm text-muted">O upload de fotos por sessão fica disponível na tela de Atendimento e Prontuário, ainda em construção.</p>
             </div>
 
           </div>
 
           <div class="flex" style="flex-direction:column;gap:24px;">
             <div class="card card-shadow">
-              <h3 class="mb-4" style="font-size:15px;">Histórico de procedimentos</h3>
-              <template x-for="(h, i) in (selected ? selected.history : [])" :key="i">
+              <h3 class="mb-4" style="font-size:15px;">Histórico de atendimentos</h3>
+              <div x-show="historyLoading" class="text-sm text-muted">Carregando histórico…</div>
+              <div x-show="!historyLoading && history.length === 0" class="text-sm text-muted">Nenhum atendimento registrado ainda.</div>
+              <template x-for="(h, i) in history" :key="i">
                 <div class="flex items-center justify-between mb-3">
                   <div>
-                    <strong class="text-sm" x-text="h.proc"></strong>
-                    <div class="text-xs text-muted" x-text="h.date"></div>
+                    <strong class="text-sm" x-text="h.protocol || 'Atendimento'"></strong>
+                    <div class="text-xs text-muted" x-text="formatDate(h.created_at)"></div>
                   </div>
-                  <span class="badge badge-neutral" x-text="h.prof"></span>
+                  <span class="badge badge-neutral" x-text="(h.users && h.users.full_name) || ''"></span>
                 </div>
               </template>
             </div>
           </div>
 
+        </div>
+      </div>
+
+      <!-- modal novo paciente -->
+      <div x-show="showNewForm" x-cloak style="position:fixed;inset:0;background:rgba(31,51,47,.45);z-index:50;display:flex;align-items:center;justify-content:center;padding:20px;" @click.self="showNewForm = false">
+        <div class="card card-shadow" style="width:100%;max-width:480px;max-height:88vh;overflow-y:auto;">
+          <div class="card-header">
+            <h3>Novo paciente</h3>
+            <button class="btn btn-ghost btn-sm" type="button" @click="showNewForm = false">Fechar</button>
+          </div>
+          <form @submit.prevent="createPatient()">
+            <div class="form-group">
+              <label class="label">Nome completo</label>
+              <input class="input" x-model="newPatient.full_name" required>
+            </div>
+            <div class="grid grid-2 gap-3">
+              <div class="form-group">
+                <label class="label">WhatsApp</label>
+                <input class="input" x-model="newPatient.phone" placeholder="(11) 90000-0000">
+              </div>
+              <div class="form-group">
+                <label class="label">Nascimento</label>
+                <input class="input" type="date" x-model="newPatient.birth_date">
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="label">E-mail</label>
+              <input class="input" type="email" x-model="newPatient.email">
+            </div>
+            <div class="form-group">
+              <label class="label">Anamnese</label>
+              <textarea class="input" x-model="newPatient.anamnesis" rows="2"></textarea>
+            </div>
+            <div class="form-group">
+              <label class="label">Alergias</label>
+              <input class="input" x-model="newPatient.allergies">
+            </div>
+            <div class="form-group flex items-center gap-2">
+              <input type="checkbox" x-model="newPatient.lgpd_consent" id="lgpd" style="width:auto;">
+              <label for="lgpd" class="text-sm" style="margin:0;">Paciente autorizou o tratamento de dados de saúde (LGPD) agora</label>
+            </div>
+            <button class="btn btn-primary btn-block mt-2" type="submit" :disabled="saving">
+              <span x-show="!saving">Salvar paciente</span>
+              <span x-show="saving" x-cloak>Salvando…</span>
+            </button>
+          </form>
         </div>
       </div>
 
@@ -146,23 +195,145 @@
 <script>
 function pacientesApp() {
   return {
+    loading: true,
+    saving: false,
     search: '',
     selected: null,
-    patients: [
-      { id:1, name:'Marina Ferreira', initials:'MF', phone:'(11) 98221-3345', tag:'Retorno · 3ª sessão', lastProcedure:'Limpeza de pele', nextSession:'Hoje, 09:00', statusLabel:'Confirmado', statusClass:'badge-success', anamnese:'Pele mista, sem alergias registradas. Sensibilidade leve a ácidos.', consentDate:'03/02/2026', history:[ {proc:'Limpeza de pele', date:'16/07/2026', prof:'Dra. Camila Rocha'}, {proc:'Limpeza de pele', date:'15/06/2026', prof:'Dra. Camila Rocha'}, {proc:'Avaliação inicial', date:'03/02/2026', prof:'Dra. Camila Rocha'} ] },
-      { id:2, name:'Beatriz Souza', initials:'BS', phone:'(11) 97744-2210', tag:'Pacote · sessão 2 de 4', lastProcedure:'Botox', nextSession:'Hoje, 09:30', statusLabel:'Confirmado', statusClass:'badge-success', anamnese:'Sem comorbidades relatadas. Uso de protetor solar diário orientado.', consentDate:'22/05/2026', history:[ {proc:'Botox', date:'16/07/2026', prof:'Dra. Camila Rocha'}, {proc:'Botox', date:'18/06/2026', prof:'Dra. Camila Rocha'} ] },
-      { id:3, name:'Juliana Alves', initials:'JA', phone:'(11) 96633-8890', tag:'Nova paciente', lastProcedure:'Preenchimento labial', nextSession:'Hoje, 10:15', statusLabel:'Aguardando', statusClass:'badge-warning', anamnese:'Primeira sessão na clínica. Sem histórico prévio de preenchimento.', consentDate:'16/07/2026', history:[ {proc:'Avaliação inicial', date:'10/07/2026', prof:'Dra. Ana Beatriz Lins'} ] },
-      { id:4, name:'Patrícia Lima', initials:'PL', phone:'(11) 99887-1123', tag:'Retorno mensal', lastProcedure:'Peeling', nextSession:'Hoje, 11:00', statusLabel:'Confirmado', statusClass:'badge-success', anamnese:'Pele oleosa, histórico de acne. Acompanhamento mensal.', consentDate:'11/01/2026', history:[ {proc:'Peeling', date:'16/06/2026', prof:'Rafaela Dias'}, {proc:'Peeling', date:'16/05/2026', prof:'Rafaela Dias'} ] },
-      { id:5, name:'Fernanda Costa', initials:'FC', phone:'(11) 98456-7712', tag:'Pacote · sessão 5 de 10', lastProcedure:'Drenagem linfática', nextSession:'Hoje, 14:00', statusLabel:'Sem resposta', statusClass:'badge-neutral', anamnese:'Pós-operatório de lipoaspiração, acompanhamento indicado por cirurgião.', consentDate:'02/06/2026', history:[ {proc:'Drenagem linfática', date:'09/07/2026', prof:'Rafaela Dias'}, {proc:'Drenagem linfática', date:'02/07/2026', prof:'Rafaela Dias'} ] },
-      { id:6, name:'Débora Santos', initials:'DS', phone:'(11) 97321-4456', tag:'Retorno 90 dias', lastProcedure:'Botox', nextSession:'Hoje · faltou', statusLabel:'Faltou', statusClass:'badge-danger', anamnese:'Sem alergias. Prefere horários no fim da tarde.', consentDate:'14/03/2026', history:[ {proc:'Botox', date:'14/04/2026', prof:'Dra. Camila Rocha'} ] },
-      { id:7, name:'Camila Nogueira', initials:'CN', phone:'(11) 96678-9932', tag:'Pacote laser', lastProcedure:'Laser depilação', nextSession:'22/07, 16:00', statusLabel:'Confirmado', statusClass:'badge-success', anamnese:'Fototipo III. Sem uso recente de ácidos ou fotossensibilizantes.', consentDate:'19/02/2026', history:[ {proc:'Laser depilação', date:'24/06/2026', prof:'Dra. Ana Beatriz Lins'}, {proc:'Laser depilação', date:'27/05/2026', prof:'Dra. Ana Beatriz Lins'} ] },
-      { id:8, name:'Larissa Martins', initials:'LM', phone:'(11) 99123-5567', tag:'Retorno trimestral', lastProcedure:'Microagulhamento', nextSession:'20/07, 10:00', statusLabel:'Confirmado', statusClass:'badge-success', anamnese:'Cicatrizes de acne leves. Sem uso de isotretinoína nos últimos 6 meses.', consentDate:'05/01/2026', history:[ {proc:'Microagulhamento', date:'20/04/2026', prof:'Dra. Camila Rocha'} ] },
-      { id:9, name:'Rafaela Torres', initials:'RT', phone:'(11) 98890-2234', tag:'Inativa há 118 dias', lastProcedure:'Botox', nextSession:'Sem agendamento', statusLabel:'Reativar', statusClass:'badge-info', anamnese:'Última visita há mais de 90 dias. Elegível para régua de reativação.', consentDate:'20/09/2025', history:[ {proc:'Botox', date:'19/03/2026', prof:'Dra. Camila Rocha'} ] }
-    ],
+    patients: [],
+    clinicId: null,
+    showNewForm: false,
+    newPatient: { full_name: '', phone: '', email: '', birth_date: '', anamnesis: '', allergies: '', lgpd_consent: false },
+    history: [],
+    historyLoading: false,
+    feedback: { type: '', message: '' },
+
+    async init() {
+      await this.loadClinicId();
+      await this.loadPatients();
+    },
+
+    async loadClinicId() {
+      const { data: { user } } = await supabaseClient.auth.getUser();
+      if (!user) return;
+      const { data } = await supabaseClient.from('users').select('clinic_id').eq('id', user.id).single();
+      this.clinicId = data ? data.clinic_id : null;
+    },
+
+    async loadPatients() {
+      this.loading = true;
+      const { data, error } = await supabaseClient
+        .from('patients')
+        .select('*')
+        .order('full_name', { ascending: true });
+      if (error) {
+        this.showFeedback('error', 'Erro ao carregar pacientes: ' + error.message);
+      } else {
+        this.patients = data || [];
+      }
+      this.loading = false;
+    },
+
     get filtered() {
       const q = this.search.trim().toLowerCase();
       if (!q) return this.patients;
-      return this.patients.filter(p => p.name.toLowerCase().includes(q) || p.phone.includes(q));
+      return this.patients.filter(p =>
+        p.full_name.toLowerCase().includes(q) || (p.phone || '').includes(q)
+      );
+    },
+
+    initials(name) {
+      if (!name) return '--';
+      const parts = name.trim().split(/\s+/);
+      return parts.length === 1 ? parts[0].slice(0, 2).toUpperCase() : (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    },
+
+    formatDate(value) {
+      if (!value) return '—';
+      const d = new Date(value);
+      if (isNaN(d)) return '—';
+      return d.toLocaleDateString('pt-BR');
+    },
+
+    async selectPatient(p) {
+      this.selected = p;
+      this.historyLoading = true;
+      this.history = [];
+      const { data, error } = await supabaseClient
+        .from('medical_records')
+        .select('protocol, notes, created_at, users ( full_name )')
+        .eq('patient_id', p.id)
+        .order('created_at', { ascending: false });
+      if (!error) this.history = data || [];
+      this.historyLoading = false;
+    },
+
+    async createPatient() {
+      if (!this.clinicId) {
+        this.showFeedback('error', 'Não foi possível identificar sua clínica. Recarregue a página e tente de novo.');
+        return;
+      }
+      this.saving = true;
+      const payload = {
+        clinic_id: this.clinicId,
+        full_name: this.newPatient.full_name,
+        phone: this.newPatient.phone || null,
+        email: this.newPatient.email || null,
+        birth_date: this.newPatient.birth_date || null,
+        anamnesis: this.newPatient.anamnesis || null,
+        allergies: this.newPatient.allergies || null
+      };
+      if (this.newPatient.lgpd_consent) {
+        payload.lgpd_consent_at = new Date().toISOString();
+        payload.lgpd_consent_text = 'Consentimento para tratamento de dados de saúde registrado no cadastro do paciente.';
+      }
+      const { error } = await supabaseClient.from('patients').insert(payload);
+      this.saving = false;
+      if (error) {
+        this.showFeedback('error', 'Erro ao salvar paciente: ' + error.message);
+        return;
+      }
+      this.showNewForm = false;
+      this.newPatient = { full_name: '', phone: '', email: '', birth_date: '', anamnesis: '', allergies: '', lgpd_consent: false };
+      this.showFeedback('success', 'Paciente cadastrado com sucesso.');
+      await this.loadPatients();
+    },
+
+    async importCsv(event) {
+      const file = event.target.files[0];
+      if (!file || !this.clinicId) return;
+      const text = await file.text();
+      const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
+      const rows = lines.slice(1); // pula a linha de cabeçalho
+      const payload = rows.map(line => {
+        const cols = line.split(',').map(s => (s || '').trim());
+        return {
+          clinic_id: this.clinicId,
+          full_name: cols[0] || '',
+          phone: cols[1] || null,
+          email: cols[2] || null,
+          birth_date: cols[3] || null
+        };
+      }).filter(r => r.full_name);
+
+      if (payload.length === 0) {
+        this.showFeedback('error', 'Nenhuma linha válida encontrada no CSV. Formato esperado: nome,telefone,email,data_nascimento');
+        event.target.value = '';
+        return;
+      }
+
+      const { error } = await supabaseClient.from('patients').insert(payload);
+      event.target.value = '';
+      if (error) {
+        this.showFeedback('error', 'Erro ao importar CSV: ' + error.message);
+        return;
+      }
+      this.showFeedback('success', payload.length + ' paciente(s) importado(s) com sucesso.');
+      await this.loadPatients();
+    },
+
+    showFeedback(type, message) {
+      this.feedback = { type, message };
+      setTimeout(() => { this.feedback = { type: '', message: '' }; }, 5000);
     }
   };
 }
