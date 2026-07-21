@@ -58,7 +58,7 @@ function loginForm() {
     async submit() {
       this.errorMsg = '';
       this.loading = true;
-      const { error } = await supabaseClient.auth.signInWithPassword({
+      const { data, error } = await supabaseClient.auth.signInWithPassword({
         email: this.email,
         password: this.password
       });
@@ -67,7 +67,12 @@ function loginForm() {
         this.loading = false;
         return;
       }
-      window.location.href = 'dashboard.html';
+      let role = null;
+      if (data.user) {
+        const { data: profile } = await supabaseClient.from('users').select('role').eq('id', data.user.id).single();
+        role = profile ? profile.role : null;
+      }
+      window.location.href = window.homeForRole(role);
     }
   };
 }

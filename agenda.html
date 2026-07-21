@@ -89,7 +89,7 @@
                   <div class="agenda-col-header" x-text="prof.full_name"></div>
                   <div class="agenda-col-body" style="height:792px;" @contextmenu.prevent="onContextMenu($event, prof.id)">
                     <template x-for="appt in apptsFor(prof.id)" :key="appt.id">
-                      <div class="agenda-event" :class="statusClass(appt.status)" :style="'top:' + topFor(appt.scheduled_at) + 'px; height:' + heightFor(appt.duration_minutes) + 'px;'">
+                      <div class="agenda-event" :class="statusClass(appt.status)" :style="'cursor:pointer; top:' + topFor(appt.scheduled_at) + 'px; height:' + heightFor(appt.duration_minutes) + 'px;'" @click.stop="showApptDetail(appt)">
                         <strong x-text="appt.patients ? appt.patients.full_name : 'Paciente'"></strong>
                         <span x-text="(appt.services ? appt.services.name + ' · ' : '') + formatTime(appt.scheduled_at) + ' · ' + statusLabel(appt.status)"></span>
                       </div>
@@ -112,10 +112,10 @@
             <template x-for="day in weekDays" :key="day.toISOString()">
               <div class="agenda-week-day">
                 <div class="agenda-week-day-header" :class="{ 'is-today': isToday(day) }" @click="goToDay(day)" x-text="weekDayLabel(day)"></div>
-                <div class="agenda-week-day-body">
+                <div class="agenda-week-day-body" @contextmenu.prevent="onContextMenuWeek($event, day)">
                   <div x-show="apptsForDay(day).length === 0 && blocksForDay(day).length === 0" class="text-xs text-soft">Livre</div>
                   <template x-for="appt in apptsForDay(day)" :key="appt.id">
-                    <div class="agenda-week-item" :class="statusClass(appt.status)">
+                    <div class="agenda-week-item" :class="statusClass(appt.status)" style="cursor:pointer;" @click.stop="showApptDetail(appt)">
                       <strong x-text="formatTime(appt.scheduled_at)"></strong>
                       <span x-text="(appt.patients ? appt.patients.full_name : 'Paciente') + ' · ' + professionalName(appt.professional_id)"></span>
                     </div>
@@ -156,6 +156,26 @@
         <button type="button" @click="ctxBloquear()">Bloquear horário</button>
         <button type="button" @click="ctxGerenciarBloqueios()">Gerenciar bloqueios</button>
         <button type="button" @click="ctxImprimir()">Imprimir</button>
+      </div>
+
+      <!-- ficha breve ao clicar num agendamento existente -->
+      <div x-show="apptDetail.show" x-cloak style="position:fixed;inset:0;background:rgba(31,51,47,.45);z-index:55;display:flex;align-items:center;justify-content:center;padding:20px;" @click.self="closeApptDetail()">
+        <div class="card card-shadow" style="width:100%;max-width:360px;" x-show="apptDetail.appt">
+          <div class="card-header">
+            <h3 x-text="apptDetail.appt ? (apptDetail.appt.patients ? apptDetail.appt.patients.full_name : 'Paciente') : ''"></h3>
+            <button class="btn btn-ghost btn-sm" type="button" @click="closeApptDetail()">Fechar</button>
+          </div>
+          <template x-if="apptDetail.appt">
+            <div style="padding:4px 0;display:flex;flex-direction:column;gap:10px;font-size:13.5px;">
+              <div><span class="text-xs text-muted">Profissional</span><br><strong x-text="professionalName(apptDetail.appt.professional_id)"></strong></div>
+              <div><span class="text-xs text-muted">Procedimento</span><br><strong x-text="apptDetail.appt.services ? apptDetail.appt.services.name : 'Não definido'"></strong></div>
+              <div><span class="text-xs text-muted">Data e horário</span><br><strong x-text="formatDateTimeLong(apptDetail.appt.scheduled_at)"></strong></div>
+              <div><span class="text-xs text-muted">Duração média</span><br><strong x-text="apptDetail.appt.duration_minutes + ' minutos'"></strong></div>
+              <div><span class="text-xs text-muted">Status</span><br><strong x-text="statusLabel(apptDetail.appt.status)"></strong></div>
+              <div x-show="apptDetail.appt.rescheduled_count > 0"><span class="text-xs text-muted">Reagendamentos</span><br><strong x-text="apptDetail.appt.rescheduled_count"></strong></div>
+            </div>
+          </template>
+        </div>
       </div>
 
       <!-- modal novo agendamento -->
@@ -200,6 +220,25 @@
                   <option :value="s.id" x-text="s.name"></option>
                 </template>
               </select>
+            </div>
+            <div class="form-group" x-show="newAppt.patient_id" x-cloak>
+              <label class="label">Serviços contratados em aberto</label>
+              <div x-show="patientPackages.length === 0" class="text-xs text-muted">Nenhum pacote em aberto para este paciente.</div>
+              <div class="flex gap-2" style="flex-wrap:wrap;" x-show="patientPackages.length > 0">
+                <template x-for="pk in patientPackages" :key="'chip-' + pk.id">
+                  <span class="badge badge-accent" x-text="(pk.services ? pk.services.name : 'Pacote') + ' · faltam ' + (pk.total_sessions - pk.used_sessions)"></span>
+                </template>
+              </div>
+            </div>
+            <div class="form-group" x-show="patientPackages.length > 0" x-cloak>
+              <label class="label">Vincular a pacote (opcional)</label>
+              <select class="input" x-model="newAppt.package_id">
+                <option value="">Sessão avulsa</option>
+                <template x-for="pk in patientPackages" :key="pk.id">
+                  <option :value="pk.id" x-text="(pk.services ? pk.services.name : 'Pacote') + ' · ' + pk.used_sessions + ' de ' + pk.total_sessions + ' usadas · faltam ' + (pk.total_sessions - pk.used_sessions)"></option>
+                </template>
+              </select>
+              <p class="input-hint">Ao concluir o atendimento, a sessão usada deste pacote é contabilizada automaticamente.</p>
             </div>
             <div class="grid grid-2 gap-3">
               <div class="form-group">
@@ -293,7 +332,7 @@ function agendaApp() {
     clinicId: null,
     currentUserId: null,
     userRole: null,
-    isStaff: false,
+    isEsteticista: false,
     view: 'dia',
     currentDate: new Date(),
     professionals: [],
@@ -306,9 +345,11 @@ function agendaApp() {
     showManageBlocks: false,
     patientSearch: '',
     patientDropdownOpen: false,
-    newAppt: { patient_id: '', professional_id: '', service_id: '', date: '', time: '09:00' },
+    patientPackages: [],
+    newAppt: { patient_id: '', professional_id: '', service_id: '', package_id: '', date: '', time: '09:00' },
     newBlock: { professional_id: '', date: '', start_time: '09:00', end_time: '10:00', reason: '' },
-    contextMenu: { show: false, x: 0, y: 0, professionalId: null, time: '09:00' },
+    contextMenu: { show: false, x: 0, y: 0, professionalId: null, time: '09:00', date: null },
+    apptDetail: { show: false, appt: null },
     feedback: { type: '', message: '' },
 
     async init() {
@@ -329,13 +370,13 @@ function agendaApp() {
       }
       this.clinicId = data ? data.clinic_id : null;
       this.userRole = data ? data.role : null;
-      this.isStaff = window.isStaffRole ? window.isStaffRole(this.userRole) : false;
+      this.isEsteticista = this.userRole === 'esteticista';
     },
 
     async loadProfessionals() {
       const { data, error } = await supabaseClient.from('users').select('id, full_name').order('full_name');
       let list = error ? [] : (data || []);
-      if (this.isStaff && this.currentUserId) {
+      if (this.isEsteticista && this.currentUserId) {
         list = list.filter(p => p.id === this.currentUserId);
       }
       this.professionals = list;
@@ -383,7 +424,7 @@ function agendaApp() {
         .gte('scheduled_at', start.toISOString())
         .lte('scheduled_at', end.toISOString())
         .order('scheduled_at', { ascending: true });
-      if (this.isStaff && this.currentUserId) {
+      if (this.isEsteticista && this.currentUserId) {
         query = query.eq('professional_id', this.currentUserId);
       }
       const { data, error } = await query;
@@ -404,7 +445,7 @@ function agendaApp() {
         .lte('start_at', end.toISOString())
         .order('start_at', { ascending: true });
       let result = error ? [] : (data || []);
-      if (this.isStaff && this.currentUserId) {
+      if (this.isEsteticista && this.currentUserId) {
         result = result.filter(b => b.professional_id === this.currentUserId || b.professional_id === null);
       }
       this.blocks = result;
@@ -478,6 +519,13 @@ function agendaApp() {
     formatTime(value) {
       const d = new Date(value);
       return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    },
+
+    formatDateTimeLong(value) {
+      const d = new Date(value);
+      const datePart = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+      const timePart = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+      return datePart + ' às ' + timePart;
     },
 
     weekDayLabel(day) {
@@ -593,25 +641,40 @@ function agendaApp() {
       const hh = Math.floor(totalMinutes / 60);
       const mm = totalMinutes % 60;
       const time = String(hh).padStart(2, '0') + ':' + String(mm).padStart(2, '0');
-      this.contextMenu = { show: true, x: event.clientX, y: event.clientY, professionalId: profId, time };
+      this.contextMenu = { show: true, x: event.clientX, y: event.clientY, professionalId: profId, time, date: new Date(this.currentDate) };
+    },
+
+    onContextMenuWeek(event, day) {
+      this.contextMenu = { show: true, x: event.clientX, y: event.clientY, professionalId: '', time: '09:00', date: new Date(day) };
     },
 
     ctxIncluir() {
       const profId = this.contextMenu.professionalId;
       const time = this.contextMenu.time;
+      const date = this.contextMenu.date || this.currentDate;
       this.contextMenu.show = false;
-      this.newAppt = { patient_id: '', professional_id: profId, service_id: '', date: this.toDateInputValue(this.currentDate), time };
+      this.newAppt = { patient_id: '', professional_id: profId, service_id: '', package_id: '', date: this.toDateInputValue(date), time };
       this.patientSearch = '';
       this.patientDropdownOpen = false;
+      this.patientPackages = [];
       this.showNewForm = true;
     },
 
     ctxBloquear() {
       const profId = this.contextMenu.professionalId;
       const time = this.contextMenu.time;
+      const date = this.contextMenu.date || this.currentDate;
       this.contextMenu.show = false;
-      this.newBlock = { professional_id: profId || '', date: this.toDateInputValue(this.currentDate), start_time: time, end_time: this.addMinutes(time, 60), reason: '' };
+      this.newBlock = { professional_id: profId || '', date: this.toDateInputValue(date), start_time: time, end_time: this.addMinutes(time, 60), reason: '' };
       this.showBlockForm = true;
+    },
+
+    showApptDetail(appt) {
+      this.apptDetail = { show: true, appt };
+    },
+
+    closeApptDetail() {
+      this.apptDetail = { show: false, appt: null };
     },
 
     ctxGerenciarBloqueios() {
@@ -630,16 +693,28 @@ function agendaApp() {
       return this.patients.filter(p => p.full_name.toLowerCase().includes(q)).slice(0, 20);
     },
 
-    selectPatientForAppt(p) {
+    async selectPatientForAppt(p) {
       this.newAppt.patient_id = p.id;
+      this.newAppt.package_id = '';
       this.patientSearch = p.full_name;
       this.patientDropdownOpen = false;
+      await this.loadPatientPackages(p.id);
+    },
+
+    async loadPatientPackages(patientId) {
+      const { data, error } = await supabaseClient
+        .from('packages')
+        .select('id, total_sessions, used_sessions, expires_at, services ( name )')
+        .eq('patient_id', patientId);
+      const list = error ? [] : (data || []);
+      this.patientPackages = list.filter(pk => pk.used_sessions < pk.total_sessions);
     },
 
     openNewForm() {
-      this.newAppt = { patient_id: '', professional_id: this.isStaff ? this.currentUserId : '', service_id: '', date: this.toDateInputValue(this.currentDate), time: '09:00' };
+      this.newAppt = { patient_id: '', professional_id: this.isEsteticista ? this.currentUserId : '', service_id: '', package_id: '', date: this.toDateInputValue(this.currentDate), time: '09:00' };
       this.patientSearch = '';
       this.patientDropdownOpen = false;
+      this.patientPackages = [];
       this.showNewForm = true;
     },
 
@@ -660,6 +735,7 @@ function agendaApp() {
         patient_id: this.newAppt.patient_id,
         professional_id: this.newAppt.professional_id || null,
         service_id: this.newAppt.service_id || null,
+        package_id: this.newAppt.package_id || null,
         scheduled_at: scheduledAt.toISOString(),
         duration_minutes: service ? service.default_duration_minutes : 60,
         status: 'agendado'

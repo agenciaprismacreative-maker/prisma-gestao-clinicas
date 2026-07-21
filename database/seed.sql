@@ -24,7 +24,7 @@ values (
   'a0000000-0000-4000-8000-000000000001',
   'Lairton',
   'agenciaprismacreative@gmail.com',
-  'gestor'
+  'administrador'
 )
 on conflict (id) do update set
   clinic_id = excluded.clinic_id,

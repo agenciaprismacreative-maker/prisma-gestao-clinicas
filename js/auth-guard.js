@@ -12,11 +12,12 @@
     return;
   }
 
-  // Páginas marcadas com data-admin-only="true" no <body> são exclusivas da
-  // visão Administrador. Um Funcionário (recepção/profissional) que tentar
-  // acessá-las direto pela URL é redirecionado para a tela de Atendimento.
-  const adminOnly = document.body.getAttribute('data-admin-only') === 'true';
-  if (!adminOnly) return;
+  // Páginas marcadas com data-allowed-roles="administrador,atendente" no
+  // <body> restringem quais papéis podem acessá-las direto pela URL. Sem o
+  // atributo, a página é aberta a qualquer papel autenticado (ex.: Agenda,
+  // que em vez de bloquear o acesso filtra os dados exibidos).
+  const allowedRolesAttr = document.body.getAttribute('data-allowed-roles');
+  if (!allowedRolesAttr) return;
 
   const { data: profile, error } = await supabaseClient
     .from('users')
@@ -29,8 +30,10 @@
     return;
   }
 
-  window.__prismaUserRole = profile ? profile.role : null;
-  if (profile && window.isStaffRole(profile.role)) {
-    window.location.href = 'atendimento.html';
+  const role = profile ? profile.role : null;
+  window.__prismaUserRole = role;
+  const allowedRoles = allowedRolesAttr.split(',').map((r) => r.trim());
+  if (!window.isAdminRole(role) && !allowedRoles.includes(role)) {
+    window.location.href = window.homeForRole(role);
   }
 })();

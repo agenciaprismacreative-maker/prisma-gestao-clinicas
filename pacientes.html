@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="stylesheet" href="css/styles.css">
 </head>
-<body data-page="pacientes" data-title="Pacientes" data-subtitle="" data-admin-only="true" x-data="{ sidebarOpen:false }">
+<body data-page="pacientes" data-title="Pacientes" data-subtitle="" data-allowed-roles="administrador,atendente" x-data="{ sidebarOpen:false }">
 
 <div class="app-shell">
   <div data-include="partials/sidebar.html"></div>
@@ -23,7 +23,7 @@
         </div>
         <div class="flex gap-3">
           <input type="file" accept=".csv" x-ref="csvInput" @change="importCsv($event)" style="display:none;">
-          <button class="btn btn-secondary" type="button" @click="$refs.csvInput.click()">Importar CSV</button>
+          <button class="btn btn-secondary" type="button" @click="$refs.csvInput.click()" title="Aceita CSV com colunas como nome, telefone, e-mail, nascimento e CPF, em qualquer ordem, com vírgula ou ponto e vírgula.">Importar CSV</button>
           <button class="btn btn-primary" type="button" @click="openNewForm()">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
             Novo paciente
@@ -141,6 +141,7 @@
                 <span class="badge badge-accent" x-text="selected ? leadSourceLabel(selected.lead_source) : ''"></span>
                 <span class="text-sm text-muted" x-show="selected && (selected.referred_by_name || selected.referred_by_patient_id)" x-text="'Indicado(a) por ' + (selected ? referrerName(selected) : '')"></span>
               </div>
+              <p class="text-xs text-muted" x-show="selected && selected.referred_by_user_id" x-text="'Captado(a) por ' + (selected ? staffName(selected.referred_by_user_id) : '') + ', da equipe'"></p>
 
               <div x-show="selected && (selected.naturality || selected.father_name || selected.mother_name || selected.profession || selected.workplace || selected.record_number)">
                 <hr class="divider">
@@ -195,6 +196,36 @@
           </div>
 
           <div class="flex" style="flex-direction:column;gap:24px;">
+
+            <div class="card card-shadow">
+              <div class="card-header">
+                <div><h3>Pacotes e sessões contratadas</h3><p>Progresso de cada pacote e retorno financeiro do paciente</p></div>
+              </div>
+              <div x-show="commercialLoading" class="text-sm text-muted">Carregando…</div>
+              <div x-show="!commercialLoading && patientPackages.length === 0" class="text-sm text-muted mb-2">Nenhum pacote contratado ainda.</div>
+
+              <template x-for="pk in patientPackages" :key="pk.id">
+                <div class="mb-3" style="padding-bottom:12px;border-bottom:1px solid var(--color-border);">
+                  <div class="flex items-center justify-between">
+                    <strong class="text-sm" x-text="pk.services ? pk.services.name : 'Serviço'"></strong>
+                    <span class="text-xs text-muted" x-text="pk.used_sessions + ' de ' + pk.total_sessions + ' sessões usadas'"></span>
+                  </div>
+                  <div class="flex gap-2 mt-2" style="flex-wrap:wrap;">
+                    <span class="badge badge-neutral" x-text="packageStats(pk).agendadas + ' agendada(s)'"></span>
+                    <span class="badge badge-success" x-text="packageStats(pk).feitas + ' concluída(s)'"></span>
+                    <span class="badge badge-danger" x-text="packageStats(pk).canceladas + ' cancelada(s)/falta(s)'"></span>
+                    <span class="badge badge-warning" x-show="packageStats(pk).remarcadas > 0" x-text="packageStats(pk).remarcadas + ' remarcada(s)'"></span>
+                  </div>
+                  <p class="text-xs text-muted mt-2" x-show="pk.total_price" x-text="'Valor total: ' + formatCurrency(pk.total_price)"></p>
+                </div>
+              </template>
+
+              <div class="flex items-center justify-between" x-show="!commercialLoading" style="padding-top:4px;">
+                <span class="text-sm text-muted">Retorno financeiro total do paciente</span>
+                <strong x-text="formatCurrency(patientTotalReturn)"></strong>
+              </div>
+            </div>
+
             <div class="card card-shadow">
               <h3 class="mb-4" style="font-size:15px;">Histórico de atendimentos</h3>
               <div x-show="historyLoading" class="text-sm text-muted">Carregando histórico…</div>
@@ -419,6 +450,19 @@
               </div>
 
               <hr class="divider">
+              <h4 class="text-xs text-muted mb-2" style="text-transform:uppercase;letter-spacing:.04em;">Captação pela equipe</h4>
+              <div class="form-group">
+                <label class="label">Indicado por um integrante da equipe (opcional)</label>
+                <select class="input" x-model="newPatient.referred_by_user_id">
+                  <option value="">Nenhum</option>
+                  <template x-for="u in users" :key="u.id">
+                    <option :value="u.id" x-text="u.full_name"></option>
+                  </template>
+                </select>
+                <p class="input-hint">Serve para reconhecer/bonificar quem trouxe o novo paciente. Entra na aba de metas de quem indicou.</p>
+              </div>
+
+              <hr class="divider">
               <h4 class="text-xs text-muted mb-2" style="text-transform:uppercase;letter-spacing:.04em;">Responsável legal</h4>
               <p class="text-xs text-soft mb-3">Preencher apenas se o paciente for menor de idade ou dependente de outra pessoa.</p>
               <div class="grid grid-2 gap-3">
@@ -597,7 +641,7 @@ function emptyNewPatient() {
     rg: '', rg_orgao_emissor: '', rg_data_emissao: '',
     phone2: '', landline: '', instagram: '', facebook: '',
     address_cep: '', address_street: '', address_number: '', address_neighborhood: '', address_complement: '', address_city: '', address_state: '',
-    lead_source: '', referred_by_patient_id: '', referred_by_name: '',
+    lead_source: '', referred_by_patient_id: '', referred_by_name: '', referred_by_user_id: '',
     legal_guardian_name: '', legal_guardian_cpf: '', legal_guardian_notes: '',
     naturality: '', father_name: '', mother_name: '', profession: '', workplace: '', record_number: '',
     anamnesis: '', allergies: '', lgpd_consent: false,
@@ -612,6 +656,7 @@ function pacientesApp() {
     search: '',
     selected: null,
     patients: [],
+    users: [],
     clinicId: null,
     showNewForm: false,
     formTab: 'gerais',
@@ -619,13 +664,27 @@ function pacientesApp() {
     newPatient: emptyNewPatient(),
     history: [],
     historyLoading: false,
+    patientPackages: [],
+    patientAppointments: [],
+    patientTransactions: [],
+    commercialLoading: false,
     feedback: { type: '', message: '' },
 
     maskPhone, maskCpf, maskCep, isValidEmail, isValidCpf,
 
     async init() {
       await this.loadClinicId();
-      await this.loadPatients();
+      await Promise.all([this.loadPatients(), this.loadUsers()]);
+    },
+
+    async loadUsers() {
+      const { data } = await supabaseClient.from('users').select('id, full_name').order('full_name');
+      this.users = data || [];
+    },
+
+    staffName(userId) {
+      const u = this.users.find(uu => uu.id === userId);
+      return u ? u.full_name : '—';
     },
 
     async loadClinicId() {
@@ -702,12 +761,13 @@ function pacientesApp() {
 
     ageOf(birthDate) {
       if (!birthDate) return null;
-      const b = new Date(birthDate);
-      if (isNaN(b)) return null;
+      const parts = (birthDate || '').split('-');
+      if (parts.length !== 3) return null;
+      const by = Number(parts[0]), bm = Number(parts[1]) - 1, bd = Number(parts[2]);
       const today = new Date();
-      let age = today.getFullYear() - b.getFullYear();
-      const m = today.getMonth() - b.getMonth();
-      if (m < 0 || (m === 0 && today.getDate() < b.getDate())) age--;
+      let age = today.getFullYear() - by;
+      const m = today.getMonth() - bm;
+      if (m < 0 || (m === 0 && today.getDate() < bd)) age--;
       return age;
     },
 
@@ -729,13 +789,61 @@ function pacientesApp() {
       this.selected = p;
       this.historyLoading = true;
       this.history = [];
-      const { data, error } = await supabaseClient
+      const historyPromise = supabaseClient
         .from('medical_records')
         .select('protocol, notes, created_at, users ( full_name )')
         .eq('patient_id', p.id)
         .order('created_at', { ascending: false });
-      if (!error) this.history = data || [];
+
+      const [{ data: historyData, error: historyError }] = await Promise.all([
+        historyPromise,
+        this.loadCommercialData(p.id)
+      ]);
+      if (!historyError) this.history = historyData || [];
       this.historyLoading = false;
+    },
+
+    async loadCommercialData(patientId) {
+      this.commercialLoading = true;
+      const [pkgRes, apptRes, txRes] = await Promise.all([
+        supabaseClient
+          .from('packages')
+          .select('id, total_sessions, used_sessions, total_price, purchased_at, expires_at, services ( name )')
+          .eq('patient_id', patientId)
+          .order('purchased_at', { ascending: false }),
+        supabaseClient
+          .from('appointments')
+          .select('id, package_id, status, rescheduled_count')
+          .eq('patient_id', patientId),
+        supabaseClient
+          .from('transactions')
+          .select('amount, type')
+          .eq('patient_id', patientId)
+      ]);
+      this.patientPackages = pkgRes.error ? [] : (pkgRes.data || []);
+      this.patientAppointments = apptRes.error ? [] : (apptRes.data || []);
+      this.patientTransactions = txRes.error ? [] : (txRes.data || []);
+      this.commercialLoading = false;
+    },
+
+    packageStats(pk) {
+      const linked = this.patientAppointments.filter(a => a.package_id === pk.id);
+      return {
+        agendadas: linked.filter(a => ['agendado', 'confirmado', 'em_atendimento'].includes(a.status)).length,
+        feitas: linked.filter(a => a.status === 'concluido').length,
+        canceladas: linked.filter(a => a.status === 'cancelado' || a.status === 'faltou').length,
+        remarcadas: linked.filter(a => (a.rescheduled_count || 0) > 0).length
+      };
+    },
+
+    get patientTotalReturn() {
+      return this.patientTransactions
+        .filter(t => t.type === 'pagamento_procedimento' || t.type === 'venda_pacote')
+        .reduce((sum, t) => sum + Number(t.amount || 0), 0);
+    },
+
+    formatCurrency(value) {
+      return (Number(value) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
     },
 
     async createPatient() {
@@ -779,6 +887,7 @@ function pacientesApp() {
         lead_source: this.newPatient.lead_source || null,
         referred_by_patient_id: this.newPatient.referred_by_patient_id || null,
         referred_by_name: this.newPatient.referred_by_name || null,
+        referred_by_user_id: this.newPatient.referred_by_user_id || null,
         legal_guardian_name: this.newPatient.legal_guardian_name || null,
         legal_guardian_cpf: this.newPatient.legal_guardian_cpf || null,
         legal_guardian_notes: this.newPatient.legal_guardian_notes || null,
@@ -807,36 +916,139 @@ function pacientesApp() {
       await this.loadPatients();
     },
 
+    detectCsvDelimiter(headerLine) {
+      const candidates = [',', ';', '\t'];
+      let best = ',';
+      let bestCount = -1;
+      candidates.forEach(d => {
+        const count = headerLine.split(d).length;
+        if (count > bestCount) { bestCount = count; best = d; }
+      });
+      return best;
+    },
+
+    parseCsvLine(line, delimiter) {
+      const cols = [];
+      let current = '';
+      let inQuotes = false;
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (ch === '"') {
+          if (inQuotes && line[i + 1] === '"') { current += '"'; i++; }
+          else { inQuotes = !inQuotes; }
+        } else if (ch === delimiter && !inQuotes) {
+          cols.push(current.trim());
+          current = '';
+        } else {
+          current += ch;
+        }
+      }
+      cols.push(current.trim());
+      return cols;
+    },
+
+    normalizeHeaderKey(value) {
+      return (value || '')
+        .toLowerCase()
+        .normalize('NFD').replace(/[̀-ͯ]/g, '')
+        .replace(/[^a-z0-9]/g, '');
+    },
+
+    findColumnIndex(normalizedHeaders, candidates) {
+      for (const candidate of candidates) {
+        const idx = normalizedHeaders.indexOf(candidate);
+        if (idx !== -1) return idx;
+      }
+      return -1;
+    },
+
+    parseCsvDate(value) {
+      if (!value) return null;
+      const v = value.trim();
+      if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
+      const br = v.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+      if (br) {
+        const day = br[1].padStart(2, '0');
+        const month = br[2].padStart(2, '0');
+        return br[3] + '-' + month + '-' + day;
+      }
+      return null;
+    },
+
+    isLikelyEmail(value) {
+      return !!value && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+    },
+
     async importCsv(event) {
       const file = event.target.files[0];
       if (!file || !this.clinicId) return;
       const text = await file.text();
       const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
-      const rows = lines.slice(1);
-      const payload = rows.map(line => {
-        const cols = line.split(',').map(s => (s || '').trim());
+      event.target.value = '';
+
+      if (lines.length < 2) {
+        this.showFeedback('error', 'O arquivo precisa ter uma linha de cabeçalho e ao menos um paciente.');
+        return;
+      }
+
+      const delimiter = this.detectCsvDelimiter(lines[0]);
+      const headerCols = this.parseCsvLine(lines[0], delimiter).map(h => this.normalizeHeaderKey(h));
+
+      const idxName = this.findColumnIndex(headerCols, ['nome', 'nomecompleto', 'paciente', 'nomepaciente', 'cliente']);
+      const idxPhone = this.findColumnIndex(headerCols, ['telefone', 'whatsapp', 'celular', 'fone', 'contato']);
+      const idxEmail = this.findColumnIndex(headerCols, ['email']);
+      const idxBirth = this.findColumnIndex(headerCols, ['nascimento', 'datanascimento', 'datadenascimento', 'aniversario', 'dtnascimento']);
+      const idxCpf = this.findColumnIndex(headerCols, ['cpf']);
+
+      const headerRecognized = idxName !== -1 || idxPhone !== -1 || idxEmail !== -1 || idxBirth !== -1;
+      // Se nenhum cabeçalho conhecido foi encontrado, assume a ordem clássica
+      // nome,telefone,email,nascimento (compatibilidade com arquivos antigos).
+      const finalIdxName = idxName !== -1 ? idxName : (headerRecognized ? -1 : 0);
+      const finalIdxPhone = idxPhone !== -1 ? idxPhone : (headerRecognized ? -1 : 1);
+      const finalIdxEmail = idxEmail !== -1 ? idxEmail : (headerRecognized ? -1 : 2);
+      const finalIdxBirth = idxBirth !== -1 ? idxBirth : (headerRecognized ? -1 : 3);
+
+      let skippedBirthDates = 0;
+      let skippedEmails = 0;
+
+      const payload = lines.slice(1).map(line => {
+        const cols = this.parseCsvLine(line, delimiter);
+        const fullName = finalIdxName !== -1 ? (cols[finalIdxName] || '').trim() : '';
+        if (!fullName) return null;
+
+        const rawEmail = finalIdxEmail !== -1 ? (cols[finalIdxEmail] || '').trim() : '';
+        const emailOk = this.isLikelyEmail(rawEmail);
+        if (rawEmail && !emailOk) skippedEmails++;
+
+        const rawBirth = finalIdxBirth !== -1 ? (cols[finalIdxBirth] || '').trim() : '';
+        const birthDate = this.parseCsvDate(rawBirth);
+        if (rawBirth && !birthDate) skippedBirthDates++;
+
         return {
           clinic_id: this.clinicId,
-          full_name: cols[0] || '',
-          phone: cols[1] || null,
-          email: cols[2] || null,
-          birth_date: cols[3] || null
+          full_name: fullName,
+          phone: finalIdxPhone !== -1 ? ((cols[finalIdxPhone] || '').trim() || null) : null,
+          email: emailOk ? rawEmail : null,
+          birth_date: birthDate,
+          cpf: idxCpf !== -1 ? ((cols[idxCpf] || '').trim() || null) : null
         };
-      }).filter(r => r.full_name);
+      }).filter(Boolean);
 
       if (payload.length === 0) {
-        this.showFeedback('error', 'Nenhuma linha válida encontrada no CSV. Formato esperado: nome,telefone,email,data_nascimento');
-        event.target.value = '';
+        this.showFeedback('error', 'Nenhuma linha válida encontrada no CSV. É preciso ao menos uma coluna de nome (ex.: "nome" ou "paciente").');
         return;
       }
 
       const { error } = await supabaseClient.from('patients').insert(payload);
-      event.target.value = '';
       if (error) {
         this.showFeedback('error', 'Erro ao importar CSV: ' + error.message);
         return;
       }
-      this.showFeedback('success', payload.length + ' paciente(s) importado(s) com sucesso.');
+
+      let message = payload.length + ' paciente(s) importado(s) com sucesso.';
+      if (skippedBirthDates > 0) message += ' ' + skippedBirthDates + ' data(s) de nascimento em formato não reconhecido foram ignoradas.';
+      if (skippedEmails > 0) message += ' ' + skippedEmails + ' e-mail(s) em formato inválido foram ignorados.';
+      this.showFeedback('success', message);
       await this.loadPatients();
     },
 

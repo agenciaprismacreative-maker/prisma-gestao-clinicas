@@ -10,13 +10,26 @@ const SUPABASE_ANON_KEY = 'sb_publishable_DPg9ge8MZ7QIC8jkPQCFYQ_OOPpR7NC';
 window.supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // ---------------------------------------------------------------------------
-// Visões do sistema: Administrador (gestor, financeiro, equipe_prisma) e
-// Funcionário/esteticista (recepção, profissional). O funcionário só acessa
-// Agenda (a própria) e Atendimento (a própria fila); o restante do menu
-// (Dashboard, Pacientes, Equipe, Financeiro, Pós-venda, Serviços, BI) é
-// exclusivo do Administrador.
+// Visões do sistema: Administrador, Esteticista e Atendente.
+// - Administrador (também aceita o papel interno "equipe_prisma", usado só
+//   pela equipe da Prisma Creative): acesso ao sistema inteiro.
+// - Esteticista: só a própria Agenda e a própria fila de Atendimento.
+// - Atendente: Agenda completa (de todos os profissionais) e Pacientes, sem
+//   Atendimento nem áreas administrativas.
 // ---------------------------------------------------------------------------
-window.PRISMA_STAFF_ROLES = ['recepcao', 'profissional'];
+window.PRISMA_STAFF_ROLES = ['atendente', 'esteticista'];
 window.isStaffRole = function (role) {
   return window.PRISMA_STAFF_ROLES.includes(role);
+};
+window.isAdminRole = function (role) {
+  return role === 'administrador' || role === 'equipe_prisma';
+};
+window.PRISMA_ROLE_HOME = {
+  administrador: 'dashboard.html',
+  equipe_prisma: 'dashboard.html',
+  esteticista: 'atendimento.html',
+  atendente: 'agenda.html'
+};
+window.homeForRole = function (role) {
+  return window.PRISMA_ROLE_HOME[role] || 'agenda.html';
 };

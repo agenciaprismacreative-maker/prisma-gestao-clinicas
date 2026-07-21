@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="stylesheet" href="css/styles.css">
 </head>
-<body data-page="servicos" data-title="Serviços" data-subtitle="" data-admin-only="true" x-data="{ sidebarOpen:false }">
+<body data-page="servicos" data-title="Serviços" data-subtitle="" data-allowed-roles="administrador" x-data="{ sidebarOpen:false }">
 
 <div class="app-shell">
   <div data-include="partials/sidebar.html"></div>
@@ -19,11 +19,11 @@
       <div class="page-header">
         <div>
           <h2>Serviços</h2>
-          <p>Catálogo de procedimentos oferecidos pela clínica</p>
+          <p>Catálogo de procedimentos e insumos usados na precificação</p>
         </div>
-        <button class="btn btn-primary" type="button" @click="openNewForm()">
+        <button class="btn btn-primary" type="button" @click="tab === 'servicos' ? openNewForm() : openNewProductForm()">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
-          Novo serviço
+          <span x-text="tab === 'servicos' ? 'Novo serviço' : 'Novo insumo'"></span>
         </button>
       </div>
 
@@ -31,36 +31,76 @@
         <span class="text-sm" x-text="feedback.message" :style="'color:' + (feedback.type==='error' ? 'var(--color-danger)' : 'var(--color-success)')"></span>
       </div>
 
-      <div x-show="loading" class="text-sm text-muted">Carregando serviços…</div>
+      <div class="flex gap-2 mb-5">
+        <button class="btn btn-sm" :class="tab==='servicos' ? 'btn-primary' : 'btn-secondary'" @click="tab='servicos'">Serviços</button>
+        <button class="btn btn-sm" :class="tab==='insumos' ? 'btn-primary' : 'btn-secondary'" @click="tab='insumos'">Insumos</button>
+      </div>
 
-      <div class="card card-shadow" style="padding:0;" x-show="!loading">
-        <div x-show="services.length === 0" class="empty-note" style="margin:20px;">
-          Nenhum serviço cadastrado ainda. Use "Novo serviço" para começar a montar o catálogo.
+      <div x-show="loading" class="text-sm text-muted">Carregando…</div>
+
+      <!-- ===================== SERVIÇOS ===================== -->
+      <div x-show="tab==='servicos' && !loading">
+        <div class="card card-shadow" style="padding:0;">
+          <div x-show="services.length === 0" class="empty-note" style="margin:20px;">
+            Nenhum serviço cadastrado ainda. Use "Novo serviço" para começar a montar o catálogo.
+          </div>
+          <div class="table-wrap" x-show="services.length > 0">
+            <table class="table">
+              <thead><tr><th>Serviço</th><th>Duração padrão</th><th>Preço</th><th>Custo de insumos</th><th>Intervalo de retorno</th><th></th></tr></thead>
+              <tbody>
+                <template x-for="s in services" :key="s.id">
+                  <tr>
+                    <td><strong x-text="s.name"></strong></td>
+                    <td x-text="s.default_duration_minutes + ' min'"></td>
+                    <td x-text="s.price !== null ? formatCurrency(s.price) : '—'"></td>
+                    <td x-text="serviceCostLabel(s.id)"></td>
+                    <td x-text="s.return_interval_days ? (s.return_interval_days + ' dias') : 'Não definido'"></td>
+                    <td class="flex gap-2">
+                      <button class="btn btn-ghost btn-sm" type="button" @click="openEditForm(s)">Editar</button>
+                      <button class="btn btn-ghost btn-sm" type="button" @click="removeService(s)">Remover</button>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
         </div>
-        <div class="table-wrap" x-show="services.length > 0">
-          <table class="table">
-            <thead><tr><th>Serviço</th><th>Duração padrão</th><th>Preço</th><th>Intervalo de retorno</th><th></th></tr></thead>
-            <tbody>
-              <template x-for="s in services" :key="s.id">
-                <tr>
-                  <td><strong x-text="s.name"></strong></td>
-                  <td x-text="s.default_duration_minutes + ' min'"></td>
-                  <td x-text="s.price !== null ? formatCurrency(s.price) : '—'"></td>
-                  <td x-text="s.return_interval_days ? (s.return_interval_days + ' dias') : 'Não definido'"></td>
-                  <td class="flex gap-2">
-                    <button class="btn btn-ghost btn-sm" type="button" @click="openEditForm(s)">Editar</button>
-                    <button class="btn btn-ghost btn-sm" type="button" @click="removeService(s)">Remover</button>
-                  </td>
-                </tr>
-              </template>
-            </tbody>
-          </table>
+      </div>
+
+      <!-- ===================== INSUMOS ===================== -->
+      <div x-show="tab==='insumos' && !loading" x-cloak>
+        <div class="card card-shadow" style="padding:0;">
+          <div x-show="products.length === 0" class="empty-note" style="margin:20px;">
+            Nenhum insumo cadastrado ainda. Cadastre aqui os produtos e matérias-primas usados nos procedimentos, para calcular o custo de cada serviço.
+          </div>
+          <div class="table-wrap" x-show="products.length > 0">
+            <table class="table">
+              <thead><tr><th>Insumo</th><th>Custo unitário</th><th>Unidade</th><th>Código de barras</th><th></th></tr></thead>
+              <tbody>
+                <template x-for="p in products" :key="p.id">
+                  <tr>
+                    <td><strong x-text="p.name"></strong></td>
+                    <td x-text="p.unit_cost !== null ? formatCurrency(p.unit_cost) : '—'"></td>
+                    <td x-text="p.unit_of_measure || '—'"></td>
+                    <td x-text="p.barcode || '—'"></td>
+                    <td class="flex gap-2">
+                      <button class="btn btn-ghost btn-sm" type="button" @click="openEditProductForm(p)">Editar</button>
+                      <button class="btn btn-ghost btn-sm" type="button" @click="removeProduct(p)">Remover</button>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
         </div>
+        <p class="text-xs text-soft mt-3">
+          Controle completo de estoque (quantidade em mão, entradas e saídas, alertas de mínimo/máximo) ainda não implementado. Por enquanto, o insumo serve para calcular o custo estimado de cada serviço.
+        </p>
       </div>
 
       <!-- modal novo/editar serviço -->
       <div x-show="showForm" x-cloak style="position:fixed;inset:0;background:rgba(31,51,47,.45);z-index:50;display:flex;align-items:center;justify-content:center;padding:20px;" @click.self="showForm = false">
-        <div class="card card-shadow" style="width:100%;max-width:460px;">
+        <div class="card card-shadow" style="width:100%;max-width:520px;max-height:88vh;overflow-y:auto;">
           <div class="card-header">
             <h3 x-text="editingId ? 'Editar serviço' : 'Novo serviço'"></h3>
             <button class="btn btn-ghost btn-sm" type="button" @click="showForm = false">Fechar</button>
@@ -77,7 +117,7 @@
               </div>
               <div class="form-group">
                 <label class="label">Preço (R$)</label>
-                <input class="input" type="number" min="0" step="0.01" x-model="form.price" placeholder="0,00">
+                <input class="input" type="text" inputmode="decimal" x-model="form.price" @input="form.price = maskCurrencyInput($event.target.value)" placeholder="R$ 0,00">
               </div>
             </div>
             <div class="form-group">
@@ -85,8 +125,68 @@
               <input class="input" type="number" min="0" x-model="form.return_interval_days" placeholder="Ex.: 90">
               <p class="input-hint">Usado em Pós-venda para sugerir reativação quando o paciente passa desse prazo sem retornar.</p>
             </div>
-            <button class="btn btn-primary btn-block mt-2" type="submit" :disabled="saving">
+
+            <hr class="divider">
+            <h4 class="text-xs text-muted mb-2" style="text-transform:uppercase;letter-spacing:.04em;">Insumos utilizados (opcional)</h4>
+            <p class="text-xs text-soft mb-3" x-show="products.length === 0">Cadastre insumos na aba "Insumos" para vinculá-los aqui.</p>
+
+            <template x-for="(row, i) in form.products" :key="i">
+              <div class="flex gap-2 mb-2" style="align-items:flex-start;">
+                <select class="input" x-model="row.product_id" style="flex:1;">
+                  <option value="">Selecione o insumo</option>
+                  <template x-for="p in products" :key="p.id">
+                    <option :value="p.id" x-text="p.name + (p.unit_cost !== null ? ' (' + formatCurrency(p.unit_cost) + (p.unit_of_measure ? '/' + p.unit_of_measure : '') + ')' : '')"></option>
+                  </template>
+                </select>
+                <input class="input" type="number" min="0" step="0.001" x-model="row.quantity_used" placeholder="Qtd." style="width:90px;">
+                <button type="button" class="btn btn-ghost btn-sm" @click="form.products.splice(i, 1)">Remover</button>
+              </div>
+            </template>
+            <button type="button" class="btn btn-secondary btn-sm mb-3" @click="form.products.push({ product_id: '', quantity_used: 1 })" :disabled="products.length === 0">
+              + Adicionar insumo
+            </button>
+
+            <div class="card" style="padding:12px 16px;background:var(--color-surface-alt);border:none;">
+              <p class="text-sm"><strong>Custo estimado de insumos:</strong> <span x-text="formatCurrency(estimatedCost)"></span></p>
+              <p class="text-xs text-muted mt-1" x-show="form.price !== ''">Margem estimada: <span x-text="formatCurrency(formPriceNumber - estimatedCost)"></span></p>
+            </div>
+
+            <button class="btn btn-primary btn-block mt-3" type="submit" :disabled="saving">
               <span x-show="!saving">Salvar serviço</span>
+              <span x-show="saving" x-cloak>Salvando…</span>
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <!-- modal novo/editar insumo -->
+      <div x-show="showProductForm" x-cloak style="position:fixed;inset:0;background:rgba(31,51,47,.45);z-index:50;display:flex;align-items:center;justify-content:center;padding:20px;" @click.self="showProductForm = false">
+        <div class="card card-shadow" style="width:100%;max-width:420px;">
+          <div class="card-header">
+            <h3 x-text="editingProductId ? 'Editar insumo' : 'Novo insumo'"></h3>
+            <button class="btn btn-ghost btn-sm" type="button" @click="showProductForm = false">Fechar</button>
+          </div>
+          <form @submit.prevent="saveProduct()">
+            <div class="form-group">
+              <label class="label">Nome do insumo</label>
+              <input class="input" x-model="productForm.name" required placeholder="Ex.: Toxina botulínica 100U">
+            </div>
+            <div class="grid grid-2 gap-3">
+              <div class="form-group">
+                <label class="label">Custo unitário (R$)</label>
+                <input class="input" type="text" inputmode="decimal" x-model="productForm.unit_cost" @input="productForm.unit_cost = maskCurrencyInput($event.target.value)" placeholder="R$ 0,00">
+              </div>
+              <div class="form-group">
+                <label class="label">Unidade de medida</label>
+                <input class="input" x-model="productForm.unit_of_measure" placeholder="Ex.: ml, un, g">
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="label">Código de barras (opcional)</label>
+              <input class="input" x-model="productForm.barcode">
+            </div>
+            <button class="btn btn-primary btn-block mt-2" type="submit" :disabled="saving">
+              <span x-show="!saving">Salvar insumo</span>
               <span x-show="saving" x-cloak>Salvando…</span>
             </button>
           </form>
@@ -97,21 +197,29 @@
   </div>
 </div>
 
+<script src="js/currency-mask.js"></script>
 <script>
 function servicosApp() {
   return {
     loading: true,
     saving: false,
     clinicId: null,
+    tab: 'servicos',
     services: [],
+    products: [],
+    serviceProductsMap: {},
     showForm: false,
     editingId: null,
-    form: { name: '', default_duration_minutes: 60, price: '', return_interval_days: '' },
+    form: { name: '', default_duration_minutes: 60, price: '', return_interval_days: '', products: [] },
+    showProductForm: false,
+    editingProductId: null,
+    productForm: { name: '', unit_cost: '', unit_of_measure: '', barcode: '' },
     feedback: { type: '', message: '' },
 
     async init() {
       await this.loadClinicId();
-      await this.loadServices();
+      await Promise.all([this.loadServices(), this.loadProducts(), this.loadServiceProductsMap()]);
+      this.loading = false;
     },
 
     async loadClinicId() {
@@ -126,7 +234,6 @@ function servicosApp() {
     },
 
     async loadServices() {
-      this.loading = true;
       const { data, error } = await supabaseClient
         .from('services')
         .select('id, name, default_duration_minutes, price, return_interval_days')
@@ -137,7 +244,44 @@ function servicosApp() {
       } else {
         this.services = data || [];
       }
-      this.loading = false;
+    },
+
+    async loadProducts() {
+      const { data, error } = await supabaseClient.from('products').select('id, name, unit_cost, unit_of_measure, barcode').order('name');
+      this.products = error ? [] : (data || []);
+    },
+
+    async loadServiceProductsMap() {
+      const { data, error } = await supabaseClient.from('service_products').select('service_id, product_id, quantity_used');
+      const map = {};
+      (error ? [] : (data || [])).forEach(row => {
+        if (!map[row.service_id]) map[row.service_id] = [];
+        map[row.service_id].push(row);
+      });
+      this.serviceProductsMap = map;
+    },
+
+    serviceCostLabel(serviceId) {
+      const rows = this.serviceProductsMap[serviceId] || [];
+      if (rows.length === 0) return '—';
+      const total = rows.reduce((sum, row) => {
+        const p = this.products.find(pp => pp.id === row.product_id);
+        if (!p || p.unit_cost === null) return sum;
+        return sum + Number(p.unit_cost) * Number(row.quantity_used || 0);
+      }, 0);
+      return this.formatCurrency(total);
+    },
+
+    get estimatedCost() {
+      return this.form.products.reduce((sum, row) => {
+        const p = this.products.find(pp => pp.id === row.product_id);
+        if (!p || p.unit_cost === null || !row.product_id) return sum;
+        return sum + Number(p.unit_cost) * Number(row.quantity_used || 0);
+      }, 0);
+    },
+
+    get formPriceNumber() {
+      return parseCurrencyToNumber(this.form.price) || 0;
     },
 
     formatCurrency(value) {
@@ -146,17 +290,18 @@ function servicosApp() {
 
     openNewForm() {
       this.editingId = null;
-      this.form = { name: '', default_duration_minutes: 60, price: '', return_interval_days: '' };
+      this.form = { name: '', default_duration_minutes: 60, price: '', return_interval_days: '', products: [] };
       this.showForm = true;
     },
 
-    openEditForm(s) {
+    async openEditForm(s) {
       this.editingId = s.id;
       this.form = {
         name: s.name,
         default_duration_minutes: s.default_duration_minutes,
-        price: s.price !== null ? s.price : '',
-        return_interval_days: s.return_interval_days !== null ? s.return_interval_days : ''
+        price: s.price !== null ? numberToCurrencyInput(s.price) : '',
+        return_interval_days: s.return_interval_days !== null ? s.return_interval_days : '',
+        products: (this.serviceProductsMap[s.id] || []).map(r => ({ product_id: r.product_id, quantity_used: r.quantity_used }))
       };
       this.showForm = true;
     },
@@ -170,25 +315,45 @@ function servicosApp() {
       const payload = {
         name: this.form.name,
         default_duration_minutes: this.form.default_duration_minutes || 60,
-        price: this.form.price === '' ? null : this.form.price,
+        price: parseCurrencyToNumber(this.form.price),
         return_interval_days: this.form.return_interval_days === '' ? null : this.form.return_interval_days
       };
 
       let error;
+      let serviceId = this.editingId;
       if (this.editingId) {
         ({ error } = await supabaseClient.from('services').update(payload).eq('id', this.editingId));
       } else {
-        ({ error } = await supabaseClient.from('services').insert({ ...payload, clinic_id: this.clinicId }));
+        const { data: inserted, error: insertError } = await supabaseClient
+          .from('services')
+          .insert({ ...payload, clinic_id: this.clinicId })
+          .select()
+          .single();
+        error = insertError;
+        if (inserted) serviceId = inserted.id;
       }
 
-      this.saving = false;
       if (error) {
+        this.saving = false;
         this.showFeedback('error', 'Erro ao salvar serviço: ' + error.message);
         return;
       }
+
+      // Substitui os vínculos de insumos por completo (mais simples que diff).
+      if (serviceId) {
+        await supabaseClient.from('service_products').delete().eq('service_id', serviceId);
+        const validRows = this.form.products.filter(r => r.product_id && Number(r.quantity_used) > 0);
+        if (validRows.length > 0) {
+          await supabaseClient.from('service_products').insert(
+            validRows.map(r => ({ service_id: serviceId, product_id: r.product_id, quantity_used: r.quantity_used }))
+          );
+        }
+      }
+
+      this.saving = false;
       this.showForm = false;
       this.showFeedback('success', this.editingId ? 'Serviço atualizado.' : 'Serviço cadastrado.');
-      await this.loadServices();
+      await Promise.all([this.loadServices(), this.loadServiceProductsMap()]);
     },
 
     async removeService(s) {
@@ -204,6 +369,63 @@ function servicosApp() {
       }
       this.showFeedback('success', 'Serviço removido.');
       await this.loadServices();
+    },
+
+    openNewProductForm() {
+      this.editingProductId = null;
+      this.productForm = { name: '', unit_cost: '', unit_of_measure: '', barcode: '' };
+      this.showProductForm = true;
+    },
+
+    openEditProductForm(p) {
+      this.editingProductId = p.id;
+      this.productForm = {
+        name: p.name,
+        unit_cost: p.unit_cost !== null ? numberToCurrencyInput(p.unit_cost) : '',
+        unit_of_measure: p.unit_of_measure || '',
+        barcode: p.barcode || ''
+      };
+      this.showProductForm = true;
+    },
+
+    async saveProduct() {
+      if (!this.clinicId) return;
+      this.saving = true;
+      const payload = {
+        name: this.productForm.name,
+        unit_cost: parseCurrencyToNumber(this.productForm.unit_cost),
+        unit_of_measure: this.productForm.unit_of_measure || null,
+        barcode: this.productForm.barcode || null
+      };
+      let error;
+      if (this.editingProductId) {
+        ({ error } = await supabaseClient.from('products').update(payload).eq('id', this.editingProductId));
+      } else {
+        ({ error } = await supabaseClient.from('products').insert({ ...payload, clinic_id: this.clinicId }));
+      }
+      this.saving = false;
+      if (error) {
+        this.showFeedback('error', 'Erro ao salvar insumo: ' + error.message);
+        return;
+      }
+      this.showProductForm = false;
+      this.showFeedback('success', this.editingProductId ? 'Insumo atualizado.' : 'Insumo cadastrado.');
+      await this.loadProducts();
+    },
+
+    async removeProduct(p) {
+      if (!window.confirm('Remover o insumo "' + p.name + '"?')) return;
+      const { error } = await supabaseClient.from('products').delete().eq('id', p.id);
+      if (error) {
+        if (error.code === '23503') {
+          this.showFeedback('error', 'Não é possível remover: este insumo está vinculado a algum serviço.');
+        } else {
+          this.showFeedback('error', 'Erro ao remover insumo: ' + error.message);
+        }
+        return;
+      }
+      this.showFeedback('success', 'Insumo removido.');
+      await this.loadProducts();
     },
 
     showFeedback(type, message) {

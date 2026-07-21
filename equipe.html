@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="stylesheet" href="css/styles.css">
 </head>
-<body data-page="equipe" data-title="Equipe e tarefas" data-subtitle="" data-admin-only="true" x-data="{ sidebarOpen:false }">
+<body data-page="equipe" data-title="Equipe e tarefas" data-subtitle="" data-allowed-roles="administrador" x-data="{ sidebarOpen:false }">
 
 <div class="app-shell">
   <div data-include="partials/sidebar.html"></div>
@@ -49,12 +49,12 @@
             <h4 class="text-xs text-muted mb-3" style="text-transform:uppercase;letter-spacing:.04em;">Pendente</h4>
             <div x-show="tasksByStatus('pendente').length === 0" class="empty-note">Nada por aqui.</div>
             <template x-for="t in tasksByStatus('pendente')" :key="t.id">
-              <div class="card card-shadow mb-3">
+              <div class="card card-shadow mb-3" style="cursor:pointer;" @click="viewTask(t)">
                 <strong class="text-sm" x-text="t.title"></strong>
                 <p class="text-xs text-muted mt-1" x-text="t.users ? t.users.full_name : 'Sem responsável'"></p>
                 <p class="text-xs text-muted" x-show="t.due_date" x-text="'Prazo: ' + formatDate(t.due_date)"></p>
                 <p class="text-xs text-muted" x-show="t.patients" x-text="t.patients ? ('Paciente: ' + t.patients.full_name) : ''"></p>
-                <button class="btn btn-ghost btn-sm mt-2" @click="updateTaskStatus(t, 'em_andamento')">Iniciar →</button>
+                <button class="btn btn-ghost btn-sm mt-2" @click.stop="updateTaskStatus(t, 'em_andamento')">Iniciar →</button>
               </div>
             </template>
           </div>
@@ -63,13 +63,13 @@
             <h4 class="text-xs text-muted mb-3" style="text-transform:uppercase;letter-spacing:.04em;">Em andamento</h4>
             <div x-show="tasksByStatus('em_andamento').length === 0" class="empty-note">Nada por aqui.</div>
             <template x-for="t in tasksByStatus('em_andamento')" :key="t.id">
-              <div class="card card-shadow mb-3">
+              <div class="card card-shadow mb-3" style="cursor:pointer;" @click="viewTask(t)">
                 <strong class="text-sm" x-text="t.title"></strong>
                 <p class="text-xs text-muted mt-1" x-text="t.users ? t.users.full_name : 'Sem responsável'"></p>
                 <p class="text-xs text-muted" x-show="t.due_date" x-text="'Prazo: ' + formatDate(t.due_date)"></p>
                 <div class="flex gap-2 mt-2">
-                  <button class="btn btn-ghost btn-sm" @click="updateTaskStatus(t, 'pendente')">← Voltar</button>
-                  <button class="btn btn-primary btn-sm" @click="updateTaskStatus(t, 'concluida')">Concluir</button>
+                  <button class="btn btn-ghost btn-sm" @click.stop="updateTaskStatus(t, 'pendente')">← Voltar</button>
+                  <button class="btn btn-primary btn-sm" @click.stop="updateTaskStatus(t, 'concluida')">Concluir</button>
                 </div>
               </div>
             </template>
@@ -79,13 +79,32 @@
             <h4 class="text-xs text-muted mb-3" style="text-transform:uppercase;letter-spacing:.04em;">Concluída</h4>
             <div x-show="tasksByStatus('concluida').length === 0" class="empty-note">Nada por aqui.</div>
             <template x-for="t in tasksByStatus('concluida')" :key="t.id">
-              <div class="card card-shadow mb-3" style="opacity:.7;">
+              <div class="card card-shadow mb-3" style="opacity:.7;cursor:pointer;" @click="viewTask(t)">
                 <strong class="text-sm" x-text="t.title" style="text-decoration:line-through;"></strong>
                 <p class="text-xs text-muted mt-1" x-text="t.users ? t.users.full_name : 'Sem responsável'"></p>
-                <button class="btn btn-ghost btn-sm mt-2" @click="updateTaskStatus(t, 'em_andamento')">Reabrir</button>
+                <button class="btn btn-ghost btn-sm mt-2" @click.stop="updateTaskStatus(t, 'em_andamento')">Reabrir</button>
               </div>
             </template>
           </div>
+        </div>
+      </div>
+
+      <!-- modal detalhe da tarefa -->
+      <div x-show="selectedTask" x-cloak style="position:fixed;inset:0;background:rgba(31,51,47,.45);z-index:55;display:flex;align-items:center;justify-content:center;padding:20px;" @click.self="selectedTask = null">
+        <div class="card card-shadow" style="width:100%;max-width:420px;" x-show="selectedTask">
+          <div class="card-header">
+            <h3 x-text="selectedTask ? selectedTask.title : ''"></h3>
+            <button class="btn btn-ghost btn-sm" @click="selectedTask = null">Fechar</button>
+          </div>
+          <template x-if="selectedTask">
+            <div style="display:flex;flex-direction:column;gap:10px;font-size:13.5px;">
+              <div><span class="text-xs text-muted">Responsável</span><br><strong x-text="selectedTask.users ? selectedTask.users.full_name : 'Sem responsável'"></strong></div>
+              <div x-show="selectedTask.patients"><span class="text-xs text-muted">Paciente</span><br><strong x-text="selectedTask.patients ? selectedTask.patients.full_name : ''"></strong></div>
+              <div x-show="selectedTask.due_date"><span class="text-xs text-muted">Prazo</span><br><strong x-text="formatDate(selectedTask.due_date)"></strong></div>
+              <div x-show="selectedTask.description"><span class="text-xs text-muted">Detalhes</span><br><span x-text="selectedTask.description"></span></div>
+              <div><span class="text-xs text-muted">Status</span><br><strong x-text="taskStatusLabel(selectedTask.status)"></strong></div>
+            </div>
+          </template>
         </div>
       </div>
 
@@ -116,7 +135,7 @@
         </div>
 
         <p class="text-xs text-soft mt-3">
-          Para adicionar alguém novo à equipe, crie o acesso em Authentication → Users no painel do Supabase (marcando "Auto Confirm User"), copie o UUID gerado e use "Vincular integrante" aqui para dar nome e papel a essa pessoa dentro da clínica.
+          "Vincular integrante" já cria o acesso completo (login e senha). Se a confirmação de e-mail estiver ativa no Supabase (Authentication → Providers → Email), a pessoa precisa clicar no link de confirmação antes do primeiro login.
         </p>
       </div>
 
@@ -171,23 +190,31 @@
           <div class="card-header"><h3>Vincular integrante</h3><button class="btn btn-ghost btn-sm" @click="showNewMemberForm=false">Fechar</button></div>
           <form @submit.prevent="addTeamMember()">
             <div class="form-group">
-              <label class="label">UUID do usuário (Authentication → Users)</label>
-              <input class="input" x-model="newMember.id" placeholder="ex.: 9ca668c5-4371-455b-8ce3-1567243079d3" required>
-            </div>
-            <div class="form-group">
               <label class="label">Nome completo</label>
               <input class="input" x-model="newMember.full_name" required>
             </div>
             <div class="form-group">
+              <label class="label">E-mail</label>
+              <input class="input" type="email" x-model="newMember.email" required placeholder="integrante@clinica.com.br">
+            </div>
+            <div class="form-group">
+              <label class="label">Senha de acesso</label>
+              <div style="position:relative;">
+                <input class="input" :type="showNewMemberPass ? 'text' : 'password'" x-model="newMember.password" required minlength="6" placeholder="Mínimo 6 caracteres" style="padding-right:56px;">
+                <button type="button" @click="showNewMemberPass = !showNewMemberPass" class="text-xs text-muted" style="position:absolute;right:14px;top:50%;transform:translateY(-50%);background:none;border:none;">
+                  <span x-text="showNewMemberPass ? 'ocultar' : 'ver'"></span>
+                </button>
+              </div>
+              <p class="input-hint">Combine essa senha com o integrante para o primeiro acesso.</p>
+            </div>
+            <div class="form-group">
               <label class="label">Papel</label>
               <select class="input" x-model="newMember.role" required>
-                <option value="recepcao">Recepção</option>
-                <option value="profissional">Profissional</option>
-                <option value="gestor">Gestor</option>
-                <option value="financeiro">Financeiro</option>
-                <option value="equipe_prisma">Equipe Prisma</option>
+                <option value="esteticista">Esteticista</option>
+                <option value="atendente">Atendente</option>
+                <option value="administrador">Administrador</option>
               </select>
-              <p class="input-hint">Gestor, Financeiro e Equipe Prisma têm acesso de Administrador (menu completo). Recepção e Profissional têm acesso de Funcionário (Atendimento e Agenda própria).</p>
+              <p class="input-hint">Administrador acessa o sistema inteiro. Esteticista vê só a própria Agenda e a própria fila de Atendimento. Atendente vê a Agenda completa e Pacientes.</p>
             </div>
 
             <hr class="divider">
@@ -225,11 +252,9 @@
             <div class="form-group">
               <label class="label">Papel</label>
               <select class="input" x-model="editingUser.role" required>
-                <option value="recepcao">Recepção</option>
-                <option value="profissional">Profissional</option>
-                <option value="gestor">Gestor</option>
-                <option value="financeiro">Financeiro</option>
-                <option value="equipe_prisma">Equipe Prisma</option>
+                <option value="esteticista">Esteticista</option>
+                <option value="atendente">Atendente</option>
+                <option value="administrador">Administrador</option>
               </select>
             </div>
 
@@ -261,6 +286,15 @@
 </div>
 
 <script>
+// Client Supabase "efêmero": mesma URL/chave do client principal, mas sem
+// persistir sessão. Usado só para criar a conta de um novo integrante
+// (signUp) sem substituir a sessão do administrador que está logado.
+function createEphemeralClient() {
+  return window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
+  });
+}
+
 function equipeApp() {
   return {
     loading: true,
@@ -270,12 +304,14 @@ function equipeApp() {
     users: [],
     tasks: [],
     patients: [],
+    selectedTask: null,
     showNewTaskForm: false,
     showNewMemberForm: false,
     showEditUserForm: false,
     editingUser: null,
+    showNewMemberPass: false,
     newTask: { title: '', description: '', assigned_to: '', due_date: '', patient_id: '' },
-    newMember: { id: '', full_name: '', role: 'recepcao', professional_register: '', specialties: '', bio: '' },
+    newMember: { full_name: '', email: '', password: '', role: 'esteticista', professional_register: '', specialties: '', bio: '' },
     feedback: { type: '', message: '' },
 
     async init() {
@@ -322,6 +358,15 @@ function equipeApp() {
       return this.tasks.filter(t => t.status === status);
     },
 
+    viewTask(t) {
+      this.selectedTask = t;
+    },
+
+    taskStatusLabel(status) {
+      const map = { pendente: 'Pendente', em_andamento: 'Em andamento', concluida: 'Concluída' };
+      return map[status] || status;
+    },
+
     initials(name) {
       if (!name) return '--';
       const parts = name.trim().split(/\s+/);
@@ -335,7 +380,7 @@ function equipeApp() {
     },
 
     roleLabel(role) {
-      const map = { recepcao: 'Recepção', profissional: 'Profissional', gestor: 'Gestor', financeiro: 'Financeiro', equipe_prisma: 'Equipe Prisma' };
+      const map = { esteticista: 'Esteticista', atendente: 'Atendente', administrador: 'Administrador', equipe_prisma: 'Equipe Prisma' };
       return map[role] || role;
     },
 
@@ -374,11 +419,41 @@ function equipeApp() {
 
     async addTeamMember() {
       if (!this.clinicId) return;
+      if (!this.newMember.email || !this.newMember.password) {
+        this.showFeedback('error', 'E-mail e senha são obrigatórios.');
+        return;
+      }
+      if (this.newMember.password.length < 6) {
+        this.showFeedback('error', 'A senha precisa ter pelo menos 6 caracteres.');
+        return;
+      }
       this.saving = true;
+
+      // Cria a conta de acesso num client separado, para não substituir a
+      // sessão do administrador que está logado no client principal.
+      const ephemeral = createEphemeralClient();
+      const { data: signUpData, error: signUpError } = await ephemeral.auth.signUp({
+        email: this.newMember.email,
+        password: this.newMember.password
+      });
+
+      if (signUpError) {
+        this.saving = false;
+        this.showFeedback('error', 'Erro ao criar acesso: ' + signUpError.message);
+        return;
+      }
+      const newUserId = signUpData.user ? signUpData.user.id : null;
+      if (!newUserId) {
+        this.saving = false;
+        this.showFeedback('error', 'Não foi possível criar o acesso. Tente novamente.');
+        return;
+      }
+
       const { error } = await supabaseClient.from('users').insert({
-        id: this.newMember.id,
+        id: newUserId,
         clinic_id: this.clinicId,
         full_name: this.newMember.full_name,
+        email: this.newMember.email,
         role: this.newMember.role,
         professional_register: this.newMember.professional_register || null,
         specialties: this.newMember.specialties || null,
@@ -386,12 +461,12 @@ function equipeApp() {
       });
       this.saving = false;
       if (error) {
-        this.showFeedback('error', 'Erro ao vincular integrante: ' + error.message);
+        this.showFeedback('error', 'Conta criada, mas houve erro ao vincular à clínica: ' + error.message);
         return;
       }
       this.showNewMemberForm = false;
-      this.newMember = { id: '', full_name: '', role: 'recepcao', professional_register: '', specialties: '', bio: '' };
-      this.showFeedback('success', 'Integrante vinculado com sucesso.');
+      this.newMember = { full_name: '', email: '', password: '', role: 'esteticista', professional_register: '', specialties: '', bio: '' };
+      this.showFeedback('success', 'Integrante cadastrado com sucesso. Se a confirmação de e-mail estiver ativa no Supabase, ele(a) precisa confirmar o e-mail antes do primeiro login.');
       await this.loadUsers();
     },
 

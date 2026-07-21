@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Vendas · Prisma Gestão de Clínicas</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body data-page="vendas" data-title="Vendas" data-subtitle="" data-allowed-roles="administrador,atendente" x-data="{ sidebarOpen:false }">
+
+<div class="app-shell">
+  <div data-include="partials/sidebar.html"></div>
+
+  <div class="main">
+    <header class="topbar" data-include="partials/topbar.html"></header>
+
+    <main class="content" x-data="vendasApp()" x-init="init()">
+
+      <div class="page-header">
+        <div>
+          <h2>Venda de planos</h2>
+          <p>Monte o carrinho com os serviços do paciente, envie para aprovação. Só a aprovação gera as sessões no cadastro do paciente e lança no caixa.</p>
+        </div>
+        <button class="btn btn-primary" type="button" @click="openNewSale()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+          Nova venda
+        </button>
+      </div>
+
+      <div x-show="feedback.message" x-cloak class="card mb-4" :style="'padding:12px 16px;border-color:' + (feedback.type==='error' ? 'var(--color-danger)' : 'var(--color-success)')">
+        <span class="text-sm" x-text="feedback.message" :style="'color:' + (feedback.type==='error' ? 'var(--color-danger)' : 'var(--color-success)')"></span>
+      </div>
+
+      <div class="grid grid-3 mb-5">
+        <div class="stat-card">
+          <div class="stat-label">Pendentes de aprovação</div>
+          <div class="stat-value" x-text="salesByStatus.pendente.length"></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Aprovadas (mês)</div>
+          <div class="stat-value" x-text="formatCurrency(approvedThisMonthTotal)"></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Ticket médio aprovado</div>
+          <div class="stat-value" x-text="formatCurrency(avgApprovedTicket)"></div>
+        </div>
+      </div>
+
+      <div class="flex gap-2 mb-5" style="flex-wrap:wrap;">
+        <button class="btn btn-sm" :class="statusFilter==='todas' ? 'btn-primary' : 'btn-secondary'" @click="statusFilter='todas'">Todas</button>
+        <button class="btn btn-sm" :class="statusFilter==='pendente' ? 'btn-primary' : 'btn-secondary'" @click="statusFilter='pendente'">Pendentes</button>
+        <button class="btn btn-sm" :class="statusFilter==='aprovada' ? 'btn-primary' : 'btn-secondary'" @click="statusFilter='aprovada'">Aprovadas</button>
+        <button class="btn btn-sm" :class="statusFilter==='cancelada' ? 'btn-primary' : 'btn-secondary'" @click="statusFilter='cancelada'">Canceladas</button>
+      </div>
+
+      <div x-show="loading" class="text-sm text-muted">Carregando…</div>
+      <div class="card card-shadow" style="padding:0;" x-show="!loading">
+        <div x-show="filteredSales.length === 0" class="empty-note" style="margin:20px;">Nenhuma venda encontrada.</div>
+        <div class="table-wrap" x-show="filteredSales.length > 0">
+          <table class="table">
+            <thead><tr><th>Data</th><th>Paciente</th><th>Itens</th><th>Total</th><th>Forma de pagamento</th><th>Status</th><th></th></tr></thead>
+            <tbody>
+              <template x-for="s in filteredSales" :key="s.id">
+                <tr>
+                  <td x-text="formatDate(s.created_at)"></td>
+                  <td x-text="(s.patients && s.patients.full_name) || '—'"></td>
+                  <td x-text="itemsSummary(s)"></td>
+                  <td x-text="formatCurrency(s.total_amount)"></td>
+                  <td>
+                    <span x-text="s.payment_method || '—'"></span>
+                    <span class="text-xs text-muted" x-show="s.installments > 1" x-text="' · ' + s.installments + 'x'"></span>
+                  </td>
+                  <td><span class="badge" :class="statusBadgeClass(s.status)"><span class="badge-dot"></span><span x-text="statusLabel(s.status)"></span></span></td>
+                  <td class="flex gap-2">
+                    <button class="btn btn-ghost btn-sm" type="button" @click="viewSale(s)">Ver</button>
+                    <button class="btn btn-secondary btn-sm" type="button" x-show="s.status === 'pendente'" @click="approveSale(s)" :disabled="approving">Aprovar</button>
+                    <button class="btn btn-ghost btn-sm" type="button" x-show="s.status === 'pendente'" @click="cancelSale(s)">Cancelar</button>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- modal ver venda -->
+      <div x-show="viewingSale" x-cloak style="position:fixed;inset:0;background:rgba(31,51,47,.45);z-index:50;display:flex;align-items:center;justify-content:center;padding:20px;" @click.self="viewingSale = null">
+        <div class="card card-shadow" style="width:100%;max-width:520px;max-height:88vh;overflow-y:auto;" x-show="viewingSale">
+          <div class="card-header">
+            <h3 x-text="viewingSale ? ((viewingSale.patients ? viewingSale.patients.full_name : 'Paciente')) : ''"></h3>
+            <button class="btn btn-ghost btn-sm" @click="viewingSale = null">Fechar</button>
+          </div>
+          <template x-if="viewingSale">
+            <div>
+              <p class="text-xs text-muted mb-3">
+                <span x-text="formatDate(viewingSale.created_at)"></span> ·
+                <span class="badge" :class="statusBadgeClass(viewingSale.status)" x-text="statusLabel(viewingSale.status)"></span>
+              </p>
+              <table class="table mb-3">
+                <thead><tr><th>Serviço</th><th>Qtd</th><th>Desconto</th><th>Total</th></tr></thead>
+                <tbody>
+                  <template x-for="item in viewingSaleItems" :key="item.id">
+                    <tr>
+                      <td x-text="(item.services ? item.services.name : '—') + (item.is_courtesy ? ' (cortesia)' : '')"></td>
+                      <td x-text="item.quantity"></td>
+                      <td x-text="item.discount_percentage ? item.discount_percentage + '%' : '—'"></td>
+                      <td x-text="formatCurrency(item.line_total)"></td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+              <p class="text-sm"><strong>Total: </strong><span x-text="formatCurrency(viewingSale.total_amount)"></span></p>
+              <p class="text-xs text-muted mt-1" x-show="viewingSale.origin">Origem: <span x-text="viewingSale.origin"></span></p>
+              <p class="text-xs text-muted" x-show="viewingSale.approved_at">Aprovada em <span x-text="formatDate(viewingSale.approved_at)"></span></p>
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <!-- modal nova venda -->
+      <div x-show="showNewSaleForm" x-cloak style="position:fixed;inset:0;background:rgba(31,51,47,.45);z-index:50;display:flex;align-items:center;justify-content:center;padding:20px;" @click.self="showNewSaleForm=false">
+        <div class="card card-shadow" style="width:100%;max-width:620px;max-height:90vh;overflow-y:auto;">
+          <div class="card-header"><h3>Nova venda de plano</h3><button class="btn btn-ghost btn-sm" @click="showNewSaleForm=false">Fechar</button></div>
+
+          <div class="form-group" style="position:relative;">
+            <label class="label">Paciente</label>
+            <input class="input" type="text" x-model="patientSearch" @focus="patientDropdownOpen = true" @input="patientDropdownOpen = true; newSale.patient_id = ''" placeholder="Buscar paciente por nome…" autocomplete="off">
+            <div x-show="patientDropdownOpen" x-cloak @click.away="patientDropdownOpen = false"
+                 style="position:absolute;z-index:10;top:100%;left:0;right:0;background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-md);box-shadow:var(--shadow-md);max-height:200px;overflow-y:auto;margin-top:4px;">
+              <div x-show="filteredPatients.length === 0" class="text-xs text-muted" style="padding:10px 14px;">Nenhum paciente encontrado.</div>
+              <template x-for="p in filteredPatients" :key="p.id">
+                <div @click="selectPatient(p)" class="patient-option" style="padding:9px 14px;cursor:pointer;font-size:13.5px;" x-text="p.full_name"></div>
+              </template>
+            </div>
+          </div>
+
+          <div class="grid grid-2 gap-3">
+            <div class="form-group">
+              <label class="label">Origem da venda</label>
+              <select class="input" x-model="newSale.origin">
+                <option value="">Não informado</option>
+                <option value="Presencial">Presencial</option>
+                <option value="Instagram">Instagram</option>
+                <option value="WhatsApp">WhatsApp</option>
+                <option value="Indicação">Indicação</option>
+                <option value="Site">Site</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="label">Validade (meses)</label>
+              <input class="input" type="number" min="0" x-model="newSale.validity_months" placeholder="Ex.: 12">
+            </div>
+          </div>
+
+          <hr class="divider">
+          <h4 class="text-xs text-muted mb-2" style="text-transform:uppercase;letter-spacing:.04em;">Adicionar serviço ao plano</h4>
+          <div class="grid grid-2 gap-3">
+            <div class="form-group">
+              <label class="label">Serviço</label>
+              <select class="input" x-model="draftItem.service_id" @change="onDraftServiceChange()">
+                <option value="">Selecione</option>
+                <template x-for="sv in services" :key="sv.id">
+                  <option :value="sv.id" x-text="sv.name"></option>
+                </template>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="label">Nº de sessões</label>
+              <input class="input" type="number" min="1" x-model="draftItem.quantity">
+            </div>
+          </div>
+          <div class="grid grid-3 gap-3" style="align-items:end;">
+            <div class="form-group">
+              <label class="label">Valor unitário (R$)</label>
+              <input class="input" type="text" inputmode="decimal" x-model="draftItem.unit_price" @input="draftItem.unit_price = maskCurrencyInput($event.target.value)" placeholder="R$ 0,00">
+            </div>
+            <div class="form-group">
+              <label class="label">Desconto (%)</label>
+              <input class="input" type="number" min="0" max="100" step="0.1" x-model="draftItem.discount_percentage">
+            </div>
+            <div class="form-group flex items-center gap-2" style="padding-bottom:10px;">
+              <input type="checkbox" x-model="draftItem.is_courtesy" id="courtesy" style="width:auto;">
+              <label for="courtesy" class="text-sm" style="margin:0;">Cortesia</label>
+            </div>
+          </div>
+          <button type="button" class="btn btn-secondary btn-sm mb-3" @click="addDraftItem()" :disabled="!draftItem.service_id">+ Adicionar ao carrinho</button>
+
+          <div x-show="cart.length > 0" class="mb-3">
+            <table class="table">
+              <thead><tr><th>Serviço</th><th>Qtd</th><th>Desc.</th><th>Total</th><th></th></tr></thead>
+              <tbody>
+                <template x-for="(item, idx) in cart" :key="idx">
+                  <tr>
+                    <td x-text="serviceName(item.service_id) + (item.is_courtesy ? ' (cortesia)' : '')"></td>
+                    <td x-text="item.quantity"></td>
+                    <td x-text="item.discount_percentage ? item.discount_percentage + '%' : '—'"></td>
+                    <td x-text="formatCurrency(cartItemTotal(item))"></td>
+                    <td><button type="button" class="btn btn-ghost btn-sm" @click="cart.splice(idx, 1)">Remover</button></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+          <p class="text-sm mb-3" x-show="cart.length > 0">Total do plano: <strong x-text="formatCurrency(cartTotal)"></strong></p>
+
+          <hr class="divider">
+          <h4 class="text-xs text-muted mb-2" style="text-transform:uppercase;letter-spacing:.04em;">Pagamento</h4>
+          <div class="grid grid-2 gap-3">
+            <div class="form-group">
+              <label class="label">Forma de pagamento</label>
+              <select class="input" x-model="newSale.payment_method">
+                <option value="">Não informado</option>
+                <option value="Dinheiro">Dinheiro</option>
+                <option value="Pix">Pix</option>
+                <option value="Cartão de débito">Cartão de débito</option>
+                <option value="Cartão de crédito">Cartão de crédito</option>
+                <option value="Transferência">Transferência</option>
+              </select>
+            </div>
+            <div class="form-group" x-show="newSale.payment_method === 'Cartão de crédito'" x-cloak>
+              <label class="label">Parcelas</label>
+              <select class="input" x-model.number="newSale.installments">
+                <template x-for="n in 12" :key="n">
+                  <option :value="n" x-text="n + 'x'"></option>
+                </template>
+              </select>
+            </div>
+          </div>
+          <div class="form-group" x-show="newSale.payment_method === 'Cartão de crédito'" x-cloak>
+            <label class="label">Maquininha</label>
+            <select class="input" x-model="newSale.payment_machine_id">
+              <option value="">Não informado</option>
+              <template x-for="m in paymentMachines" :key="m.id">
+                <option :value="m.id" x-text="m.name"></option>
+              </template>
+            </select>
+          </div>
+
+          <p class="input-hint mb-3">A venda é salva como "pendente". As sessões só entram no cadastro do paciente e o valor só entra no caixa depois de aprovada.</p>
+
+          <button class="btn btn-primary btn-block mt-2" type="button" @click="submitSale()" :disabled="saving || !newSale.patient_id || cart.length === 0">
+            <span x-show="!saving">Enviar para aprovação</span>
+            <span x-show="saving" x-cloak>Salvando…</span>
+          </button>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<script src="js/currency-mask.js"></script>
+<script>
+function vendasApp() {
+  return {
+    loading: true,
+    saving: false,
+    approving: false,
+    clinicId: null,
+    sales: [],
+    saleItemsBySale: {},
+    patients: [],
+    services: [],
+    paymentMachines: [],
+    statusFilter: 'todas',
+    showNewSaleForm: false,
+    patientSearch: '',
+    patientDropdownOpen: false,
+    viewingSale: null,
+    newSale: { patient_id: '', origin: '', validity_months: '', payment_method: '', installments: 1, payment_machine_id: '' },
+    draftItem: { service_id: '', quantity: 1, unit_price: '', discount_percentage: 0, is_courtesy: false },
+    cart: [],
+    feedback: { type: '', message: '' },
+
+    async init() {
+      await this.loadClinicId();
+      await Promise.all([this.loadSales(), this.loadPatients(), this.loadServices(), this.loadPaymentMachines(), this.loadAllSaleItems()]);
+      this.loading = false;
+    },
+
+    async loadAllSaleItems() {
+      const { data, error } = await supabaseClient
+        .from('sale_items')
+        .select('id, sale_id, service_id, quantity, unit_price, discount_percentage, is_courtesy, line_total, services ( name )');
+      if (error) return;
+      const map = {};
+      (data || []).forEach(item => {
+        if (!map[item.sale_id]) map[item.sale_id] = [];
+        map[item.sale_id].push(item);
+      });
+      this.saleItemsBySale = map;
+    },
+
+    async loadClinicId() {
+      const { data: { user } } = await supabaseClient.auth.getUser();
+      if (!user) return;
+      const { data, error } = await supabaseClient.from('users').select('clinic_id').eq('id', user.id).single();
+      if (error) {
+        this.showFeedback('error', 'Erro ao identificar sua clínica: ' + error.message);
+        return;
+      }
+      this.clinicId = data ? data.clinic_id : null;
+    },
+
+    async loadSales() {
+      const { data, error } = await supabaseClient
+        .from('sales')
+        .select('id, patient_id, status, origin, validity_months, total_amount, payment_method, installments, payment_machine_id, created_at, approved_at, patients ( full_name )')
+        .order('created_at', { ascending: false });
+      this.sales = error ? [] : (data || []);
+      if (error) this.showFeedback('error', 'Erro ao carregar vendas: ' + error.message);
+    },
+
+    async loadSaleItems(saleId) {
+      if (this.saleItemsBySale[saleId]) return this.saleItemsBySale[saleId];
+      const { data, error } = await supabaseClient
+        .from('sale_items')
+        .select('id, service_id, quantity, unit_price, discount_percentage, is_courtesy, line_total, services ( name )')
+        .eq('sale_id', saleId);
+      const items = error ? [] : (data || []);
+      this.saleItemsBySale[saleId] = items;
+      return items;
+    },
+
+    async loadPatients() {
+      const { data } = await supabaseClient.from('patients').select('id, full_name').order('full_name');
+      this.patients = data || [];
+    },
+
+    async loadServices() {
+      const { data } = await supabaseClient.from('services').select('id, name, price').order('name');
+      this.services = data || [];
+    },
+
+    async loadPaymentMachines() {
+      const { data } = await supabaseClient.from('payment_machines').select('id, name, fee_rates').order('name');
+      this.paymentMachines = data || [];
+    },
+
+    get filteredPatients() {
+      const q = this.patientSearch.trim().toLowerCase();
+      if (!q) return this.patients.slice(0, 20);
+      return this.patients.filter(p => p.full_name.toLowerCase().includes(q)).slice(0, 20);
+    },
+
+    selectPatient(p) {
+      this.newSale.patient_id = p.id;
+      this.patientSearch = p.full_name;
+      this.patientDropdownOpen = false;
+    },
+
+    serviceName(id) {
+      const s = this.services.find(sv => sv.id === id);
+      return s ? s.name : '—';
+    },
+
+    onDraftServiceChange() {
+      const s = this.services.find(sv => sv.id === this.draftItem.service_id);
+      this.draftItem.unit_price = s && s.price !== null ? numberToCurrencyInput(s.price) : '';
+    },
+
+    cartItemTotal(item) {
+      if (item.is_courtesy) return 0;
+      const price = parseCurrencyToNumber(item.unit_price) || 0;
+      const qty = Number(item.quantity) || 0;
+      const discount = Number(item.discount_percentage) || 0;
+      return Math.round(price * qty * (1 - discount / 100) * 100) / 100;
+    },
+
+    get cartTotal() {
+      return this.cart.reduce((sum, item) => sum + this.cartItemTotal(item), 0);
+    },
+
+    addDraftItem() {
+      if (!this.draftItem.service_id) return;
+      this.cart.push({ ...this.draftItem });
+      this.draftItem = { service_id: '', quantity: 1, unit_price: '', discount_percentage: 0, is_courtesy: false };
+    },
+
+    openNewSale() {
+      this.newSale = { patient_id: '', origin: '', validity_months: '', payment_method: '', installments: 1, payment_machine_id: '' };
+      this.draftItem = { service_id: '', quantity: 1, unit_price: '', discount_percentage: 0, is_courtesy: false };
+      this.cart = [];
+      this.patientSearch = '';
+      this.showNewSaleForm = true;
+    },
+
+    async submitSale() {
+      if (!this.clinicId || !this.newSale.patient_id || this.cart.length === 0) return;
+      this.saving = true;
+      const { data: { user } } = await supabaseClient.auth.getUser();
+      const payload = {
+        clinic_id: this.clinicId,
+        patient_id: this.newSale.patient_id,
+        status: 'pendente',
+        origin: this.newSale.origin || null,
+        validity_months: this.newSale.validity_months || null,
+        total_amount: this.cartTotal,
+        payment_method: this.newSale.payment_method || null,
+        installments: this.newSale.payment_method === 'Cartão de crédito' ? (this.newSale.installments || 1) : 1,
+        payment_machine_id: this.newSale.payment_method === 'Cartão de crédito' ? (this.newSale.payment_machine_id || null) : null,
+        created_by: user ? user.id : null
+      };
+      const { data: sale, error } = await supabaseClient.from('sales').insert(payload).select().single();
+      if (error) {
+        this.saving = false;
+        this.showFeedback('error', 'Erro ao criar venda: ' + error.message);
+        return;
+      }
+
+      const itemsPayload = this.cart.map(item => ({
+        sale_id: sale.id,
+        service_id: item.service_id,
+        quantity: item.quantity || 1,
+        unit_price: parseCurrencyToNumber(item.unit_price) || 0,
+        discount_percentage: item.discount_percentage || 0,
+        is_courtesy: !!item.is_courtesy,
+        line_total: this.cartItemTotal(item)
+      }));
+      const { error: itemsError } = await supabaseClient.from('sale_items').insert(itemsPayload);
+      this.saving = false;
+      if (itemsError) {
+        this.showFeedback('error', 'Venda criada, mas houve erro ao salvar os itens: ' + itemsError.message);
+        this.showNewSaleForm = false;
+        await this.loadSales();
+        return;
+      }
+
+      this.showNewSaleForm = false;
+      this.showFeedback('success', 'Venda enviada para aprovação.');
+      await Promise.all([this.loadSales(), this.loadAllSaleItems()]);
+    },
+
+    async viewSale(sale) {
+      this.viewingSale = sale;
+      await this.loadSaleItems(sale.id);
+    },
+
+    get viewingSaleItems() {
+      return this.viewingSale ? (this.saleItemsBySale[this.viewingSale.id] || []) : [];
+    },
+
+    async approveSale(sale) {
+      if (!window.confirm('Aprovar esta venda? Isso vai gerar as sessões no cadastro do paciente e lançar o valor no financeiro.')) return;
+      this.approving = true;
+      const items = await this.loadSaleItems(sale.id);
+      const { data: { user } } = await supabaseClient.auth.getUser();
+
+      try {
+        for (const item of items) {
+          const { data: pkg, error: pkgError } = await supabaseClient
+            .from('packages')
+            .insert({
+              clinic_id: this.clinicId,
+              patient_id: sale.patient_id,
+              service_id: item.service_id,
+              total_sessions: item.quantity,
+              total_price: item.line_total,
+              purchased_at: new Date().toISOString().slice(0, 10)
+            })
+            .select()
+            .single();
+          if (pkgError) throw pkgError;
+
+          await supabaseClient.from('sale_items').update({ package_id: pkg.id }).eq('id', item.id);
+
+          if (Number(item.line_total) > 0) {
+            const { error: txError } = await supabaseClient.from('transactions').insert({
+              clinic_id: this.clinicId,
+              type: 'venda_pacote',
+              patient_id: sale.patient_id,
+              package_id: pkg.id,
+              amount: item.line_total,
+              payment_method: sale.payment_method || null,
+              installments: sale.installments || 1,
+              payment_machine_id: sale.payment_machine_id || null,
+              sale_group_id: sale.id,
+              transaction_date: new Date().toISOString().slice(0, 10)
+            });
+            if (txError) throw txError;
+          }
+        }
+
+        const { error: saleError } = await supabaseClient
+          .from('sales')
+          .update({ status: 'aprovada', approved_at: new Date().toISOString(), approved_by: user ? user.id : null })
+          .eq('id', sale.id);
+        if (saleError) throw saleError;
+
+        this.showFeedback('success', 'Venda aprovada: sessões geradas e lançamento criado no financeiro.');
+        await Promise.all([this.loadSales(), this.loadAllSaleItems()]);
+      } catch (err) {
+        this.showFeedback('error', 'Erro ao aprovar venda: ' + err.message);
+      }
+      this.approving = false;
+    },
+
+    async cancelSale(sale) {
+      if (!window.confirm('Cancelar esta venda pendente?')) return;
+      const { error } = await supabaseClient.from('sales').update({ status: 'cancelada' }).eq('id', sale.id);
+      if (error) {
+        this.showFeedback('error', 'Erro ao cancelar venda: ' + error.message);
+        return;
+      }
+      this.showFeedback('success', 'Venda cancelada.');
+      await this.loadSales();
+    },
+
+    itemsSummary(sale) {
+      const items = this.saleItemsBySale[sale.id];
+      if (!items) return 'Ver detalhes';
+      return items.length + ' serviço(s)';
+    },
+
+    get salesByStatus() {
+      const map = { pendente: [], aprovada: [], cancelada: [] };
+      this.sales.forEach(s => { if (map[s.status]) map[s.status].push(s); });
+      return map;
+    },
+
+    get filteredSales() {
+      if (this.statusFilter === 'todas') return this.sales;
+      return this.sales.filter(s => s.status === this.statusFilter);
+    },
+
+    get approvedThisMonthTotal() {
+      const now = new Date();
+      return this.sales
+        .filter(s => s.status === 'aprovada' && s.approved_at)
+        .filter(s => {
+          const d = new Date(s.approved_at);
+          return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+        })
+        .reduce((sum, s) => sum + Number(s.total_amount || 0), 0);
+    },
+
+    get avgApprovedTicket() {
+      const approved = this.sales.filter(s => s.status === 'aprovada');
+      if (approved.length === 0) return 0;
+      return approved.reduce((sum, s) => sum + Number(s.total_amount || 0), 0) / approved.length;
+    },
+
+    statusBadgeClass(status) {
+      const map = { pendente: 'badge-warning', aprovada: 'badge-success', cancelada: 'badge-neutral' };
+      return map[status] || 'badge-neutral';
+    },
+
+    statusLabel(status) {
+      const map = { pendente: 'Pendente', aprovada: 'Aprovada', cancelada: 'Cancelada' };
+      return map[status] || status;
+    },
+
+    formatCurrency(value) {
+      return (Number(value) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    },
+
+    formatDate(value) {
+      if (!value) return '—';
+      const d = new Date(value);
+      return isNaN(d) ? '—' : d.toLocaleDateString('pt-BR');
+    },
+
+    showFeedback(type, message) {
+      this.feedback = { type, message };
+      setTimeout(() => { this.feedback = { type: '', message: '' }; }, 5000);
+    }
+  };
+}
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="js/supabase-client.js"></script>
+<script src="js/auth-guard.js"></script>
+<script src="js/include.js" defer></script>
+</body>
+</html>

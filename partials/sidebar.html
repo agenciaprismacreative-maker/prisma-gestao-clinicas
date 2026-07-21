@@ -11,7 +11,7 @@
     </div>
 
     <nav class="sidebar-nav">
-      <a href="dashboard.html" class="nav-item" data-page="dashboard" data-admin-only="true">
+      <a href="dashboard.html" class="nav-item" data-page="dashboard" data-allowed-roles="administrador">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/>
           <rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/>
@@ -19,7 +19,7 @@
         <span>Dashboard</span>
       </a>
 
-      <a href="pacientes.html" class="nav-item" data-page="pacientes" data-admin-only="true">
+      <a href="pacientes.html" class="nav-item" data-page="pacientes" data-allowed-roles="administrador,atendente">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="9" cy="8" r="3.2"/><path d="M3.5 20c0-3.6 2.5-6 5.5-6s5.5 2.4 5.5 6"/>
           <circle cx="17.5" cy="8.5" r="2.4"/><path d="M15.7 12.2c2.4.3 4.1 2.3 4.3 5.3"/>
@@ -36,7 +36,7 @@
 
       <div class="sidebar-divider"></div>
 
-      <a href="equipe.html" class="nav-item" data-page="equipe" data-admin-only="true">
+      <a href="equipe.html" class="nav-item" data-page="equipe" data-allowed-roles="administrador">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <rect x="5" y="4" width="14" height="17" rx="2"/><rect x="9" y="2.5" width="6" height="3" rx="1"/>
           <path d="M8.5 11h7"/><path d="M8.5 15h7"/><path d="M8.5 19h4"/>
@@ -44,14 +44,22 @@
         <span>Equipe e tarefas</span>
       </a>
 
-      <a href="atendimento.html" class="nav-item" data-page="atendimento">
+      <a href="atendimento.html" class="nav-item" data-page="atendimento" data-allowed-roles="administrador,esteticista">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <path d="M3 12h4l2-5 3 10 2-7 2 4h5"/>
         </svg>
         <span>Atendimento</span>
       </a>
 
-      <a href="financeiro.html" class="nav-item" data-page="financeiro" data-admin-only="true">
+      <a href="vendas.html" class="nav-item" data-page="vendas" data-allowed-roles="administrador,atendente">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="9" cy="21" r="1.4"/><circle cx="18" cy="21" r="1.4"/>
+          <path d="M2.5 3h2.5l2.6 12.4a2 2 0 0 0 2 1.6h8a2 2 0 0 0 2-1.6L21.5 8H6"/>
+        </svg>
+        <span>Vendas</span>
+      </a>
+
+      <a href="financeiro.html" class="nav-item" data-page="financeiro" data-allowed-roles="administrador">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="9"/><path d="M12 7.5v9"/>
           <path d="M15 9.8c0-1.2-1.3-2-3-2s-3 .8-3 2 1.3 1.8 3 1.8 3 .8 3 2-1.3 2-3 2-3-.8-3-2"/>
@@ -59,7 +67,7 @@
         <span>Financeiro</span>
       </a>
 
-      <a href="reativacao.html" class="nav-item" data-page="reativacao" data-admin-only="true">
+      <a href="reativacao.html" class="nav-item" data-page="reativacao" data-allowed-roles="administrador">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <path d="M4 12a8 8 0 0 1 14-5.3L20 8"/><path d="M20 4v4h-4"/>
           <path d="M20 12a8 8 0 0 1-14 5.3L4 16"/><path d="M4 20v-4h4"/>
@@ -67,7 +75,7 @@
         <span>Pós-venda</span>
       </a>
 
-      <a href="servicos.html" class="nav-item" data-page="servicos" data-admin-only="true">
+      <a href="servicos.html" class="nav-item" data-page="servicos" data-allowed-roles="administrador">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <path d="M20.5 7.3L12 12l-8.5-4.7M12 12v9M12 12L3.5 7.3M12 3l8.5 4.3-8.5 4.3-8.5-4.3L12 3z"/>
         </svg>
@@ -76,14 +84,14 @@
 
       <div class="sidebar-divider"></div>
 
-      <a href="bi.html" class="nav-item" data-page="bi" data-admin-only="true">
+      <a href="bi.html" class="nav-item" data-page="bi" data-allowed-roles="administrador,esteticista,atendente">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <path d="M4 20V10"/><path d="M12 20V4"/><path d="M20 20v-7"/>
         </svg>
-        <span>BI (Business Intelligence)</span>
+        <span>Desempenho</span>
       </a>
 
-      <a href="#" class="nav-item disabled" data-page="configuracoes" data-admin-only="true">
+      <a href="#" class="nav-item disabled" data-page="configuracoes" data-allowed-roles="administrador">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <path d="M4 6h9"/><circle cx="16" cy="6" r="2"/>
           <path d="M4 12h3"/><circle cx="10" cy="12" r="2"/><path d="M13 12h7"/>

@@ -1,18 +1,20 @@
 -- ============================================================================
--- Rodar uma única vez no SQL Editor do Supabase.
--- Consolida as migrations 002 a 005 nesta ordem.
+-- Rodar no SQL Editor do Supabase. Seguro rodar mais de uma vez (idempotente):
+-- cada comando primeiro remove/verifica o que já existe antes de recriar.
 -- ============================================================================
 
 -- 002: corrige o erro "new row violates row-level security policy for table users"
+drop policy if exists "users_insert" on public.users;
 create policy "users_insert" on public.users for insert
   with check (clinic_id = public.auth_clinic_id() or public.auth_is_prisma_team());
 
+drop policy if exists "users_update" on public.users;
 create policy "users_update" on public.users for update
   using (clinic_id = public.auth_clinic_id() or public.auth_is_prisma_team())
   with check (clinic_id = public.auth_clinic_id() or public.auth_is_prisma_team());
 
 -- 003: bloqueios de agenda
-create table public.schedule_blocks (
+create table if not exists public.schedule_blocks (
   id uuid primary key default gen_random_uuid(),
   clinic_id uuid not null references public.clinics (id) on delete cascade,
   professional_id uuid references public.users (id) on delete cascade,
@@ -22,10 +24,11 @@ create table public.schedule_blocks (
   created_at timestamptz not null default now()
 );
 
-create index idx_schedule_blocks_clinic_date on public.schedule_blocks (clinic_id, start_at);
+create index if not exists idx_schedule_blocks_clinic_date on public.schedule_blocks (clinic_id, start_at);
 
 alter table public.schedule_blocks enable row level security;
 
+drop policy if exists "schedule_blocks_all" on public.schedule_blocks;
 create policy "schedule_blocks_all" on public.schedule_blocks for all
   using (clinic_id = public.auth_clinic_id() or public.auth_is_prisma_team())
   with check (clinic_id = public.auth_clinic_id() or public.auth_is_prisma_team());

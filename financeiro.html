@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="stylesheet" href="css/styles.css">
 </head>
-<body data-page="financeiro" data-title="Financeiro" data-subtitle="" data-admin-only="true" x-data="{ sidebarOpen:false }">
+<body data-page="financeiro" data-title="Financeiro" data-subtitle="" data-allowed-roles="administrador" x-data="{ sidebarOpen:false }">
 
 <div class="app-shell">
   <div data-include="partials/sidebar.html"></div>
@@ -45,6 +45,7 @@
       <div class="flex gap-2 mb-5">
         <button class="btn btn-sm" :class="tab==='transacoes' ? 'btn-primary' : 'btn-secondary'" @click="tab='transacoes'">Transações</button>
         <button class="btn btn-sm" :class="tab==='pacotes' ? 'btn-primary' : 'btn-secondary'" @click="tab='pacotes'">Pacotes</button>
+        <button class="btn btn-sm" :class="tab==='maquininhas' ? 'btn-primary' : 'btn-secondary'" @click="tab='maquininhas'">Maquininhas</button>
       </div>
 
       <!-- TRANSAÇÕES -->
@@ -59,7 +60,7 @@
           <div x-show="transactions.length === 0" class="empty-note" style="margin:20px;">Nenhum lançamento registrado ainda.</div>
           <div class="table-wrap" x-show="transactions.length > 0">
             <table class="table">
-              <thead><tr><th>Data</th><th>Tipo</th><th>Paciente</th><th>Profissional</th><th>Forma</th><th>Valor</th></tr></thead>
+              <thead><tr><th>Data</th><th>Tipo</th><th>Paciente</th><th>Profissional</th><th>Detalhe</th><th>Forma</th><th>Valor</th></tr></thead>
               <tbody>
                 <template x-for="t in transactions" :key="t.id">
                   <tr>
@@ -67,7 +68,18 @@
                     <td><span class="badge badge-neutral" x-text="typeLabel(t.type)"></span></td>
                     <td x-text="(t.patients && t.patients.full_name) || '—'"></td>
                     <td x-text="(t.users && t.users.full_name) || '—'"></td>
-                    <td x-text="t.payment_method || '—'"></td>
+                    <td>
+                      <span x-show="t.type === 'venda_pacote' && t.packages" class="text-xs text-muted" x-text="t.packages ? ('Pacote · ' + (t.packages.services ? t.packages.services.name : '') + ' · ' + t.packages.total_sessions + ' sessões') : ''"></span>
+                      <span x-show="t.type === 'comissao_profissional' && t.commission_percentage" class="text-xs text-muted" x-text="t.commission_percentage + '% de ' + formatCurrency(t.base_amount)"></span>
+                      <span x-show="!(t.type === 'venda_pacote' && t.packages) && !(t.type === 'comissao_profissional' && t.commission_percentage)">—</span>
+                      <br x-show="t.sale_group_id">
+                      <span class="text-xs text-soft" x-show="t.sale_group_id">Pagamento dividido</span>
+                    </td>
+                    <td>
+                      <span x-text="t.payment_method || '—'"></span>
+                      <span class="text-xs text-muted" x-show="t.installments > 1" x-text="' · ' + t.installments + 'x'"></span>
+                      <div class="text-xs text-muted" x-show="t.net_amount && Number(t.net_amount) !== Number(t.amount)" x-text="'líquido: ' + formatCurrency(t.net_amount)"></div>
+                    </td>
                     <td x-text="formatCurrency(t.amount)"></td>
                   </tr>
                 </template>
@@ -88,19 +100,80 @@
           <div x-show="packages.length === 0" class="empty-note" style="margin:20px;">Nenhum pacote vendido ainda.</div>
           <div class="table-wrap" x-show="packages.length > 0">
             <table class="table">
-              <thead><tr><th>Paciente</th><th>Serviço</th><th>Sessões</th><th>Validade</th></tr></thead>
+              <thead><tr><th>Paciente</th><th>Serviço</th><th>Sessões</th><th>Valor total</th><th>Custo insumos</th><th>Margem</th><th>Validade</th></tr></thead>
               <tbody>
                 <template x-for="pk in packages" :key="pk.id">
                   <tr>
                     <td x-text="(pk.patients && pk.patients.full_name) || '—'"></td>
                     <td x-text="(pk.services && pk.services.name) || '—'"></td>
                     <td x-text="pk.used_sessions + ' de ' + pk.total_sessions + ' usadas'"></td>
+                    <td x-text="pk.total_price ? formatCurrency(pk.total_price) : '—'"></td>
+                    <td x-text="formatCurrency(packageCost(pk))"></td>
+                    <td>
+                      <span class="badge" :class="packageMargin(pk) === null ? 'badge-neutral' : (packageMargin(pk) >= 0 ? 'badge-success' : 'badge-danger')"
+                            x-text="packageMargin(pk) === null ? '—' : packageMargin(pk) + '%'"></span>
+                    </td>
                     <td x-text="formatDate(pk.expires_at)"></td>
                   </tr>
                 </template>
               </tbody>
             </table>
           </div>
+        </div>
+      </div>
+
+      <!-- MAQUININHAS -->
+      <div x-show="tab==='maquininhas'" x-cloak>
+        <div class="page-header" style="margin-bottom:20px;">
+          <div><p class="text-sm text-muted">Cadastre a taxa cobrada pela maquininha em cada quantidade de parcelas, para calcular o valor líquido recebido no crédito.</p></div>
+          <button class="btn btn-primary btn-sm" type="button" @click="openNewMachineForm()">Nova maquininha</button>
+        </div>
+
+        <div class="card card-shadow" style="padding:0;">
+          <div x-show="paymentMachines.length === 0" class="empty-note" style="margin:20px;">Nenhuma maquininha cadastrada ainda.</div>
+          <div class="table-wrap" x-show="paymentMachines.length > 0">
+            <table class="table">
+              <thead><tr><th>Maquininha</th><th>Taxas cadastradas</th><th></th></tr></thead>
+              <tbody>
+                <template x-for="m in paymentMachines" :key="m.id">
+                  <tr>
+                    <td x-text="m.name"></td>
+                    <td class="text-xs text-muted" x-text="feeSummary(m)"></td>
+                    <td class="flex gap-2">
+                      <button class="btn btn-ghost btn-sm" type="button" @click="openEditMachineForm(m)">Editar</button>
+                      <button class="btn btn-ghost btn-sm" type="button" @click="removeMachine(m)">Remover</button>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- modal nova/editar maquininha -->
+      <div x-show="showMachineForm" x-cloak style="position:fixed;inset:0;background:rgba(31,51,47,.45);z-index:50;display:flex;align-items:center;justify-content:center;padding:20px;" @click.self="showMachineForm=false">
+        <div class="card card-shadow" style="width:100%;max-width:520px;max-height:88vh;overflow-y:auto;">
+          <div class="card-header"><h3 x-text="editingMachineId ? 'Editar maquininha' : 'Nova maquininha'"></h3><button class="btn btn-ghost btn-sm" @click="showMachineForm=false">Fechar</button></div>
+          <form @submit.prevent="saveMachine()">
+            <div class="form-group">
+              <label class="label">Nome da maquininha</label>
+              <input class="input" x-model="machineForm.name" placeholder="Ex.: Stone, Cielo, PagSeguro" required>
+            </div>
+            <p class="text-xs text-muted mb-2">Taxa (%) por número de parcelas. Deixe em branco o que não se aplica.</p>
+            <div class="grid grid-3 gap-3">
+              <template x-for="n in 12" :key="n">
+                <div class="form-group">
+                  <label class="label" x-text="n + 'x'"></label>
+                  <input class="input" type="number" step="0.01" min="0" max="100" x-model="machineForm.rates[n]" placeholder="0,00">
+                </div>
+              </template>
+            </div>
+            <button class="btn btn-primary btn-block mt-2" type="submit" :disabled="saving">
+              <span x-show="!saving">Salvar maquininha</span>
+              <span x-show="saving" x-cloak>Salvando…</span>
+            </button>
+          </form>
         </div>
       </div>
 
@@ -126,7 +199,7 @@
                 </template>
               </select>
             </div>
-            <div class="form-group" x-show="newTransaction.type === 'comissao_profissional'">
+            <div class="form-group" x-show="newTransaction.type === 'comissao_profissional'" x-cloak>
               <label class="label">Profissional</label>
               <select class="input" x-model="newTransaction.professional_id">
                 <option value="">Selecione</option>
@@ -135,27 +208,109 @@
                 </template>
               </select>
             </div>
-            <div class="grid grid-2 gap-3">
-              <div class="form-group">
-                <label class="label">Valor (R$)</label>
-                <input class="input" type="number" step="0.01" min="0" x-model="newTransaction.amount" required>
+
+            <template x-if="newTransaction.type === 'comissao_profissional'">
+              <div class="grid grid-2 gap-3">
+                <div class="form-group">
+                  <label class="label">Valor base (procedimento/pacote)</label>
+                  <input class="input" type="text" inputmode="decimal" x-model="newTransaction.base_amount" @input="newTransaction.base_amount = maskCurrencyInput($event.target.value); recalcCommission()" placeholder="R$ 0,00">
+                </div>
+                <div class="form-group">
+                  <label class="label">Percentual (%)</label>
+                  <input class="input" type="number" step="0.1" min="0" max="100" x-model="newTransaction.commission_percentage" @input="recalcCommission()">
+                </div>
               </div>
+            </template>
+
+            <!-- comissão: valor único, sem divisão de pagamento -->
+            <template x-if="newTransaction.type === 'comissao_profissional'">
+              <div class="grid grid-2 gap-3">
+                <div class="form-group">
+                  <label class="label">Valor da comissão (R$)</label>
+                  <input class="input" type="text" inputmode="decimal" x-model="newTransaction.amount" @input="newTransaction.amount = maskCurrencyInput($event.target.value)" placeholder="R$ 0,00" required>
+                  <p class="input-hint">Calculado automaticamente, mas pode ajustar.</p>
+                </div>
+                <div class="form-group">
+                  <label class="label">Data</label>
+                  <input class="input" type="date" x-model="newTransaction.transaction_date" required>
+                </div>
+              </div>
+            </template>
+            <template x-if="newTransaction.type === 'comissao_profissional'">
+              <div class="form-group">
+                <label class="label">Forma de pagamento</label>
+                <select class="input" x-model="newTransaction.payment_method">
+                  <option value="">Não informado</option>
+                  <option value="Dinheiro">Dinheiro</option>
+                  <option value="Pix">Pix</option>
+                  <option value="Cartão de débito">Cartão de débito</option>
+                  <option value="Cartão de crédito">Cartão de crédito</option>
+                  <option value="Transferência">Transferência</option>
+                </select>
+              </div>
+            </template>
+
+            <!-- pagamento/venda: data + uma ou mais formas de pagamento -->
+            <template x-if="newTransaction.type !== 'comissao_profissional'">
               <div class="form-group">
                 <label class="label">Data</label>
                 <input class="input" type="date" x-model="newTransaction.transaction_date" required>
               </div>
-            </div>
-            <div class="form-group">
-              <label class="label">Forma de pagamento</label>
-              <select class="input" x-model="newTransaction.payment_method">
-                <option value="">Não informado</option>
-                <option value="Dinheiro">Dinheiro</option>
-                <option value="Pix">Pix</option>
-                <option value="Cartão de débito">Cartão de débito</option>
-                <option value="Cartão de crédito">Cartão de crédito</option>
-                <option value="Transferência">Transferência</option>
-              </select>
-            </div>
+            </template>
+
+            <template x-if="newTransaction.type !== 'comissao_profissional'">
+              <div>
+                <template x-for="(line, idx) in newTransaction.paymentLines" :key="idx">
+                  <div class="card" style="padding:12px 14px;margin-bottom:10px;background:var(--color-surface-alt);">
+                    <div class="flex items-center justify-between mb-2">
+                      <strong class="text-xs text-muted" x-text="'Forma de pagamento ' + (idx + 1)"></strong>
+                      <button type="button" class="btn btn-ghost btn-sm" x-show="newTransaction.paymentLines.length > 1" @click="newTransaction.paymentLines.splice(idx, 1)">Remover</button>
+                    </div>
+                    <div class="grid grid-2 gap-3">
+                      <div class="form-group">
+                        <label class="label">Forma</label>
+                        <select class="input" x-model="line.payment_method">
+                          <option value="Dinheiro">Dinheiro</option>
+                          <option value="Pix">Pix</option>
+                          <option value="Cartão de débito">Cartão de débito</option>
+                          <option value="Cartão de crédito">Cartão de crédito</option>
+                          <option value="Transferência">Transferência</option>
+                        </select>
+                      </div>
+                      <div class="form-group">
+                        <label class="label">Valor (R$)</label>
+                        <input class="input" type="text" inputmode="decimal" x-model="line.amount" @input="line.amount = maskCurrencyInput($event.target.value)" placeholder="R$ 0,00" required>
+                      </div>
+                    </div>
+                    <div class="grid grid-2 gap-3" x-show="line.payment_method === 'Cartão de crédito'" x-cloak>
+                      <div class="form-group">
+                        <label class="label">Maquininha</label>
+                        <select class="input" x-model="line.payment_machine_id">
+                          <option value="">Não informado</option>
+                          <template x-for="m in paymentMachines" :key="m.id">
+                            <option :value="m.id" x-text="m.name"></option>
+                          </template>
+                        </select>
+                      </div>
+                      <div class="form-group">
+                        <label class="label">Parcelas</label>
+                        <select class="input" x-model.number="line.installments">
+                          <template x-for="n in 12" :key="n">
+                            <option :value="n" x-text="n + 'x'"></option>
+                          </template>
+                        </select>
+                      </div>
+                    </div>
+                    <p class="input-hint" x-show="line.payment_method === 'Cartão de crédito' && line.payment_machine_id">
+                      Valor líquido estimado: <strong x-text="formatCurrency(netAmountFor(line))"></strong>
+                    </p>
+                  </div>
+                </template>
+                <button type="button" class="btn btn-secondary btn-sm mb-3" x-show="newTransaction.paymentLines.length < 2" @click="newTransaction.paymentLines.push(emptyPaymentLine())">+ Adicionar forma de pagamento</button>
+                <p class="text-sm mb-3">Total do lançamento: <strong x-text="formatCurrency(paymentLinesTotal(newTransaction.paymentLines))"></strong></p>
+              </div>
+            </template>
+
             <button class="btn btn-primary btn-block mt-2" type="submit" :disabled="saving">
               <span x-show="!saving">Salvar lançamento</span>
               <span x-show="saving" x-cloak>Salvando…</span>
@@ -197,6 +352,61 @@
                 <input class="input" type="date" x-model="newPackage.expires_at">
               </div>
             </div>
+            <p class="text-sm text-muted mb-2" x-show="suggestedPackagePrice() > 0">
+              Sugerido pelo valor do serviço: <strong x-text="formatCurrency(suggestedPackagePrice())"></strong>
+              · <a href="#" @click.prevent="newPackage.paymentLines[0].amount = numberToCurrencyInput(suggestedPackagePrice())">usar sugerido</a>
+            </p>
+
+            <template x-for="(line, idx) in newPackage.paymentLines" :key="idx">
+              <div class="card" style="padding:12px 14px;margin-bottom:10px;background:var(--color-surface-alt);">
+                <div class="flex items-center justify-between mb-2">
+                  <strong class="text-xs text-muted" x-text="'Forma de pagamento ' + (idx + 1)"></strong>
+                  <button type="button" class="btn btn-ghost btn-sm" x-show="newPackage.paymentLines.length > 1" @click="newPackage.paymentLines.splice(idx, 1)">Remover</button>
+                </div>
+                <div class="grid grid-2 gap-3">
+                  <div class="form-group">
+                    <label class="label">Forma</label>
+                    <select class="input" x-model="line.payment_method">
+                      <option value="Dinheiro">Dinheiro</option>
+                      <option value="Pix">Pix</option>
+                      <option value="Cartão de débito">Cartão de débito</option>
+                      <option value="Cartão de crédito">Cartão de crédito</option>
+                      <option value="Transferência">Transferência</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label class="label">Valor (R$)</label>
+                    <input class="input" type="number" step="0.01" min="0" x-model="line.amount" required>
+                  </div>
+                </div>
+                <div class="grid grid-2 gap-3" x-show="line.payment_method === 'Cartão de crédito'" x-cloak>
+                  <div class="form-group">
+                    <label class="label">Maquininha</label>
+                    <select class="input" x-model="line.payment_machine_id">
+                      <option value="">Não informado</option>
+                      <template x-for="m in paymentMachines" :key="m.id">
+                        <option :value="m.id" x-text="m.name"></option>
+                      </template>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label class="label">Parcelas</label>
+                    <select class="input" x-model.number="line.installments">
+                      <template x-for="n in 12" :key="n">
+                        <option :value="n" x-text="n + 'x'"></option>
+                      </template>
+                    </select>
+                  </div>
+                </div>
+                <p class="input-hint" x-show="line.payment_method === 'Cartão de crédito' && line.payment_machine_id">
+                  Valor líquido estimado: <strong x-text="formatCurrency(netAmountFor(line))"></strong>
+                </p>
+              </div>
+            </template>
+            <button type="button" class="btn btn-secondary btn-sm mb-3" x-show="newPackage.paymentLines.length < 2" @click="newPackage.paymentLines.push(emptyPaymentLine())">+ Adicionar forma de pagamento</button>
+            <p class="text-sm mb-3">Valor total da venda: <strong x-text="formatCurrency(paymentLinesTotal(newPackage.paymentLines))"></strong></p>
+            <p class="input-hint mb-3">Ao salvar, um lançamento de "Venda de pacote" é criado automaticamente no financeiro para cada forma de pagamento informada.</p>
+
             <button class="btn btn-primary btn-block mt-2" type="submit" :disabled="saving">
               <span x-show="!saving">Registrar venda</span>
               <span x-show="saving" x-cloak>Salvando…</span>
@@ -209,6 +419,7 @@
   </div>
 </div>
 
+<script src="js/currency-mask.js"></script>
 <script>
 function financeiroApp() {
   return {
@@ -223,13 +434,21 @@ function financeiroApp() {
     users: [],
     showNewTransactionForm: false,
     showNewPackageForm: false,
-    newTransaction: { type: 'pagamento_procedimento', patient_id: '', professional_id: '', amount: '', payment_method: '', transaction_date: new Date().toISOString().slice(0,10) },
-    newPackage: { patient_id: '', service_id: '', total_sessions: '', expires_at: '' },
+    products: [],
+    serviceProductsMap: {},
+    paymentMachines: [],
+    showMachineForm: false,
+    editingMachineId: null,
+    machineForm: { name: '', rates: {} },
+    newTransaction: { type: 'pagamento_procedimento', patient_id: '', professional_id: '', amount: '', base_amount: '', commission_percentage: '', payment_method: '', transaction_date: new Date().toISOString().slice(0,10), paymentLines: [] },
+    newPackage: { patient_id: '', service_id: '', total_sessions: 1, expires_at: '', paymentLines: [] },
     feedback: { type: '', message: '' },
 
     async init() {
       await this.loadClinicId();
-      await Promise.all([this.loadTransactions(), this.loadPackages(), this.loadPatients(), this.loadServices(), this.loadUsers()]);
+      await Promise.all([this.loadTransactions(), this.loadPackages(), this.loadPatients(), this.loadServices(), this.loadUsers(), this.loadProducts(), this.loadServiceProductsMap(), this.loadPaymentMachines()]);
+      this.newTransaction.paymentLines = [this.emptyPaymentLine()];
+      this.newPackage.paymentLines = [this.emptyPaymentLine()];
       this.loading = false;
     },
 
@@ -247,7 +466,7 @@ function financeiroApp() {
     async loadTransactions() {
       const { data, error } = await supabaseClient
         .from('transactions')
-        .select('id, type, amount, payment_method, transaction_date, patients ( full_name ), users ( full_name )')
+        .select('id, type, amount, commission_percentage, base_amount, payment_method, installments, net_amount, sale_group_id, transaction_date, patients ( full_name ), users ( full_name ), packages ( total_sessions, services ( name ) )')
         .order('transaction_date', { ascending: false });
       this.transactions = error ? [] : (data || []);
       if (error) this.showFeedback('error', 'Erro ao carregar transações: ' + error.message);
@@ -256,7 +475,7 @@ function financeiroApp() {
     async loadPackages() {
       const { data, error } = await supabaseClient
         .from('packages')
-        .select('id, total_sessions, used_sessions, expires_at, patients ( full_name ), services ( name )')
+        .select('id, service_id, total_sessions, used_sessions, total_price, expires_at, patients ( full_name ), services ( name )')
         .order('purchased_at', { ascending: false });
       this.packages = error ? [] : (data || []);
     },
@@ -267,13 +486,33 @@ function financeiroApp() {
     },
 
     async loadServices() {
-      const { data } = await supabaseClient.from('services').select('id, name').order('name');
+      const { data } = await supabaseClient.from('services').select('id, name, price').order('name');
       this.services = data || [];
     },
 
     async loadUsers() {
       const { data } = await supabaseClient.from('users').select('id, full_name').order('full_name');
       this.users = data || [];
+    },
+
+    async loadProducts() {
+      const { data } = await supabaseClient.from('products').select('id, unit_cost');
+      this.products = data || [];
+    },
+
+    async loadServiceProductsMap() {
+      const { data } = await supabaseClient.from('service_products').select('service_id, product_id, quantity_used');
+      const map = {};
+      (data || []).forEach(sp => {
+        if (!map[sp.service_id]) map[sp.service_id] = [];
+        map[sp.service_id].push(sp);
+      });
+      this.serviceProductsMap = map;
+    },
+
+    async loadPaymentMachines() {
+      const { data, error } = await supabaseClient.from('payment_machines').select('id, name, fee_rates').order('name');
+      this.paymentMachines = error ? [] : (data || []);
     },
 
     get totalPeriodo() {
@@ -284,6 +523,123 @@ function financeiroApp() {
       const map = { pagamento_procedimento: 0, venda_pacote: 0, comissao_profissional: 0 };
       this.transactions.forEach(t => { map[t.type] = (map[t.type] || 0) + Number(t.amount || 0); });
       return map;
+    },
+
+    suggestedPackagePrice() {
+      const service = this.services.find(s => s.id === this.newPackage.service_id);
+      const sessions = Number(this.newPackage.total_sessions) || 0;
+      if (!service || !service.price || !sessions) return 0;
+      return Number(service.price) * sessions;
+    },
+
+    unitCostFor(serviceId) {
+      const rows = this.serviceProductsMap[serviceId] || [];
+      return rows.reduce((sum, sp) => {
+        const product = this.products.find(p => p.id === sp.product_id);
+        const unitCost = product && product.unit_cost ? Number(product.unit_cost) : 0;
+        return sum + unitCost * Number(sp.quantity_used || 0);
+      }, 0);
+    },
+
+    packageCost(pk) {
+      const perSession = this.unitCostFor(pk.service_id);
+      return perSession * Number(pk.total_sessions || 0);
+    },
+
+    packageMargin(pk) {
+      if (!pk.total_price) return null;
+      const cost = this.packageCost(pk);
+      const margin = ((Number(pk.total_price) - cost) / Number(pk.total_price)) * 100;
+      return Math.round(margin);
+    },
+
+    recalcCommission() {
+      const base = parseCurrencyToNumber(this.newTransaction.base_amount) || 0;
+      const pct = Number(this.newTransaction.commission_percentage) || 0;
+      if (base > 0 && pct > 0) {
+        this.newTransaction.amount = numberToCurrencyInput(Math.round(base * pct / 100 * 100) / 100);
+      }
+    },
+
+    emptyPaymentLine() {
+      return { payment_method: 'Dinheiro', amount: '', installments: 1, payment_machine_id: '' };
+    },
+
+    feeRateFor(machineId, installments) {
+      const machine = this.paymentMachines.find(m => m.id === machineId);
+      if (!machine || !machine.fee_rates) return 0;
+      return Number(machine.fee_rates[String(installments)] || 0);
+    },
+
+    netAmountFor(line) {
+      const amount = parseCurrencyToNumber(line.amount) || 0;
+      if (line.payment_method !== 'Cartão de crédito' || !line.payment_machine_id) return amount;
+      const fee = this.feeRateFor(line.payment_machine_id, line.installments);
+      return Math.round((amount - (amount * fee / 100)) * 100) / 100;
+    },
+
+    paymentLinesTotal(lines) {
+      return (lines || []).reduce((sum, l) => sum + (parseCurrencyToNumber(l.amount) || 0), 0);
+    },
+
+    feeSummary(machine) {
+      const rates = machine.fee_rates || {};
+      const parts = Object.keys(rates)
+        .map(k => Number(k))
+        .sort((a, b) => a - b)
+        .filter(n => rates[String(n)] !== '' && rates[String(n)] !== null && rates[String(n)] !== undefined)
+        .map(n => n + 'x: ' + Number(rates[String(n)]) + '%');
+      return parts.length ? parts.join(' · ') : 'Nenhuma taxa cadastrada';
+    },
+
+    openNewMachineForm() {
+      this.editingMachineId = null;
+      this.machineForm = { name: '', rates: {} };
+      this.showMachineForm = true;
+    },
+
+    openEditMachineForm(machine) {
+      this.editingMachineId = machine.id;
+      const rates = {};
+      for (let n = 1; n <= 12; n++) {
+        rates[n] = machine.fee_rates && machine.fee_rates[String(n)] !== undefined ? machine.fee_rates[String(n)] : '';
+      }
+      this.machineForm = { name: machine.name, rates };
+      this.showMachineForm = true;
+    },
+
+    async saveMachine() {
+      if (!this.clinicId || !this.machineForm.name) return;
+      this.saving = true;
+      const feeRates = {};
+      Object.keys(this.machineForm.rates).forEach(n => {
+        const v = this.machineForm.rates[n];
+        if (v !== '' && v !== null && v !== undefined) feeRates[n] = Number(v);
+      });
+      let error;
+      if (this.editingMachineId) {
+        ({ error } = await supabaseClient.from('payment_machines').update({ name: this.machineForm.name, fee_rates: feeRates }).eq('id', this.editingMachineId));
+      } else {
+        ({ error } = await supabaseClient.from('payment_machines').insert({ clinic_id: this.clinicId, name: this.machineForm.name, fee_rates: feeRates }));
+      }
+      this.saving = false;
+      if (error) {
+        this.showFeedback('error', 'Erro ao salvar maquininha: ' + error.message);
+        return;
+      }
+      this.showMachineForm = false;
+      this.showFeedback('success', 'Maquininha salva.');
+      await this.loadPaymentMachines();
+    },
+
+    async removeMachine(machine) {
+      const { error } = await supabaseClient.from('payment_machines').delete().eq('id', machine.id);
+      if (error) {
+        this.showFeedback('error', 'Erro ao remover maquininha: ' + error.message);
+        return;
+      }
+      this.showFeedback('success', 'Maquininha removida.');
+      await this.loadPaymentMachines();
     },
 
     typeLabel(type) {
@@ -301,50 +657,119 @@ function financeiroApp() {
       return isNaN(d) ? '—' : d.toLocaleDateString('pt-BR');
     },
 
+    newSaleGroupId() {
+      return (window.crypto && window.crypto.randomUUID) ? window.crypto.randomUUID() : (Date.now() + '-' + Math.random().toString(16).slice(2));
+    },
+
     async createTransaction() {
       if (!this.clinicId) return;
+      const isCommission = this.newTransaction.type === 'comissao_profissional';
       this.saving = true;
-      const payload = {
-        clinic_id: this.clinicId,
-        type: this.newTransaction.type,
-        patient_id: this.newTransaction.patient_id || null,
-        professional_id: this.newTransaction.professional_id || null,
-        amount: this.newTransaction.amount,
-        payment_method: this.newTransaction.payment_method || null,
-        transaction_date: this.newTransaction.transaction_date
-      };
-      const { error } = await supabaseClient.from('transactions').insert(payload);
-      this.saving = false;
-      if (error) {
-        this.showFeedback('error', 'Erro ao salvar lançamento: ' + error.message);
-        return;
+
+      if (isCommission) {
+        const payload = {
+          clinic_id: this.clinicId,
+          type: this.newTransaction.type,
+          patient_id: this.newTransaction.patient_id || null,
+          professional_id: this.newTransaction.professional_id || null,
+          amount: parseCurrencyToNumber(this.newTransaction.amount),
+          commission_percentage: this.newTransaction.commission_percentage || null,
+          base_amount: parseCurrencyToNumber(this.newTransaction.base_amount),
+          payment_method: this.newTransaction.payment_method || null,
+          transaction_date: this.newTransaction.transaction_date
+        };
+        const { error } = await supabaseClient.from('transactions').insert(payload);
+        this.saving = false;
+        if (error) {
+          this.showFeedback('error', 'Erro ao salvar lançamento: ' + error.message);
+          return;
+        }
+      } else {
+        const lines = this.newTransaction.paymentLines.filter(l => (parseCurrencyToNumber(l.amount) || 0) > 0);
+        if (lines.length === 0) {
+          this.saving = false;
+          this.showFeedback('error', 'Informe ao menos um valor de pagamento.');
+          return;
+        }
+        const saleGroupId = lines.length > 1 ? this.newSaleGroupId() : null;
+        const payload = lines.map(line => ({
+          clinic_id: this.clinicId,
+          type: this.newTransaction.type,
+          patient_id: this.newTransaction.patient_id || null,
+          professional_id: this.newTransaction.professional_id || null,
+          amount: parseCurrencyToNumber(line.amount),
+          payment_method: line.payment_method || null,
+          installments: line.payment_method === 'Cartão de crédito' ? (line.installments || 1) : 1,
+          payment_machine_id: line.payment_method === 'Cartão de crédito' ? (line.payment_machine_id || null) : null,
+          net_amount: this.netAmountFor(line),
+          sale_group_id: saleGroupId,
+          transaction_date: this.newTransaction.transaction_date
+        }));
+        const { error } = await supabaseClient.from('transactions').insert(payload);
+        this.saving = false;
+        if (error) {
+          this.showFeedback('error', 'Erro ao salvar lançamento: ' + error.message);
+          return;
+        }
       }
+
       this.showNewTransactionForm = false;
-      this.newTransaction = { type: 'pagamento_procedimento', patient_id: '', professional_id: '', amount: '', payment_method: '', transaction_date: new Date().toISOString().slice(0,10) };
+      this.newTransaction = { type: 'pagamento_procedimento', patient_id: '', professional_id: '', amount: '', base_amount: '', commission_percentage: '', payment_method: '', transaction_date: new Date().toISOString().slice(0,10), paymentLines: [this.emptyPaymentLine()] };
       this.showFeedback('success', 'Lançamento registrado.');
       await this.loadTransactions();
     },
 
     async createPackage() {
       if (!this.clinicId) return;
+      const lines = this.newPackage.paymentLines.filter(l => (parseCurrencyToNumber(l.amount) || 0) > 0);
+      const totalPrice = this.paymentLinesTotal(this.newPackage.paymentLines);
       this.saving = true;
       const payload = {
         clinic_id: this.clinicId,
         patient_id: this.newPackage.patient_id,
         service_id: this.newPackage.service_id,
         total_sessions: this.newPackage.total_sessions,
+        total_price: totalPrice || null,
         expires_at: this.newPackage.expires_at || null
       };
-      const { error } = await supabaseClient.from('packages').insert(payload);
-      this.saving = false;
+      const { data: newPkg, error } = await supabaseClient.from('packages').insert(payload).select().single();
       if (error) {
+        this.saving = false;
         this.showFeedback('error', 'Erro ao registrar pacote: ' + error.message);
         return;
       }
+
+      if (lines.length > 0) {
+        const saleGroupId = lines.length > 1 ? this.newSaleGroupId() : null;
+        const txPayload = lines.map(line => ({
+          clinic_id: this.clinicId,
+          type: 'venda_pacote',
+          patient_id: this.newPackage.patient_id,
+          package_id: newPkg.id,
+          amount: parseCurrencyToNumber(line.amount),
+          payment_method: line.payment_method || null,
+          installments: line.payment_method === 'Cartão de crédito' ? (line.installments || 1) : 1,
+          payment_machine_id: line.payment_method === 'Cartão de crédito' ? (line.payment_machine_id || null) : null,
+          net_amount: this.netAmountFor(line),
+          sale_group_id: saleGroupId,
+          transaction_date: new Date().toISOString().slice(0, 10)
+        }));
+        const { error: txError } = await supabaseClient.from('transactions').insert(txPayload);
+        if (txError) {
+          this.showFeedback('error', 'Pacote registrado, mas houve erro ao lançar a venda no financeiro: ' + txError.message);
+          this.saving = false;
+          this.showNewPackageForm = false;
+          this.newPackage = { patient_id: '', service_id: '', total_sessions: 1, expires_at: '', paymentLines: [this.emptyPaymentLine()] };
+          await Promise.all([this.loadPackages(), this.loadTransactions()]);
+          return;
+        }
+      }
+
+      this.saving = false;
       this.showNewPackageForm = false;
-      this.newPackage = { patient_id: '', service_id: '', total_sessions: '', expires_at: '' };
-      this.showFeedback('success', 'Pacote registrado.');
-      await this.loadPackages();
+      this.newPackage = { patient_id: '', service_id: '', total_sessions: 1, expires_at: '', paymentLines: [this.emptyPaymentLine()] };
+      this.showFeedback('success', 'Pacote registrado e lançado no financeiro.');
+      await Promise.all([this.loadPackages(), this.loadTransactions()]);
     },
 
     showFeedback(type, message) {

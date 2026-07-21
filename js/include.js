@@ -106,9 +106,12 @@ async function fillUserInfo() {
 }
 
 function applyRoleVisibility(role) {
-  if (!window.isStaffRole || !window.isStaffRole(role)) return; // administrador vê o menu inteiro
-  document.querySelectorAll('[data-admin-only="true"]').forEach((el) => {
-    el.style.display = 'none';
+  if (window.isAdminRole && window.isAdminRole(role)) return; // administrador vê o menu inteiro
+  document.querySelectorAll('[data-allowed-roles]').forEach((el) => {
+    const allowed = el.getAttribute('data-allowed-roles').split(',').map((r) => r.trim());
+    if (!allowed.includes(role)) {
+      el.style.display = 'none';
+    }
   });
 }
 
