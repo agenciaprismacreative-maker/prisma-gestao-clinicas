@@ -63,7 +63,7 @@ function loginForm() {
         password: this.password
       });
       if (error) {
-        this.errorMsg = 'E-mail ou senha incorretos.';
+        this.errorMsg = error.message || 'E-mail ou senha incorretos.';
         this.loading = false;
         return;
       }
