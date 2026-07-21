@@ -179,6 +179,37 @@
           <div class="card card-shadow">
             <div class="card-header">
               <div>
+                <h3>Anotações</h3>
+                <p>Bloco de notas rápido da clínica</p>
+              </div>
+            </div>
+            <form class="flex gap-2 mb-2" @submit.prevent="addNote()">
+              <input class="input" type="text" x-model="newNoteText" placeholder="Escrever uma anotação…">
+              <button class="btn btn-secondary btn-sm" type="submit" :disabled="!newNoteText.trim()">Adicionar</button>
+            </form>
+            <div class="form-group mb-3">
+              <select class="input" x-model="newNoteTarget" style="max-width:260px;">
+                <option value="">Pública (visível para todos)</option>
+                <template x-for="u in professionals" :key="u.id">
+                  <option :value="u.id" x-text="'Só para ' + u.full_name"></option>
+                </template>
+              </select>
+            </div>
+            <div x-show="visibleNotes.length === 0" class="text-sm text-muted">Nenhuma anotação ainda.</div>
+            <template x-for="n in visibleNotes" :key="n.id">
+              <div class="note-item">
+                <p x-text="n.content"></p>
+                <div class="note-meta">
+                  <span x-text="(n.users ? n.users.full_name : '') + ' · ' + formatDateTime(n.created_at) + (n.target_user_id ? ' · privada' : ' · pública')"></span>
+                  <a href="#" @click.prevent="removeNote(n)">remover</a>
+                </div>
+              </div>
+            </template>
+          </div>
+
+          <div class="card card-shadow">
+            <div class="card-header">
+              <div>
                 <h3>Agendamentos aguardando confirmação</h3>
                 <p>Próximas 48 horas</p>
               </div>
@@ -250,29 +281,6 @@
             </div>
           </div>
 
-          <div class="card card-shadow">
-            <div class="card-header">
-              <div>
-                <h3>Anotações</h3>
-                <p>Bloco de notas rápido da clínica</p>
-              </div>
-            </div>
-            <form class="flex gap-2 mb-3" @submit.prevent="addNote()">
-              <input class="input" type="text" x-model="newNoteText" placeholder="Escrever uma anotação…">
-              <button class="btn btn-secondary btn-sm" type="submit" :disabled="!newNoteText.trim()">Adicionar</button>
-            </form>
-            <div x-show="notes.length === 0" class="text-sm text-muted">Nenhuma anotação ainda.</div>
-            <template x-for="n in notes" :key="n.id">
-              <div class="note-item">
-                <p x-text="n.content"></p>
-                <div class="note-meta">
-                  <span x-text="(n.users ? n.users.full_name : '') + ' · ' + formatDateTime(n.created_at)"></span>
-                  <a href="#" @click.prevent="removeNote(n)">remover</a>
-                </div>
-              </div>
-            </template>
-          </div>
-
         </div>
 
       </div>
@@ -295,7 +303,12 @@ function dashboardApp() {
     birthdayPatients: [],
     notes: [],
     newNoteText: '',
+    newNoteTarget: '',
     currentUserId: null,
+
+    get visibleNotes() {
+      return this.notes.filter((n) => !n.target_user_id || n.target_user_id === this.currentUserId);
+    },
 
     async init() {
       await this.loadClinicId();
@@ -328,7 +341,7 @@ function dashboardApp() {
     async loadNotes() {
       const { data, error } = await supabaseClient
         .from('dashboard_notes')
-        .select('id, content, created_at, author_id, users ( full_name )')
+        .select('id, content, created_at, author_id, target_user_id, users ( full_name )')
         .order('created_at', { ascending: false })
         .limit(20);
       this.notes = error ? [] : (data || []);
@@ -338,10 +351,12 @@ function dashboardApp() {
       const content = this.newNoteText.trim();
       if (!content || !this.clinicId) return;
       const { error } = await supabaseClient.from('dashboard_notes').insert({
-        clinic_id: this.clinicId, author_id: this.currentUserId, content
+        clinic_id: this.clinicId, author_id: this.currentUserId, content,
+        target_user_id: this.newNoteTarget || null
       });
       if (error) return;
       this.newNoteText = '';
+      this.newNoteTarget = '';
       await this.loadNotes();
     },
 
@@ -558,6 +573,7 @@ function dashboardApp() {
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="js/supabase-client.js"></script>
 <script src="js/auth-guard.js"></script>
+<script src="js/topbar.js"></script>
 <script src="js/include.js" defer></script>
 </body>
 </html>

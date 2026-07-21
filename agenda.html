@@ -90,7 +90,7 @@
                   <div class="agenda-col-body" style="height:792px;" @contextmenu.prevent="onContextMenu($event, prof.id)">
                     <template x-for="appt in apptsFor(prof.id)" :key="appt.id">
                       <div class="agenda-event" :class="statusClass(appt.status)" :style="'cursor:pointer; top:' + topFor(appt.scheduled_at) + 'px; height:' + heightFor(appt.duration_minutes) + 'px;'" @click.stop="showApptDetail(appt)">
-                        <strong x-text="appt.patients ? appt.patients.full_name : 'Paciente'"></strong>
+                        <strong x-text="appt.patients ? displayPatientName(appt.patients.full_name) : 'Paciente'"></strong>
                         <span x-text="(appt.services ? appt.services.name + ' · ' : '') + formatTime(appt.scheduled_at) + ' · ' + statusLabel(appt.status)"></span>
                       </div>
                     </template>
@@ -117,7 +117,7 @@
                   <template x-for="appt in apptsForDay(day)" :key="appt.id">
                     <div class="agenda-week-item" :class="statusClass(appt.status)" style="cursor:pointer;" @click.stop="showApptDetail(appt)">
                       <strong x-text="formatTime(appt.scheduled_at)"></strong>
-                      <span x-text="(appt.patients ? appt.patients.full_name : 'Paciente') + ' · ' + professionalName(appt.professional_id)"></span>
+                      <span x-text="(appt.patients ? displayPatientName(appt.patients.full_name) : 'Paciente') + ' · ' + professionalName(appt.professional_id)"></span>
                     </div>
                   </template>
                   <template x-for="blk in blocksForDay(day)" :key="'blk-' + blk.id">
@@ -139,7 +139,7 @@
           </div>
           <div class="agenda-month-cells">
             <template x-for="cell in monthCells" :key="cell.date.toISOString()">
-              <div class="agenda-month-cell" :class="{ 'is-other-month': !cell.inMonth, 'is-today': isToday(cell.date) }" @click="goToDay(cell.date)">
+              <div class="agenda-month-cell" :class="{ 'is-other-month': !cell.inMonth, 'is-today': isToday(cell.date) }" @click="goToDay(cell.date)" @contextmenu.prevent="onContextMenuMonth($event, cell.date)">
                 <span class="agenda-month-daynum" x-text="cell.date.getDate()"></span>
                 <span class="agenda-month-count" x-show="apptsForDay(cell.date).length > 0" x-text="apptsForDay(cell.date).length + ' agend.'"></span>
                 <span class="agenda-month-count" x-show="blocksForDay(cell.date).length > 0" x-text="blocksForDay(cell.date).length + ' bloq.'" style="color:var(--color-text-soft);"></span>
@@ -154,13 +154,14 @@
       <div x-show="contextMenu.show" x-cloak @click.away="contextMenu.show = false" class="context-menu" :style="'top:' + contextMenu.y + 'px; left:' + contextMenu.x + 'px;'">
         <button type="button" @click="ctxIncluir()">Incluir</button>
         <button type="button" @click="ctxBloquear()">Bloquear horário</button>
+        <button type="button" x-show="contextMenu.showViewDay" @click="ctxVerDia()">Ver agenda do dia</button>
         <button type="button" @click="ctxGerenciarBloqueios()">Gerenciar bloqueios</button>
         <button type="button" @click="ctxImprimir()">Imprimir</button>
       </div>
 
       <!-- ficha breve ao clicar num agendamento existente -->
-      <div x-show="apptDetail.show" x-cloak style="position:fixed;inset:0;background:rgba(31,51,47,.45);z-index:55;display:flex;align-items:center;justify-content:center;padding:20px;" @click.self="closeApptDetail()">
-        <div class="card card-shadow" style="width:100%;max-width:360px;" x-show="apptDetail.appt">
+      <div x-show="apptDetail.show" x-cloak class="modal-overlay" style="z-index:55;" @click.self="closeApptDetail()">
+        <div class="card card-shadow" style="margin:auto;width:100%;max-width:360px;" x-show="apptDetail.appt">
           <div class="card-header">
             <h3 x-text="apptDetail.appt ? (apptDetail.appt.patients ? apptDetail.appt.patients.full_name : 'Paciente') : ''"></h3>
             <button class="btn btn-ghost btn-sm" type="button" @click="closeApptDetail()">Fechar</button>
@@ -173,14 +174,53 @@
               <div><span class="text-xs text-muted">Duração média</span><br><strong x-text="apptDetail.appt.duration_minutes + ' minutos'"></strong></div>
               <div><span class="text-xs text-muted">Status</span><br><strong x-text="statusLabel(apptDetail.appt.status)"></strong></div>
               <div x-show="apptDetail.appt.rescheduled_count > 0"><span class="text-xs text-muted">Reagendamentos</span><br><strong x-text="apptDetail.appt.rescheduled_count"></strong></div>
+
+              <template x-if="!['concluido', 'cancelado'].includes(apptDetail.appt.status) && apptDetail.mode === 'view'">
+                <div class="flex gap-2 mt-2">
+                  <button type="button" class="btn btn-secondary btn-sm" @click="startDetailReschedule()">Reagendar</button>
+                  <button type="button" class="btn btn-ghost btn-sm" @click="startDetailCancel()">Cancelar</button>
+                </div>
+              </template>
+
+              <template x-if="apptDetail.mode === 'reagendar'">
+                <div class="mt-2" style="border-top:1px solid var(--color-border);padding-top:12px;">
+                  <div class="grid grid-2 gap-3">
+                    <div class="form-group">
+                      <label class="label">Nova data</label>
+                      <input class="input" type="date" x-model="apptDetail.rescheduleDate">
+                    </div>
+                    <div class="form-group">
+                      <label class="label">Novo horário</label>
+                      <input class="input" type="time" x-model="apptDetail.rescheduleTime">
+                    </div>
+                  </div>
+                  <div class="flex gap-2">
+                    <button type="button" class="btn btn-primary btn-sm" @click="submitDetailReschedule()" :disabled="savingDetail">Confirmar reagendamento</button>
+                    <button type="button" class="btn btn-ghost btn-sm" @click="apptDetail.mode = 'view'">Cancelar</button>
+                  </div>
+                </div>
+              </template>
+
+              <template x-if="apptDetail.mode === 'cancelar'">
+                <div class="mt-2" style="border-top:1px solid var(--color-border);padding-top:12px;">
+                  <div class="form-group">
+                    <label class="label">Motivo do cancelamento</label>
+                    <textarea class="input" x-model="apptDetail.cancelReason" rows="2" placeholder="Descreva o motivo"></textarea>
+                  </div>
+                  <div class="flex gap-2">
+                    <button type="button" class="btn btn-primary btn-sm" @click="submitDetailCancel()" :disabled="savingDetail">Confirmar cancelamento</button>
+                    <button type="button" class="btn btn-ghost btn-sm" @click="apptDetail.mode = 'view'">Voltar</button>
+                  </div>
+                </div>
+              </template>
             </div>
           </template>
         </div>
       </div>
 
       <!-- modal novo agendamento -->
-      <div x-show="showNewForm" x-cloak style="position:fixed;inset:0;background:rgba(31,51,47,.45);z-index:50;display:flex;align-items:center;justify-content:center;padding:20px;" @click.self="showNewForm = false">
-        <div class="card card-shadow" style="width:100%;max-width:480px;max-height:88vh;overflow-y:auto;">
+      <div x-show="showNewForm" x-cloak class="modal-overlay" @click.self="showNewForm = false">
+        <div class="card card-shadow" style="margin:auto;width:100%;max-width:480px;max-height:88vh;overflow-y:auto;">
           <div class="card-header">
             <h3>Novo agendamento</h3>
             <button class="btn btn-ghost btn-sm" type="button" @click="showNewForm = false">Fechar</button>
@@ -193,7 +233,7 @@
           <form @submit.prevent="createAppointment()" x-show="patients.length > 0">
             <div class="form-group" style="position:relative;">
               <label class="label">Paciente</label>
-              <input class="input" type="text" x-model="patientSearch" @focus="patientDropdownOpen = true" @input="patientDropdownOpen = true; newAppt.patient_id = ''" placeholder="Buscar paciente por nome…" autocomplete="off">
+              <input class="input" type="text" x-model="patientSearch" @focus="patientDropdownOpen = true" @input="patientDropdownOpen = true; newAppt.patient_id = ''" placeholder="Digite o nome do paciente" autocomplete="off">
               <div x-show="patientDropdownOpen" x-cloak @click.away="patientDropdownOpen = false"
                    style="position:absolute;z-index:10;top:100%;left:0;right:0;background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-md);box-shadow:var(--shadow-md);max-height:220px;overflow-y:auto;margin-top:4px;">
                 <div x-show="filteredPatientsForSearch.length === 0" class="text-xs text-muted" style="padding:10px 14px;">Nenhum paciente encontrado.</div>
@@ -225,8 +265,8 @@
               <label class="label">Serviços contratados em aberto</label>
               <div x-show="patientPackages.length === 0" class="text-xs text-muted">Nenhum pacote em aberto para este paciente.</div>
               <div class="flex gap-2" style="flex-wrap:wrap;" x-show="patientPackages.length > 0">
-                <template x-for="pk in patientPackages" :key="'chip-' + pk.id">
-                  <span class="badge badge-accent" x-text="(pk.services ? pk.services.name : 'Pacote') + ' · faltam ' + (pk.total_sessions - pk.used_sessions)"></span>
+                <template x-for="grp in groupedOpenServices" :key="'chip-' + grp.name">
+                  <span class="badge badge-accent" x-text="grp.name + ' · faltam ' + grp.remaining"></span>
                 </template>
               </div>
             </div>
@@ -259,8 +299,8 @@
       </div>
 
       <!-- modal bloquear horário -->
-      <div x-show="showBlockForm" x-cloak style="position:fixed;inset:0;background:rgba(31,51,47,.45);z-index:50;display:flex;align-items:center;justify-content:center;padding:20px;" @click.self="showBlockForm = false">
-        <div class="card card-shadow" style="width:100%;max-width:440px;">
+      <div x-show="showBlockForm" x-cloak class="modal-overlay" @click.self="showBlockForm = false">
+        <div class="card card-shadow" style="margin:auto;width:100%;max-width:440px;">
           <div class="card-header"><h3>Bloquear horário</h3><button class="btn btn-ghost btn-sm" type="button" @click="showBlockForm = false">Fechar</button></div>
           <form @submit.prevent="createBlock()">
             <div class="form-group">
@@ -299,8 +339,8 @@
       </div>
 
       <!-- modal gerenciar bloqueios -->
-      <div x-show="showManageBlocks" x-cloak style="position:fixed;inset:0;background:rgba(31,51,47,.45);z-index:50;display:flex;align-items:center;justify-content:center;padding:20px;" @click.self="showManageBlocks = false">
-        <div class="card card-shadow" style="width:100%;max-width:520px;max-height:80vh;overflow-y:auto;">
+      <div x-show="showManageBlocks" x-cloak class="modal-overlay" @click.self="showManageBlocks = false">
+        <div class="card card-shadow" style="margin:auto;width:100%;max-width:520px;max-height:80vh;overflow-y:auto;">
           <div class="card-header"><h3>Gerenciar bloqueios</h3><button class="btn btn-ghost btn-sm" type="button" @click="showManageBlocks = false">Fechar</button></div>
           <p class="text-xs text-soft mb-3">Bloqueios do período exibido na visão atual da agenda.</p>
           <div x-show="blocks.length === 0" class="empty-note">Nenhum bloqueio no período exibido.</div>
@@ -348,14 +388,25 @@ function agendaApp() {
     patientPackages: [],
     newAppt: { patient_id: '', professional_id: '', service_id: '', package_id: '', date: '', time: '09:00' },
     newBlock: { professional_id: '', date: '', start_time: '09:00', end_time: '10:00', reason: '' },
-    contextMenu: { show: false, x: 0, y: 0, professionalId: null, time: '09:00', date: null },
-    apptDetail: { show: false, appt: null },
+    contextMenu: { show: false, x: 0, y: 0, professionalId: null, time: '09:00', date: null, showViewDay: false },
+    apptDetail: { show: false, appt: null, mode: 'view', rescheduleDate: '', rescheduleTime: '', cancelReason: '' },
+    savingDetail: false,
     feedback: { type: '', message: '' },
 
     async init() {
       await this.loadClinicId();
       await Promise.all([this.loadProfessionals(), this.loadPatients(), this.loadServices()]);
       await this.loadAll();
+
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('novo_agendamento') === '1') {
+        this.openNewForm();
+        const patientId = params.get('patient_id');
+        if (patientId) {
+          const p = this.patients.find(pp => pp.id === patientId);
+          if (p) await this.selectPatientForAppt(p);
+        }
+      }
     },
 
     async loadClinicId() {
@@ -641,11 +692,21 @@ function agendaApp() {
       const hh = Math.floor(totalMinutes / 60);
       const mm = totalMinutes % 60;
       const time = String(hh).padStart(2, '0') + ':' + String(mm).padStart(2, '0');
-      this.contextMenu = { show: true, x: event.clientX, y: event.clientY, professionalId: profId, time, date: new Date(this.currentDate) };
+      this.contextMenu = { show: true, x: event.clientX, y: event.clientY, professionalId: profId, time, date: new Date(this.currentDate), showViewDay: false };
     },
 
     onContextMenuWeek(event, day) {
-      this.contextMenu = { show: true, x: event.clientX, y: event.clientY, professionalId: '', time: '09:00', date: new Date(day) };
+      this.contextMenu = { show: true, x: event.clientX, y: event.clientY, professionalId: '', time: '09:00', date: new Date(day), showViewDay: false };
+    },
+
+    onContextMenuMonth(event, day) {
+      this.contextMenu = { show: true, x: event.clientX, y: event.clientY, professionalId: '', time: '09:00', date: new Date(day), showViewDay: true };
+    },
+
+    ctxVerDia() {
+      const date = this.contextMenu.date || this.currentDate;
+      this.contextMenu.show = false;
+      this.goToDay(date);
     },
 
     ctxIncluir() {
@@ -670,11 +731,70 @@ function agendaApp() {
     },
 
     showApptDetail(appt) {
-      this.apptDetail = { show: true, appt };
+      this.apptDetail = { show: true, appt, mode: 'view', rescheduleDate: '', rescheduleTime: '', cancelReason: '' };
     },
 
     closeApptDetail() {
-      this.apptDetail = { show: false, appt: null };
+      this.apptDetail = { show: false, appt: null, mode: 'view', rescheduleDate: '', rescheduleTime: '', cancelReason: '' };
+    },
+
+    startDetailReschedule() {
+      const d = new Date(this.apptDetail.appt.scheduled_at);
+      this.apptDetail.rescheduleDate = this.toDateInputValue(d);
+      this.apptDetail.rescheduleTime = d.toTimeString().slice(0, 5);
+      this.apptDetail.mode = 'reagendar';
+    },
+
+    async submitDetailReschedule() {
+      const appt = this.apptDetail.appt;
+      if (!appt || !this.apptDetail.rescheduleDate || !this.apptDetail.rescheduleTime) return;
+      const newDateTime = new Date(this.apptDetail.rescheduleDate + 'T' + this.apptDetail.rescheduleTime + ':00');
+
+      const preventDouble = !window.__prismaClinicSettings || window.__prismaClinicSettings.prevent_double_booking !== false;
+      if (preventDouble && appt.professional_id) {
+        const hasConflict = await this.hasSchedulingConflict(appt.professional_id, newDateTime, appt.duration_minutes || 60, appt.id);
+        if (hasConflict) {
+          this.showFeedback('error', 'Esse profissional já tem um agendamento nesse novo horário. Escolha outro.');
+          return;
+        }
+      }
+
+      this.savingDetail = true;
+      const { error } = await supabaseClient
+        .from('appointments')
+        .update({ scheduled_at: newDateTime.toISOString(), rescheduled_count: (appt.rescheduled_count || 0) + 1 })
+        .eq('id', appt.id);
+      this.savingDetail = false;
+      if (error) {
+        this.showFeedback('error', 'Erro ao reagendar: ' + error.message);
+        return;
+      }
+      this.showFeedback('success', 'Agendamento remarcado com sucesso.');
+      this.closeApptDetail();
+      await this.loadAppointments();
+    },
+
+    startDetailCancel() {
+      this.apptDetail.cancelReason = '';
+      this.apptDetail.mode = 'cancelar';
+    },
+
+    async submitDetailCancel() {
+      const appt = this.apptDetail.appt;
+      if (!appt) return;
+      this.savingDetail = true;
+      const { error } = await supabaseClient
+        .from('appointments')
+        .update({ status: 'cancelado', cancel_reason: this.apptDetail.cancelReason || null })
+        .eq('id', appt.id);
+      this.savingDetail = false;
+      if (error) {
+        this.showFeedback('error', 'Erro ao cancelar: ' + error.message);
+        return;
+      }
+      this.showFeedback('success', 'Agendamento cancelado.');
+      this.closeApptDetail();
+      await this.loadAppointments();
     },
 
     ctxGerenciarBloqueios() {
@@ -691,6 +811,17 @@ function agendaApp() {
       const q = this.patientSearch.trim().toLowerCase();
       if (!q) return this.patients.slice(0, 20);
       return this.patients.filter(p => p.full_name.toLowerCase().includes(q)).slice(0, 20);
+    },
+
+    get groupedOpenServices() {
+      const map = {};
+      this.patientPackages.forEach(pk => {
+        const name = pk.services ? pk.services.name : 'Pacote';
+        const remaining = Number(pk.total_sessions) - Number(pk.used_sessions);
+        if (!map[name]) map[name] = 0;
+        map[name] += remaining;
+      });
+      return Object.keys(map).sort().map(name => ({ name, remaining: map[name] }));
     },
 
     async selectPatientForAppt(p) {
@@ -718,6 +849,37 @@ function agendaApp() {
       this.showNewForm = true;
     },
 
+    displayPatientName(fullName) {
+      if (!fullName) return 'Paciente';
+      const format = window.__prismaClinicSettings ? window.__prismaClinicSettings.agenda_name_format : 'completo';
+      const parts = fullName.trim().split(/\s+/);
+      if (format === 'primeiro') return parts[0];
+      if (format === 'nome_sobrenome') return parts.length > 1 ? parts[0] + ' ' + parts[parts.length - 1] : parts[0];
+      return fullName;
+    },
+
+    async hasSchedulingConflict(professionalId, scheduledAt, durationMinutes, excludeApptId) {
+      const dayStart = new Date(scheduledAt); dayStart.setHours(0, 0, 0, 0);
+      const dayEnd = new Date(scheduledAt); dayEnd.setHours(23, 59, 59, 999);
+      let query = supabaseClient
+        .from('appointments')
+        .select('id, scheduled_at, duration_minutes, status')
+        .eq('professional_id', professionalId)
+        .gte('scheduled_at', dayStart.toISOString())
+        .lte('scheduled_at', dayEnd.toISOString())
+        .neq('status', 'cancelado');
+      const { data, error } = await query;
+      if (error || !data) return false;
+      const newStart = scheduledAt.getTime();
+      const newEnd = newStart + durationMinutes * 60000;
+      return data.some(appt => {
+        if (excludeApptId && appt.id === excludeApptId) return false;
+        const existingStart = new Date(appt.scheduled_at).getTime();
+        const existingEnd = existingStart + (appt.duration_minutes || 60) * 60000;
+        return newStart < existingEnd && existingStart < newEnd;
+      });
+    },
+
     async createAppointment() {
       if (!this.clinicId) {
         this.showFeedback('error', 'Não foi possível identificar sua clínica. Recarregue a página.');
@@ -727,9 +889,20 @@ function agendaApp() {
         this.showFeedback('error', 'Selecione um paciente na busca antes de salvar.');
         return;
       }
-      this.saving = true;
       const service = this.services.find(s => s.id === this.newAppt.service_id);
       const scheduledAt = new Date(this.newAppt.date + 'T' + (this.newAppt.time || '09:00') + ':00');
+      const durationMinutes = service ? service.default_duration_minutes : 60;
+
+      const preventDouble = !window.__prismaClinicSettings || window.__prismaClinicSettings.prevent_double_booking !== false;
+      if (preventDouble && this.newAppt.professional_id) {
+        const hasConflict = await this.hasSchedulingConflict(this.newAppt.professional_id, scheduledAt, durationMinutes, null);
+        if (hasConflict) {
+          this.showFeedback('error', 'Esse profissional já tem um agendamento nesse horário. Escolha outro horário.');
+          return;
+        }
+      }
+
+      this.saving = true;
       const payload = {
         clinic_id: this.clinicId,
         patient_id: this.newAppt.patient_id,
@@ -737,7 +910,7 @@ function agendaApp() {
         service_id: this.newAppt.service_id || null,
         package_id: this.newAppt.package_id || null,
         scheduled_at: scheduledAt.toISOString(),
-        duration_minutes: service ? service.default_duration_minutes : 60,
+        duration_minutes: durationMinutes,
         status: 'agendado'
       };
       const { error } = await supabaseClient.from('appointments').insert(payload);
@@ -806,6 +979,7 @@ function agendaApp() {
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="js/supabase-client.js"></script>
 <script src="js/auth-guard.js"></script>
+<script src="js/topbar.js"></script>
 <script src="js/include.js" defer></script>
 </body>
 </html>

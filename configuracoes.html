@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Configurações · Prisma Gestão de Clínicas</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body data-page="configuracoes" data-title="Configurações" data-subtitle="" data-allowed-roles="administrador" x-data="{ sidebarOpen:false }">
+
+<div class="app-shell">
+  <div data-include="partials/sidebar.html"></div>
+
+  <div class="main">
+    <header class="topbar" data-include="partials/topbar.html"></header>
+
+    <main class="content" x-data="configuracoesApp()" x-init="init()">
+
+      <div class="page-header">
+        <div>
+          <h2>Configurações</h2>
+          <p>Identidade visual, regras de agendamento, segurança e permissões da clínica</p>
+        </div>
+        <button class="btn btn-primary" type="button" @click="save()" :disabled="saving">
+          <span x-show="!saving">Salvar alterações</span>
+          <span x-show="saving" x-cloak>Salvando…</span>
+        </button>
+      </div>
+
+      <div x-show="feedback.message" x-cloak class="card mb-4" :style="'padding:12px 16px;border-color:' + (feedback.type==='error' ? 'var(--color-danger)' : 'var(--color-success)')">
+        <span class="text-sm" x-text="feedback.message" :style="'color:' + (feedback.type==='error' ? 'var(--color-danger)' : 'var(--color-success)')"></span>
+      </div>
+
+      <div x-show="loading" class="text-sm text-muted">Carregando…</div>
+
+      <div x-show="!loading" class="flex gap-2 mb-5" style="flex-wrap:wrap;">
+        <button class="btn btn-sm" :class="tab==='geral' ? 'btn-primary' : 'btn-secondary'" @click="tab='geral'">Geral</button>
+        <button class="btn btn-sm" :class="tab==='agendamento' ? 'btn-primary' : 'btn-secondary'" @click="tab='agendamento'">Agendamento</button>
+        <button class="btn btn-sm" :class="tab==='seguranca' ? 'btn-primary' : 'btn-secondary'" @click="tab='seguranca'">Segurança</button>
+        <button class="btn btn-sm" :class="tab==='desempenho' ? 'btn-primary' : 'btn-secondary'" @click="tab='desempenho'">Desempenho</button>
+      </div>
+
+      <!-- GERAL -->
+      <div x-show="!loading && tab==='geral'" class="flex" style="flex-direction:column;gap:20px;max-width:640px;">
+        <div class="card card-shadow">
+          <h3 class="mb-3" style="font-size:15px;">Identidade da clínica</h3>
+          <div class="form-group">
+            <label class="label">Nome da clínica</label>
+            <input class="input" x-model="clinicName">
+          </div>
+          <div class="form-group">
+            <label class="label">Logotipo</label>
+            <div class="flex items-center gap-3">
+              <img :src="settings.logo_url" x-show="settings.logo_url" style="height:44px;max-width:160px;object-fit:contain;border:1px solid var(--color-border);border-radius:var(--radius-md);padding:4px;">
+              <input type="file" accept="image/*" x-ref="logoInput" @change="onLogoSelected($event)" style="display:none;">
+              <button type="button" class="btn btn-secondary btn-sm" @click="$refs.logoInput.click()">Enviar logotipo</button>
+              <span class="text-xs text-muted" x-show="uploadingLogo">Enviando…</span>
+            </div>
+            <p class="input-hint">Aparece no menu lateral do sistema.</p>
+          </div>
+        </div>
+
+        <div class="card card-shadow">
+          <h3 class="mb-3" style="font-size:15px;">Aparência</h3>
+          <div class="form-group">
+            <label class="label">Tema</label>
+            <div class="flex gap-4 mt-1">
+              <label class="text-sm flex items-center gap-2"><input type="radio" value="claro" x-model="settings.theme" @change="previewTheme()" style="width:auto;"> Claro</label>
+              <label class="text-sm flex items-center gap-2"><input type="radio" value="escuro" x-model="settings.theme" @change="previewTheme()" style="width:auto;"> Escuro</label>
+            </div>
+            <p class="input-hint">Vale para todo mundo que acessa o sistema dessa clínica.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- AGENDAMENTO -->
+      <div x-show="!loading && tab==='agendamento'" class="flex" style="flex-direction:column;gap:20px;max-width:640px;">
+        <div class="card card-shadow">
+          <h3 class="mb-3" style="font-size:15px;">Regras da agenda</h3>
+          <div class="form-group flex items-center gap-2">
+            <input type="checkbox" x-model="settings.prevent_double_booking" id="dbl" style="width:auto;">
+            <label for="dbl" class="text-sm" style="margin:0;">Impedir agendar dois pacientes no mesmo horário para o mesmo profissional</label>
+          </div>
+          <div class="form-group mt-3">
+            <label class="label">Como exibir o nome do paciente na agenda</label>
+            <select class="input" x-model="settings.agenda_name_format">
+              <option value="completo">Nome completo</option>
+              <option value="primeiro">Só o primeiro nome</option>
+              <option value="nome_sobrenome">Primeiro nome e sobrenome</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- SEGURANÇA -->
+      <div x-show="!loading && tab==='seguranca'" class="flex" style="flex-direction:column;gap:20px;max-width:640px;">
+        <div class="card card-shadow">
+          <h3 class="mb-3" style="font-size:15px;">Senha do gerente</h3>
+          <p class="text-xs text-muted mb-3">
+            Usada para autorizar ações sensíveis na hora da venda. Como o sistema não tem um servidor próprio, trate essa senha como uma trava operacional para a equipe (evitar desconto/cortesia sem autorização), não como segurança de dados — ela não substitui o login de cada pessoa.
+          </p>
+          <div class="form-group">
+            <label class="label">Senha do gerente</label>
+            <input class="input" type="text" x-model="settings.manager_password" placeholder="Deixe em branco para não exigir">
+          </div>
+          <div class="form-group flex items-center gap-2">
+            <input type="checkbox" x-model="settings.manager_password_for_discount" id="pwdisc" style="width:auto;">
+            <label for="pwdisc" class="text-sm" style="margin:0;">Exigir senha do gerente para aplicar desconto em uma venda</label>
+          </div>
+          <div class="form-group flex items-center gap-2">
+            <input type="checkbox" x-model="settings.manager_password_for_courtesy" id="pwcourt" style="width:auto;">
+            <label for="pwcourt" class="text-sm" style="margin:0;">Exigir senha do gerente para marcar um item como cortesia</label>
+          </div>
+        </div>
+      </div>
+
+      <!-- DESEMPENHO -->
+      <div x-show="!loading && tab==='desempenho'" class="flex" style="flex-direction:column;gap:20px;max-width:640px;">
+        <div class="card card-shadow">
+          <h3 class="mb-3" style="font-size:15px;">Permissões de visualização</h3>
+          <div class="form-group flex items-center gap-2">
+            <input type="checkbox" x-model="settings.show_performance_to_staff" id="showperf" style="width:auto;">
+            <label for="showperf" class="text-sm" style="margin:0;">Atendente e Esteticista podem ver a aba Desempenho (a própria meta, comissão e o ranking da equipe)</label>
+          </div>
+          <p class="input-hint">Se desmarcar, só o Administrador enxerga o Desempenho. Cada funcionário sempre vê só os próprios números — nunca os dos colegas.</p>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="js/supabase-client.js"></script>
+<script src="js/auth-guard.js"></script>
+<script src="js/topbar.js"></script>
+<script>
+function configuracoesApp() {
+  return {
+    loading: true,
+    saving: false,
+    uploadingLogo: false,
+    clinicId: null,
+    clinicName: '',
+    tab: 'geral',
+    settings: {
+      logo_url: '', theme: 'claro', prevent_double_booking: true, agenda_name_format: 'completo',
+      manager_password: '', manager_password_for_discount: false, manager_password_for_courtesy: false,
+      show_performance_to_staff: true
+    },
+    settingsId: null,
+    feedback: { type: '', message: '' },
+
+    async init() {
+      const { data: { user } } = await supabaseClient.auth.getUser();
+      if (!user) { this.loading = false; return; }
+      const { data: profile, error: profileError } = await supabaseClient.from('users').select('clinic_id').eq('id', user.id).single();
+      if (profileError || !profile) {
+        this.showFeedback('error', 'Erro ao identificar sua clínica.');
+        this.loading = false;
+        return;
+      }
+      this.clinicId = profile.clinic_id;
+
+      const [clinicRes, settingsRes] = await Promise.all([
+        supabaseClient.from('clinics').select('name').eq('id', this.clinicId).single(),
+        supabaseClient.from('clinic_settings').select('*').eq('clinic_id', this.clinicId).maybeSingle()
+      ]);
+      if (clinicRes.data) this.clinicName = clinicRes.data.name;
+      if (settingsRes.data) {
+        this.settingsId = settingsRes.data.id;
+        this.settings = {
+          logo_url: settingsRes.data.logo_url || '',
+          theme: settingsRes.data.theme || 'claro',
+          prevent_double_booking: settingsRes.data.prevent_double_booking,
+          agenda_name_format: settingsRes.data.agenda_name_format || 'completo',
+          manager_password: settingsRes.data.manager_password || '',
+          manager_password_for_discount: settingsRes.data.manager_password_for_discount,
+          manager_password_for_courtesy: settingsRes.data.manager_password_for_courtesy,
+          show_performance_to_staff: settingsRes.data.show_performance_to_staff
+        };
+      }
+      this.loading = false;
+    },
+
+    previewTheme() {
+      document.documentElement.setAttribute('data-theme', this.settings.theme === 'escuro' ? 'escuro' : 'claro');
+    },
+
+    async onLogoSelected(event) {
+      const file = event.target.files[0];
+      if (!file || !this.clinicId) return;
+      this.uploadingLogo = true;
+      const path = this.clinicId + '/logo-' + Date.now() + '-' + file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+      const { error: upError } = await supabaseClient.storage.from('clinic-assets').upload(path, file, { upsert: true });
+      if (upError) {
+        this.uploadingLogo = false;
+        this.showFeedback('error', 'Erro ao enviar logotipo: ' + upError.message);
+        return;
+      }
+      const { data } = supabaseClient.storage.from('clinic-assets').getPublicUrl(path);
+      this.settings.logo_url = data.publicUrl;
+      this.uploadingLogo = false;
+    },
+
+    async save() {
+      if (!this.clinicId) return;
+      this.saving = true;
+
+      const { error: clinicError } = await supabaseClient.from('clinics').update({ name: this.clinicName }).eq('id', this.clinicId);
+      if (clinicError) {
+        this.saving = false;
+        this.showFeedback('error', 'Erro ao salvar nome da clínica: ' + clinicError.message);
+        return;
+      }
+
+      const payload = { clinic_id: this.clinicId, ...this.settings, updated_at: new Date().toISOString() };
+      let error;
+      if (this.settingsId) {
+        ({ error } = await supabaseClient.from('clinic_settings').update(payload).eq('id', this.settingsId));
+      } else {
+        const res = await supabaseClient.from('clinic_settings').insert(payload).select().single();
+        error = res.error;
+        if (!error && res.data) this.settingsId = res.data.id;
+      }
+      this.saving = false;
+      if (error) {
+        this.showFeedback('error', 'Erro ao salvar configurações: ' + error.message);
+        return;
+      }
+      this.previewTheme();
+      this.showFeedback('success', 'Configurações salvas.');
+    },
+
+    showFeedback(type, message) {
+      this.feedback = { type, message };
+      setTimeout(() => { this.feedback = { type: '', message: '' }; }, 5000);
+    }
+  };
+}
+</script>
+<script src="js/include.js" defer></script>
+</body>
+</html>

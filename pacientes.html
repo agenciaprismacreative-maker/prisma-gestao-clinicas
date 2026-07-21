@@ -102,10 +102,13 @@
                     <span x-show="selected && ageOf(selected.birth_date) !== null"> · <span x-text="selected && ageOf(selected.birth_date)"></span> anos</span>
                   </p>
                 </div>
-                <span class="badge" style="margin-left:auto;" :class="selected && selected.lgpd_consent_at ? 'badge-success' : 'badge-warning'">
-                  <span class="badge-dot"></span>
-                  <span x-text="selected && selected.lgpd_consent_at ? 'LGPD assinado' : 'LGPD pendente'"></span>
-                </span>
+                <div class="flex items-center gap-2" style="margin-left:auto;">
+                  <span class="badge" :class="selected && selected.lgpd_consent_at ? 'badge-success' : 'badge-warning'">
+                    <span class="badge-dot"></span>
+                    <span x-text="selected && selected.lgpd_consent_at ? 'LGPD assinado' : 'LGPD pendente'"></span>
+                  </span>
+                  <a class="btn btn-primary btn-sm" :href="selected ? ('agenda.html?novo_agendamento=1&patient_id=' + selected.id) : '#'">Agendar</a>
+                </div>
               </div>
               <hr class="divider">
               <div class="grid grid-2 gap-3 mb-3">
@@ -190,7 +193,35 @@
 
             <div class="card card-shadow">
               <div class="card-header"><div><h3>Fotos de evolução</h3><p>Comparador antes / depois</p></div></div>
-              <p class="text-sm text-muted">O upload de fotos por sessão fica disponível na tela de Atendimento e Prontuário.</p>
+              <div x-show="photosLoading" class="text-sm text-muted">Carregando fotos…</div>
+              <div x-show="!photosLoading && patientPhotos.length === 0" class="text-sm text-muted">
+                Nenhuma foto registrada ainda. O upload é feito na tela de Atendimento e Prontuário, ao concluir uma sessão.
+              </div>
+
+              <div x-show="!photosLoading && patientPhotos.length >= 2" class="mb-4">
+                <p class="text-xs text-muted mb-2">Mais antiga × mais recente</p>
+                <div class="grid grid-2 gap-2">
+                  <div>
+                    <img :src="oldestPhoto && oldestPhoto.url" style="width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:var(--radius-md);border:1px solid var(--color-border);cursor:pointer;" @click="openPhotoLightbox(oldestPhoto)">
+                    <p class="text-xs text-muted mt-1" x-text="oldestPhoto && formatDate(oldestPhoto.session_date)"></p>
+                  </div>
+                  <div>
+                    <img :src="newestPhoto && newestPhoto.url" style="width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:var(--radius-md);border:1px solid var(--color-border);cursor:pointer;" @click="openPhotoLightbox(newestPhoto)">
+                    <p class="text-xs text-muted mt-1" x-text="newestPhoto && formatDate(newestPhoto.session_date)"></p>
+                  </div>
+                </div>
+              </div>
+
+              <div x-show="!photosLoading && patientPhotos.length > 0">
+                <p class="text-xs text-muted mb-2">Todas as fotos</p>
+                <div class="grid grid-3 gap-2">
+                  <template x-for="photo in patientPhotos" :key="photo.id">
+                    <div style="position:relative;">
+                      <img :src="photo.url" style="width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:var(--radius-md);border:1px solid var(--color-border);cursor:pointer;" @click="openPhotoLightbox(photo)">
+                    </div>
+                  </template>
+                </div>
+              </div>
             </div>
 
           </div>
@@ -226,6 +257,16 @@
               </div>
             </div>
 
+            <div class="card card-shadow" x-show="referredFriends.length > 0" x-cloak>
+              <div class="card-header"><div><h3>Amigos indicados</h3><p>Pacientes que vieram por indicação deste paciente</p></div></div>
+              <template x-for="s in referredFriends" :key="s.id">
+                <div class="flex items-center justify-between mb-2">
+                  <span class="text-sm" x-text="s.patients.full_name"></span>
+                  <span class="badge" :class="s.status === 'aprovada' ? 'badge-success' : 'badge-warning'" x-text="s.status === 'aprovada' ? 'Compra confirmada' : 'Venda pendente'"></span>
+                </div>
+              </template>
+            </div>
+
             <div class="card card-shadow">
               <h3 class="mb-4" style="font-size:15px;">Histórico de atendimentos</h3>
               <div x-show="historyLoading" class="text-sm text-muted">Carregando histórico…</div>
@@ -252,9 +293,20 @@
         </div>
       </div>
 
+      <!-- lightbox de foto de evolução -->
+      <div x-show="photoLightbox.show" x-cloak class="modal-overlay" style="background:rgba(31,51,47,.75);z-index:60;" @click.self="closePhotoLightbox()">
+        <div style="max-width:min(640px,92vw);max-height:88vh;">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-sm" style="color:#fff;" x-text="photoLightbox.photo && formatDate(photoLightbox.photo.session_date)"></span>
+            <button class="btn btn-ghost btn-sm" type="button" @click="closePhotoLightbox()" style="color:#fff;">Fechar</button>
+          </div>
+          <img :src="photoLightbox.photo && photoLightbox.photo.url" style="max-width:100%;max-height:78vh;border-radius:var(--radius-md);display:block;">
+        </div>
+      </div>
+
       <!-- modal novo paciente -->
-      <div x-show="showNewForm" x-cloak style="position:fixed;inset:0;background:rgba(31,51,47,.45);z-index:50;display:flex;align-items:center;justify-content:center;padding:20px;" @click.self="showNewForm = false">
-        <div class="card card-shadow" style="width:100%;max-width:640px;max-height:88vh;overflow-y:auto;">
+      <div x-show="showNewForm" x-cloak class="modal-overlay" @click.self="showNewForm = false">
+        <div class="card card-shadow" style="margin:auto;width:100%;max-width:640px;max-height:88vh;overflow-y:auto;">
           <div class="card-header">
             <h3>Novo paciente</h3>
             <button class="btn btn-ghost btn-sm" type="button" @click="showNewForm = false">Fechar</button>
@@ -668,6 +720,10 @@ function pacientesApp() {
     patientAppointments: [],
     patientTransactions: [],
     commercialLoading: false,
+    patientPhotos: [],
+    photosLoading: false,
+    photoLightbox: { show: false, photo: null },
+    referredFriends: [],
     feedback: { type: '', message: '' },
 
     maskPhone, maskCpf, maskCep, isValidEmail, isValidCpf,
@@ -675,6 +731,16 @@ function pacientesApp() {
     async init() {
       await this.loadClinicId();
       await Promise.all([this.loadPatients(), this.loadUsers()]);
+
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('novo') === '1') {
+        this.openNewForm();
+      }
+      const patientId = params.get('patient_id');
+      if (patientId) {
+        const p = this.patients.find(pp => pp.id === patientId);
+        if (p) await this.selectPatient(p);
+      }
     },
 
     async loadUsers() {
@@ -797,10 +863,53 @@ function pacientesApp() {
 
       const [{ data: historyData, error: historyError }] = await Promise.all([
         historyPromise,
-        this.loadCommercialData(p.id)
+        this.loadCommercialData(p.id),
+        this.loadPatientPhotos(p.id),
+        this.loadReferredFriends(p.id)
       ]);
       if (!historyError) this.history = historyData || [];
       this.historyLoading = false;
+    },
+
+    async loadReferredFriends(patientId) {
+      const { data, error } = await supabaseClient
+        .from('sales')
+        .select('id, status, created_at, patients ( id, full_name )')
+        .eq('referred_by_patient_id', patientId)
+        .neq('status', 'cancelada')
+        .order('created_at', { ascending: false });
+      this.referredFriends = error ? [] : (data || []).filter(s => s.patients);
+    },
+
+    async loadPatientPhotos(patientId) {
+      this.photosLoading = true;
+      this.patientPhotos = [];
+      const { data, error } = await supabaseClient
+        .from('patient_photos')
+        .select('id, storage_path, session_date, marketing_consent, created_at')
+        .eq('patient_id', patientId)
+        .order('session_date', { ascending: true });
+      if (error || !data || data.length === 0) {
+        this.photosLoading = false;
+        return;
+      }
+      const withUrls = await Promise.all(data.map(async photo => {
+        const { data: signed } = await supabaseClient.storage
+          .from('patient-photos')
+          .createSignedUrl(photo.storage_path, 3600);
+        return { ...photo, url: signed ? signed.signedUrl : '' };
+      }));
+      this.patientPhotos = withUrls.filter(p => p.url);
+      this.photosLoading = false;
+    },
+
+    openPhotoLightbox(photo) {
+      if (!photo) return;
+      this.photoLightbox = { show: true, photo };
+    },
+
+    closePhotoLightbox() {
+      this.photoLightbox = { show: false, photo: null };
     },
 
     async loadCommercialData(patientId) {
@@ -840,6 +949,14 @@ function pacientesApp() {
       return this.patientTransactions
         .filter(t => t.type === 'pagamento_procedimento' || t.type === 'venda_pacote')
         .reduce((sum, t) => sum + Number(t.amount || 0), 0);
+    },
+
+    get oldestPhoto() {
+      return this.patientPhotos.length > 0 ? this.patientPhotos[0] : null;
+    },
+
+    get newestPhoto() {
+      return this.patientPhotos.length > 0 ? this.patientPhotos[this.patientPhotos.length - 1] : null;
     },
 
     formatCurrency(value) {
@@ -1063,6 +1180,7 @@ function pacientesApp() {
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="js/supabase-client.js"></script>
 <script src="js/auth-guard.js"></script>
+<script src="js/topbar.js"></script>
 <script src="js/include.js" defer></script>
 </body>
 </html>

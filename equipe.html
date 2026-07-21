@@ -90,8 +90,8 @@
       </div>
 
       <!-- modal detalhe da tarefa -->
-      <div x-show="selectedTask" x-cloak style="position:fixed;inset:0;background:rgba(31,51,47,.45);z-index:55;display:flex;align-items:center;justify-content:center;padding:20px;" @click.self="selectedTask = null">
-        <div class="card card-shadow" style="width:100%;max-width:420px;" x-show="selectedTask">
+      <div x-show="selectedTask" x-cloak class="modal-overlay" style="z-index:55;" @click.self="selectedTask = null">
+        <div class="card card-shadow" style="margin:auto;width:100%;max-width:420px;" x-show="selectedTask">
           <div class="card-header">
             <h3 x-text="selectedTask ? selectedTask.title : ''"></h3>
             <button class="btn btn-ghost btn-sm" @click="selectedTask = null">Fechar</button>
@@ -140,8 +140,8 @@
       </div>
 
       <!-- modal nova tarefa -->
-      <div x-show="showNewTaskForm" x-cloak style="position:fixed;inset:0;background:rgba(31,51,47,.45);z-index:50;display:flex;align-items:center;justify-content:center;padding:20px;" @click.self="showNewTaskForm=false">
-        <div class="card card-shadow" style="width:100%;max-width:480px;max-height:88vh;overflow-y:auto;">
+      <div x-show="showNewTaskForm" x-cloak class="modal-overlay" @click.self="showNewTaskForm=false">
+        <div class="card card-shadow" style="margin:auto;width:100%;max-width:480px;max-height:88vh;overflow-y:auto;">
           <div class="card-header"><h3>Nova tarefa</h3><button class="btn btn-ghost btn-sm" @click="showNewTaskForm=false">Fechar</button></div>
           <form @submit.prevent="createTask()">
             <div class="form-group">
@@ -167,14 +167,16 @@
                 <input class="input" type="date" x-model="newTask.due_date">
               </div>
             </div>
-            <div class="form-group">
+            <div class="form-group" style="position:relative;">
               <label class="label">Paciente relacionado (opcional)</label>
-              <select class="input" x-model="newTask.patient_id">
-                <option value="">Nenhum</option>
-                <template x-for="p in patients" :key="p.id">
-                  <option :value="p.id" x-text="p.full_name"></option>
+              <input class="input" type="text" x-model="taskPatientSearch" @focus="taskPatientDropdownOpen = true" @input="taskPatientDropdownOpen = true; newTask.patient_id = ''" placeholder="Digite o nome do paciente" autocomplete="off">
+              <div x-show="taskPatientDropdownOpen" x-cloak @click.away="taskPatientDropdownOpen = false"
+                   style="position:absolute;z-index:10;top:100%;left:0;right:0;background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-md);box-shadow:var(--shadow-md);max-height:200px;overflow-y:auto;margin-top:4px;">
+                <div @click="newTask.patient_id = ''; taskPatientSearch = ''; taskPatientDropdownOpen = false" class="patient-option" style="padding:9px 14px;cursor:pointer;font-size:13.5px;">Nenhum</div>
+                <template x-for="p in filteredPatientsFor(taskPatientSearch)" :key="p.id">
+                  <div @click="newTask.patient_id = p.id; taskPatientSearch = p.full_name; taskPatientDropdownOpen = false" class="patient-option" style="padding:9px 14px;cursor:pointer;font-size:13.5px;" x-text="p.full_name"></div>
                 </template>
-              </select>
+              </div>
             </div>
             <button class="btn btn-primary btn-block mt-2" type="submit" :disabled="saving">
               <span x-show="!saving">Criar tarefa</span>
@@ -185,8 +187,8 @@
       </div>
 
       <!-- modal vincular integrante -->
-      <div x-show="showNewMemberForm" x-cloak style="position:fixed;inset:0;background:rgba(31,51,47,.45);z-index:50;display:flex;align-items:center;justify-content:center;padding:20px;" @click.self="showNewMemberForm=false">
-        <div class="card card-shadow" style="width:100%;max-width:480px;">
+      <div x-show="showNewMemberForm" x-cloak class="modal-overlay" @click.self="showNewMemberForm=false">
+        <div class="card card-shadow" style="margin:auto;width:100%;max-width:480px;">
           <div class="card-header"><h3>Vincular integrante</h3><button class="btn btn-ghost btn-sm" @click="showNewMemberForm=false">Fechar</button></div>
           <form @submit.prevent="addTeamMember()">
             <div class="form-group">
@@ -241,8 +243,8 @@
       </div>
 
       <!-- modal editar integrante -->
-      <div x-show="showEditUserForm" x-cloak style="position:fixed;inset:0;background:rgba(31,51,47,.45);z-index:50;display:flex;align-items:center;justify-content:center;padding:20px;" @click.self="showEditUserForm=false">
-        <div class="card card-shadow" style="width:100%;max-width:480px;" x-show="editingUser">
+      <div x-show="showEditUserForm" x-cloak class="modal-overlay" @click.self="showEditUserForm=false">
+        <div class="card card-shadow" style="margin:auto;width:100%;max-width:480px;" x-show="editingUser">
           <div class="card-header"><h3>Editar integrante</h3><button class="btn btn-ghost btn-sm" @click="showEditUserForm=false">Fechar</button></div>
           <form @submit.prevent="saveEditUser()" x-show="editingUser">
             <div class="form-group">
@@ -311,6 +313,8 @@ function equipeApp() {
     editingUser: null,
     showNewMemberPass: false,
     newTask: { title: '', description: '', assigned_to: '', due_date: '', patient_id: '' },
+    taskPatientSearch: '',
+    taskPatientDropdownOpen: false,
     newMember: { full_name: '', email: '', password: '', role: 'esteticista', professional_register: '', specialties: '', bio: '' },
     feedback: { type: '', message: '' },
 
@@ -352,6 +356,12 @@ function equipeApp() {
     async loadPatients() {
       const { data, error } = await supabaseClient.from('patients').select('id, full_name').order('full_name');
       this.patients = error ? [] : (data || []);
+    },
+
+    filteredPatientsFor(query) {
+      const q = (query || '').trim().toLowerCase();
+      if (!q) return this.patients.slice(0, 20);
+      return this.patients.filter(p => p.full_name.toLowerCase().includes(q)).slice(0, 20);
     },
 
     tasksByStatus(status) {
@@ -404,6 +414,7 @@ function equipeApp() {
       }
       this.showNewTaskForm = false;
       this.newTask = { title: '', description: '', assigned_to: '', due_date: '', patient_id: '' };
+      this.taskPatientSearch = '';
       this.showFeedback('success', 'Tarefa criada.');
       await this.loadTasks();
     },
@@ -513,6 +524,7 @@ function equipeApp() {
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="js/supabase-client.js"></script>
 <script src="js/auth-guard.js"></script>
+<script src="js/topbar.js"></script>
 <script src="js/include.js" defer></script>
 </body>
 </html>

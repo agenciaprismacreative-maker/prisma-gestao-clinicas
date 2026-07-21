@@ -1,34 +1,62 @@
-<div class="flex items-center gap-4">
-  <button class="icon-btn menu-toggle" type="button" @click="sidebarOpen = !sidebarOpen" title="Abrir menu">
-    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M3 6h18"/><path d="M3 12h18"/><path d="M3 18h18"/>
-    </svg>
-  </button>
-  <div class="topbar-title">
-    <h1 data-slot="page-title">Prisma</h1>
-    <span data-slot="page-subtitle" class="text-muted"></span>
-  </div>
-</div>
+<div x-data="topbarApp()" x-init="init()" style="display:contents;">
 
-<div class="topbar-actions">
-  <div class="topbar-search">
-    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-      <circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>
-    </svg>
-    <input type="text" placeholder="Buscar paciente, agendamento…">
+  <div class="flex items-center gap-4">
+    <button class="icon-btn menu-toggle" type="button" @click="sidebarOpen = !sidebarOpen" title="Abrir menu">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 6h18"/><path d="M3 12h18"/><path d="M3 18h18"/>
+      </svg>
+    </button>
+    <div class="topbar-title">
+      <h1 data-slot="page-title">Prisma</h1>
+      <span data-slot="page-subtitle" class="text-muted"></span>
+    </div>
   </div>
 
-  <button class="icon-btn" type="button" title="Notificações">
-    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M6 9a6 6 0 0 1 12 0c0 4 1.5 5.5 1.5 5.5H4.5S6 13 6 9z"/><path d="M10 18a2 2 0 0 0 4 0"/>
-    </svg>
-    <span class="dot"></span>
-  </button>
+  <div class="topbar-actions">
+    <div class="topbar-search" style="position:relative;">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>
+      </svg>
+      <input type="text" placeholder="Buscar paciente pelo nome…" x-model="query" @input="onSearchInput()" @focus="showResults = query.trim().length >= 2" @blur="closeSearchDelayed()">
 
-  <a href="pacientes.html" class="btn btn-primary btn-sm">
-    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;">
-      <path d="M12 5v14"/><path d="M5 12h14"/>
-    </svg>
-    Novo paciente
-  </a>
+      <div x-show="showResults" x-cloak class="card card-shadow" style="position:absolute;top:calc(100% + 6px);left:0;width:280px;padding:8px;z-index:70;max-height:320px;overflow-y:auto;">
+        <div x-show="searching" class="text-xs text-muted" style="padding:8px;">Buscando…</div>
+        <div x-show="!searching && results.length === 0" class="text-xs text-muted" style="padding:8px;">Nenhum paciente encontrado.</div>
+        <template x-for="p in results" :key="p.id">
+          <div @mousedown.prevent="goToPatient(p)" style="padding:8px;border-radius:var(--radius-md);cursor:pointer;" class="topbar-search-result">
+            <div class="text-sm" x-text="p.full_name" style="font-weight:600;"></div>
+            <div class="text-xs text-muted" x-text="p.phone || 'sem telefone'"></div>
+          </div>
+        </template>
+      </div>
+    </div>
+
+    <div style="position:relative;">
+      <button class="icon-btn" type="button" title="Lembretes" @click="showReminders = !showReminders">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M6 9a6 6 0 0 1 12 0c0 4 1.5 5.5 1.5 5.5H4.5S6 13 6 9z"/><path d="M10 18a2 2 0 0 0 4 0"/>
+        </svg>
+        <span class="dot" x-show="reminders.length > 0"></span>
+      </button>
+
+      <div x-show="showReminders" x-cloak @click.outside="showReminders = false" class="card card-shadow" style="position:absolute;top:calc(100% + 6px);right:0;width:300px;padding:8px;z-index:70;max-height:360px;overflow-y:auto;">
+        <p class="text-xs text-muted mb-2" style="padding:4px 8px;">Lembretes e pendências</p>
+        <div x-show="remindersLoading" class="text-xs text-muted" style="padding:8px;">Carregando…</div>
+        <div x-show="!remindersLoading && reminders.length === 0" class="text-xs text-muted" style="padding:8px;">Nada pendente por aqui.</div>
+        <template x-for="(r, i) in reminders" :key="i">
+          <a :href="r.href" class="topbar-search-result" style="display:block;padding:8px;border-radius:var(--radius-md);text-decoration:none;">
+            <span class="text-sm" :style="'color:' + (r.overdue ? 'var(--color-danger)' : 'var(--color-text)')" x-text="r.label"></span>
+          </a>
+        </template>
+      </div>
+    </div>
+
+    <a href="pacientes.html?novo=1" class="btn btn-primary btn-sm">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;">
+        <path d="M12 5v14"/><path d="M5 12h14"/>
+      </svg>
+      Novo paciente
+    </a>
+  </div>
+
 </div>

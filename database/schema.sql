@@ -336,10 +336,15 @@ create table public.sales (
   status text not null default 'pendente' check (status in ('pendente', 'aprovada', 'cancelada')),
   origin text,
   validity_months integer,
+  discount_percentage numeric(5, 2) not null default 0,
   total_amount numeric(10, 2) not null default 0,
   payment_method text,
   installments integer not null default 1,
   payment_machine_id uuid references public.payment_machines (id) on delete set null,
+  payment_lines jsonb,
+  referred_by_patient_id uuid references public.patients (id) on delete set null,
+  referred_by_user_id uuid references public.users (id) on delete set null,
+  referral_commission_percentage numeric(5, 2),
   created_by uuid references public.users (id) on delete set null,
   approved_at timestamptz,
   approved_by uuid references public.users (id) on delete set null,
@@ -364,14 +369,56 @@ create table public.sale_items (
 );
 
 -- ============================================================================
--- 20. DASHBOARD_NOTES (anotações manuais / post-its da clínica)
+-- 20. DASHBOARD_NOTES (anotações manuais / post-its da clínica; podem ser
+-- públicas para a clínica inteira ou direcionadas a um funcionário)
 -- ============================================================================
 create table public.dashboard_notes (
   id uuid primary key default gen_random_uuid(),
   clinic_id uuid not null references public.clinics (id) on delete cascade,
   author_id uuid references public.users (id) on delete set null,
+  target_user_id uuid references public.users (id) on delete cascade,
   content text not null,
   created_at timestamptz not null default now()
+);
+
+-- ============================================================================
+-- 21. PLAN_TEMPLATES / PLAN_TEMPLATE_ITEMS (modelos de pacote reutilizáveis:
+-- descrevem o que um pacote oferece, sem preço nem pagamento — isso só
+-- existe na venda em si, montada em cima de um modelo ou do zero)
+-- ============================================================================
+create table public.plan_templates (
+  id uuid primary key default gen_random_uuid(),
+  clinic_id uuid not null references public.clinics (id) on delete cascade,
+  name text not null,
+  description text,
+  created_at timestamptz not null default now()
+);
+
+create table public.plan_template_items (
+  id uuid primary key default gen_random_uuid(),
+  plan_template_id uuid not null references public.plan_templates (id) on delete cascade,
+  service_id uuid not null references public.services (id),
+  quantity integer not null default 1,
+  created_at timestamptz not null default now()
+);
+
+-- ============================================================================
+-- 22. CLINIC_SETTINGS (aba Configurações: identidade visual, tema, regras de
+-- agendamento, senha do gerente e permissão de visualização do desempenho)
+-- ============================================================================
+create table public.clinic_settings (
+  id uuid primary key default gen_random_uuid(),
+  clinic_id uuid not null unique references public.clinics (id) on delete cascade,
+  logo_url text,
+  theme text not null default 'claro' check (theme in ('claro', 'escuro')),
+  prevent_double_booking boolean not null default true,
+  agenda_name_format text not null default 'completo' check (agenda_name_format in ('completo', 'primeiro', 'nome_sobrenome')),
+  manager_password text,
+  manager_password_for_discount boolean not null default false,
+  manager_password_for_courtesy boolean not null default false,
+  show_performance_to_staff boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
 );
 
 -- ============================================================================
@@ -396,6 +443,12 @@ create index idx_sales_clinic_status on public.sales (clinic_id, status);
 create index idx_sales_patient on public.sales (patient_id);
 create index idx_sale_items_sale on public.sale_items (sale_id);
 create index idx_dashboard_notes_clinic on public.dashboard_notes (clinic_id, created_at);
+create index idx_dashboard_notes_target on public.dashboard_notes (target_user_id);
+create index idx_sales_referred_patient on public.sales (referred_by_patient_id);
+create index idx_sales_referred_user on public.sales (referred_by_user_id);
+create index idx_plan_templates_clinic on public.plan_templates (clinic_id);
+create index idx_plan_template_items_template on public.plan_template_items (plan_template_id);
+create unique index idx_clinic_settings_clinic on public.clinic_settings (clinic_id);
 
 -- ============================================================================
 -- FUNÇÕES AUXILIARES PARA AS POLÍTICAS DE RLS
@@ -477,6 +530,9 @@ alter table public.payment_machines enable row level security;
 alter table public.sales enable row level security;
 alter table public.sale_items enable row level security;
 alter table public.dashboard_notes enable row level security;
+alter table public.plan_templates enable row level security;
+alter table public.plan_template_items enable row level security;
+alter table public.clinic_settings enable row level security;
 
 -- clinics: qualquer usuário autenticado enxerga apenas a própria clínica
 create policy "clinics_select" on public.clinics for select
@@ -601,6 +657,31 @@ create policy "dashboard_notes_all" on public.dashboard_notes for all
   using (clinic_id = public.auth_clinic_id() or public.auth_is_prisma_team())
   with check (clinic_id = public.auth_clinic_id() or public.auth_is_prisma_team());
 
+create policy "plan_templates_all" on public.plan_templates for all
+  using (clinic_id = public.auth_clinic_id() or public.auth_is_prisma_team())
+  with check (clinic_id = public.auth_clinic_id() or public.auth_is_prisma_team());
+
+create policy "plan_template_items_all" on public.plan_template_items for all
+  using (exists (
+    select 1 from public.plan_templates t
+    where t.id = plan_template_items.plan_template_id
+      and (t.clinic_id = public.auth_clinic_id() or public.auth_is_prisma_team())
+  ))
+  with check (exists (
+    select 1 from public.plan_templates t
+    where t.id = plan_template_items.plan_template_id
+      and (t.clinic_id = public.auth_clinic_id() or public.auth_is_prisma_team())
+  ));
+
+-- clinic_settings: qualquer integrante da clínica lê (a agenda e o tema
+-- dependem disso para todo mundo), só administrador escreve.
+create policy "clinic_settings_select" on public.clinic_settings for select
+  using (clinic_id = public.auth_clinic_id() or public.auth_is_prisma_team());
+
+create policy "clinic_settings_write" on public.clinic_settings for all
+  using (public.auth_is_prisma_team() or (clinic_id = public.auth_clinic_id() and public.auth_is_admin()))
+  with check (public.auth_is_prisma_team() or (clinic_id = public.auth_clinic_id() and public.auth_is_admin()));
+
 -- ============================================================================
 -- STORAGE: bucket para fotos de evolução dos pacientes
 -- ============================================================================
@@ -613,6 +694,22 @@ create policy "patient_photos_storage_select" on storage.objects for select
 
 create policy "patient_photos_storage_insert" on storage.objects for insert
   with check (bucket_id = 'patient-photos' and auth.role() = 'authenticated');
+
+-- ============================================================================
+-- STORAGE: bucket público para logo e outros assets visuais da clínica
+-- ============================================================================
+insert into storage.buckets (id, name, public)
+values ('clinic-assets', 'clinic-assets', true)
+on conflict (id) do nothing;
+
+create policy "clinic_assets_storage_select" on storage.objects for select
+  using (bucket_id = 'clinic-assets');
+
+create policy "clinic_assets_storage_insert" on storage.objects for insert
+  with check (bucket_id = 'clinic-assets' and auth.role() = 'authenticated');
+
+create policy "clinic_assets_storage_update" on storage.objects for update
+  using (bucket_id = 'clinic-assets' and auth.role() = 'authenticated');
 
 -- ============================================================================
 -- Fim do schema. Próximo passo: criar a clínica e o primeiro usuário de teste

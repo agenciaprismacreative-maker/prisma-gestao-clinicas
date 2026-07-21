@@ -61,6 +61,38 @@
   --topbar-height: 68px;
 }
 
+/* Tema escuro, ativado via [data-theme="escuro"] no <html>, de acordo com
+   a configuração da clínica em Configurações > Geral. */
+html[data-theme="escuro"] {
+  --color-bg: #16181A;
+  --color-surface: #1F2224;
+  --color-surface-alt: #282B2D;
+  --color-border: #383B3D;
+  --color-text: #ECEAE5;
+  --color-text-muted: #A9A69F;
+  --color-text-soft: #75726B;
+
+  --color-primary: #4C7B72;
+  --color-primary-dark: #37584F;
+  --color-primary-light: #24312E;
+
+  --color-accent: #D4AF52;
+  --color-accent-light: #332C1B;
+
+  --color-success: #4FA279;
+  --color-success-bg: #1D2E26;
+  --color-warning: #D4A017;
+  --color-warning-bg: #332C16;
+  --color-danger: #D46464;
+  --color-danger-bg: #332020;
+  --color-info: #5C93C9;
+  --color-info-bg: #1E2A34;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, .3), 0 1px 3px rgba(0, 0, 0, .25);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, .35);
+  --shadow-lg: 0 16px 40px rgba(0, 0, 0, .5);
+}
+
 * { box-sizing: border-box; }
 html, body { height: 100%; }
 body {
@@ -156,6 +188,7 @@ svg.icon { width: 20px; height: 20px; flex-shrink: 0; }
 }
 .topbar-search input { border: none; background: transparent; outline: none; font-size: 13.5px; width: 100%; font-family: inherit; color: var(--color-text); }
 .topbar-search svg { color: var(--color-text-soft); }
+.topbar-search-result:hover { background: var(--color-surface-alt); }
 .icon-btn {
   width: 38px; height: 38px; border-radius: var(--radius-md);
   display: flex; align-items: center; justify-content: center;
@@ -313,6 +346,21 @@ textarea.input { resize: vertical; min-height: 80px; }
 }
 .sidebar-backdrop.is-open { display: block; }
 [x-cloak] { display: none !important; }
+
+/* ---------- modais ---------- */
+/* Overlay padrão de todo popup/modal do sistema: cobre a tela inteira,
+   centraliza o card e, se o conteúdo for mais alto que a tela, rola a
+   própria camada (align-items:flex-start + padding) em vez de cortar o
+   topo do card, que é o que fazia os modais mais longos parecerem
+   "grudados" no canto em telas menores. */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(31, 51, 47, .45);
+  z-index: 50; display: flex; align-items: flex-start; justify-content: center;
+  padding: 5vh 20px; overflow-y: auto;
+}
+.modal-card { width: min(92vw, 480px); margin: auto; }
+.modal-card-sm { width: min(92vw, 360px); margin: auto; }
+.modal-card-lg { width: min(94vw, 720px); margin: auto; }
 
 /* ---------- tela de login ---------- */
 .auth-screen {

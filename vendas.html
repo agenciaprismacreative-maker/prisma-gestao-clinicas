@@ -75,6 +75,7 @@
                     <button class="btn btn-ghost btn-sm" type="button" @click="viewSale(s)">Ver</button>
                     <button class="btn btn-secondary btn-sm" type="button" x-show="s.status === 'pendente'" @click="approveSale(s)" :disabled="approving">Aprovar</button>
                     <button class="btn btn-ghost btn-sm" type="button" x-show="s.status === 'pendente'" @click="cancelSale(s)">Cancelar</button>
+                    <button class="btn btn-ghost btn-sm" type="button" x-show="s.status === 'aprovada'" @click="downloadReceipt(s)">Comprovante</button>
                   </td>
                 </tr>
               </template>
@@ -84,8 +85,8 @@
       </div>
 
       <!-- modal ver venda -->
-      <div x-show="viewingSale" x-cloak style="position:fixed;inset:0;background:rgba(31,51,47,.45);z-index:50;display:flex;align-items:center;justify-content:center;padding:20px;" @click.self="viewingSale = null">
-        <div class="card card-shadow" style="width:100%;max-width:520px;max-height:88vh;overflow-y:auto;" x-show="viewingSale">
+      <div x-show="viewingSale" x-cloak class="modal-overlay" @click.self="viewingSale = null">
+        <div class="card card-shadow" style="margin:auto;width:100%;max-width:520px;max-height:88vh;overflow-y:auto;" x-show="viewingSale">
           <div class="card-header">
             <h3 x-text="viewingSale ? ((viewingSale.patients ? viewingSale.patients.full_name : 'Paciente')) : ''"></h3>
             <button class="btn btn-ghost btn-sm" @click="viewingSale = null">Fechar</button>
@@ -112,19 +113,20 @@
               <p class="text-sm"><strong>Total: </strong><span x-text="formatCurrency(viewingSale.total_amount)"></span></p>
               <p class="text-xs text-muted mt-1" x-show="viewingSale.origin">Origem: <span x-text="viewingSale.origin"></span></p>
               <p class="text-xs text-muted" x-show="viewingSale.approved_at">Aprovada em <span x-text="formatDate(viewingSale.approved_at)"></span></p>
+              <button class="btn btn-secondary btn-sm mt-3" type="button" x-show="viewingSale.status === 'aprovada'" @click="downloadReceipt(viewingSale)">Baixar comprovante em PDF</button>
             </div>
           </template>
         </div>
       </div>
 
       <!-- modal nova venda -->
-      <div x-show="showNewSaleForm" x-cloak style="position:fixed;inset:0;background:rgba(31,51,47,.45);z-index:50;display:flex;align-items:center;justify-content:center;padding:20px;" @click.self="showNewSaleForm=false">
-        <div class="card card-shadow" style="width:100%;max-width:620px;max-height:90vh;overflow-y:auto;">
+      <div x-show="showNewSaleForm" x-cloak class="modal-overlay" @click.self="showNewSaleForm=false">
+        <div class="card card-shadow" style="margin:auto;width:100%;max-width:620px;max-height:90vh;overflow-y:auto;">
           <div class="card-header"><h3>Nova venda de plano</h3><button class="btn btn-ghost btn-sm" @click="showNewSaleForm=false">Fechar</button></div>
 
           <div class="form-group" style="position:relative;">
             <label class="label">Paciente</label>
-            <input class="input" type="text" x-model="patientSearch" @focus="patientDropdownOpen = true" @input="patientDropdownOpen = true; newSale.patient_id = ''" placeholder="Buscar paciente por nome…" autocomplete="off">
+            <input class="input" type="text" x-model="patientSearch" @focus="patientDropdownOpen = true" @input="patientDropdownOpen = true; newSale.patient_id = ''" placeholder="Digite o nome do paciente" autocomplete="off">
             <div x-show="patientDropdownOpen" x-cloak @click.away="patientDropdownOpen = false"
                  style="position:absolute;z-index:10;top:100%;left:0;right:0;background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-md);box-shadow:var(--shadow-md);max-height:200px;overflow-y:auto;margin-top:4px;">
               <div x-show="filteredPatients.length === 0" class="text-xs text-muted" style="padding:10px 14px;">Nenhum paciente encontrado.</div>
@@ -142,8 +144,9 @@
                 <option value="Presencial">Presencial</option>
                 <option value="Instagram">Instagram</option>
                 <option value="WhatsApp">WhatsApp</option>
-                <option value="Indicação">Indicação</option>
                 <option value="Site">Site</option>
+                <option value="Indicação de paciente">Indicação de paciente</option>
+                <option value="Indicação de funcionário">Indicação de funcionário</option>
               </select>
             </div>
             <div class="form-group">
@@ -152,7 +155,51 @@
             </div>
           </div>
 
+          <div class="form-group" style="position:relative;" x-show="newSale.origin === 'Indicação de paciente'" x-cloak>
+            <label class="label">Indicado por qual paciente?</label>
+            <input class="input" type="text" x-model="referralPatientSearch" @focus="referralPatientDropdownOpen = true" @input="referralPatientDropdownOpen = true; newSale.referred_by_patient_id = ''" placeholder="Digite o nome do paciente" autocomplete="off">
+            <div x-show="referralPatientDropdownOpen" x-cloak @click.away="referralPatientDropdownOpen = false"
+                 style="position:absolute;z-index:10;top:100%;left:0;right:0;background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-md);box-shadow:var(--shadow-md);max-height:200px;overflow-y:auto;margin-top:4px;">
+              <template x-for="p in filteredPatientsFor(referralPatientSearch)" :key="p.id">
+                <div @click="newSale.referred_by_patient_id = p.id; referralPatientSearch = p.full_name; referralPatientDropdownOpen = false" class="patient-option" style="padding:9px 14px;cursor:pointer;font-size:13.5px;" x-text="p.full_name"></div>
+              </template>
+            </div>
+          </div>
+
+          <div class="grid grid-2 gap-3" x-show="newSale.origin === 'Indicação de funcionário'" x-cloak>
+            <div class="form-group">
+              <label class="label">Funcionário que indicou</label>
+              <select class="input" x-model="newSale.referred_by_user_id">
+                <option value="">Selecione</option>
+                <template x-for="u in users" :key="u.id">
+                  <option :value="u.id" x-text="u.full_name"></option>
+                </template>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="label">Comissão da indicação (%)</label>
+              <input class="input" type="number" min="0" max="100" step="0.1" x-model="newSale.referral_commission_percentage">
+            </div>
+          </div>
+          <p class="input-hint mb-3" x-show="newSale.origin === 'Indicação de funcionário'" x-cloak>
+            Ao aprovar a venda, gera automaticamente um lançamento de comissão para este funcionário.
+          </p>
+
           <hr class="divider">
+
+          <div x-show="planTemplates.length > 0" class="mb-3">
+            <label class="label">Usar modelo de pacote (opcional)</label>
+            <div class="flex gap-2">
+              <select class="input" x-model="selectedTemplateId">
+                <option value="">Selecione um modelo</option>
+                <template x-for="tpl in planTemplates" :key="tpl.id">
+                  <option :value="tpl.id" x-text="tpl.name"></option>
+                </template>
+              </select>
+              <button type="button" class="btn btn-secondary btn-sm" style="white-space:nowrap;" @click="addTemplateToCart()" :disabled="!selectedTemplateId">Adicionar ao carrinho</button>
+            </div>
+            <p class="input-hint">Adiciona de uma vez todos os serviços e quantidades desse modelo. Você ainda pode ajustar valores e descontos abaixo.</p>
+          </div>
           <h4 class="text-xs text-muted mb-2" style="text-transform:uppercase;letter-spacing:.04em;">Adicionar serviço ao plano</h4>
           <div class="grid grid-2 gap-3">
             <div class="form-group">
@@ -176,10 +223,10 @@
             </div>
             <div class="form-group">
               <label class="label">Desconto (%)</label>
-              <input class="input" type="number" min="0" max="100" step="0.1" x-model="draftItem.discount_percentage">
+              <input class="input" type="number" min="0" max="100" step="0.1" x-model="draftItem.discount_percentage" @change="authorizeDiscount()">
             </div>
             <div class="form-group flex items-center gap-2" style="padding-bottom:10px;">
-              <input type="checkbox" x-model="draftItem.is_courtesy" id="courtesy" style="width:auto;">
+              <input type="checkbox" x-model="draftItem.is_courtesy" id="courtesy" style="width:auto;" @change="authorizeCourtesy()">
               <label for="courtesy" class="text-sm" style="margin:0;">Cortesia</label>
             </div>
           </div>
@@ -201,40 +248,66 @@
               </tbody>
             </table>
           </div>
-          <p class="text-sm mb-3" x-show="cart.length > 0">Total do plano: <strong x-text="formatCurrency(cartTotal)"></strong></p>
+          <div x-show="cart.length > 0" class="mb-3">
+            <p class="text-sm">Subtotal: <span x-text="formatCurrency(cartTotal)"></span></p>
+            <div class="form-group" style="max-width:220px;margin-top:6px;">
+              <label class="label">Desconto no total do plano (%)</label>
+              <input class="input" type="number" min="0" max="100" step="0.1" x-model="newSale.discount_percentage" @change="authorizeSaleDiscount()">
+            </div>
+            <p class="text-sm mt-2">Total do plano: <strong x-text="formatCurrency(cartTotalAfterDiscount)"></strong></p>
+          </div>
 
           <hr class="divider">
           <h4 class="text-xs text-muted mb-2" style="text-transform:uppercase;letter-spacing:.04em;">Pagamento</h4>
-          <div class="grid grid-2 gap-3">
-            <div class="form-group">
-              <label class="label">Forma de pagamento</label>
-              <select class="input" x-model="newSale.payment_method">
-                <option value="">Não informado</option>
-                <option value="Dinheiro">Dinheiro</option>
-                <option value="Pix">Pix</option>
-                <option value="Cartão de débito">Cartão de débito</option>
-                <option value="Cartão de crédito">Cartão de crédito</option>
-                <option value="Transferência">Transferência</option>
-              </select>
+
+          <template x-for="(line, idx) in newSale.paymentLines" :key="idx">
+            <div class="card" style="padding:12px 14px;margin-bottom:10px;background:var(--color-surface-alt);">
+              <div class="flex items-center justify-between mb-2">
+                <strong class="text-xs text-muted" x-text="'Forma de pagamento ' + (idx + 1)"></strong>
+                <button type="button" class="btn btn-ghost btn-sm" x-show="newSale.paymentLines.length > 1" @click="newSale.paymentLines.splice(idx, 1)">Remover</button>
+              </div>
+              <div class="grid grid-2 gap-3">
+                <div class="form-group">
+                  <label class="label">Forma</label>
+                  <select class="input" x-model="line.payment_method">
+                    <option value="Dinheiro">Dinheiro</option>
+                    <option value="Pix">Pix</option>
+                    <option value="Cartão de débito">Cartão de débito</option>
+                    <option value="Cartão de crédito">Cartão de crédito</option>
+                    <option value="Transferência">Transferência</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label class="label">Valor (R$)</label>
+                  <input class="input" type="text" inputmode="decimal" x-model="line.amount" @input="line.amount = maskCurrencyInput($event.target.value)" placeholder="R$ 0,00" required>
+                </div>
+              </div>
+              <div class="grid grid-2 gap-3" x-show="line.payment_method === 'Cartão de crédito'" x-cloak>
+                <div class="form-group">
+                  <label class="label">Maquininha</label>
+                  <select class="input" x-model="line.payment_machine_id">
+                    <option value="">Não informado</option>
+                    <template x-for="m in paymentMachines" :key="m.id">
+                      <option :value="m.id" x-text="m.name"></option>
+                    </template>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label class="label">Parcelas</label>
+                  <select class="input" x-model.number="line.installments">
+                    <template x-for="n in 12" :key="n">
+                      <option :value="n" x-text="n + 'x'"></option>
+                    </template>
+                  </select>
+                </div>
+              </div>
+              <p class="input-hint" x-show="line.payment_method === 'Cartão de crédito' && line.payment_machine_id">
+                Valor líquido estimado: <strong x-text="formatCurrency(netAmountFor(line))"></strong>
+              </p>
             </div>
-            <div class="form-group" x-show="newSale.payment_method === 'Cartão de crédito'" x-cloak>
-              <label class="label">Parcelas</label>
-              <select class="input" x-model.number="newSale.installments">
-                <template x-for="n in 12" :key="n">
-                  <option :value="n" x-text="n + 'x'"></option>
-                </template>
-              </select>
-            </div>
-          </div>
-          <div class="form-group" x-show="newSale.payment_method === 'Cartão de crédito'" x-cloak>
-            <label class="label">Maquininha</label>
-            <select class="input" x-model="newSale.payment_machine_id">
-              <option value="">Não informado</option>
-              <template x-for="m in paymentMachines" :key="m.id">
-                <option :value="m.id" x-text="m.name"></option>
-              </template>
-            </select>
-          </div>
+          </template>
+          <button type="button" class="btn btn-secondary btn-sm mb-3" x-show="newSale.paymentLines.length < 2" @click="newSale.paymentLines.push(emptyPaymentLine())">+ Adicionar forma de pagamento</button>
+          <p class="text-sm mb-3">Total combinado no pagamento: <strong x-text="formatCurrency(paymentLinesTotal(newSale.paymentLines))"></strong></p>
 
           <p class="input-hint mb-3">A venda é salva como "pendente". As sessões só entram no cadastro do paciente e o valor só entra no caixa depois de aprovada.</p>
 
@@ -249,6 +322,7 @@
   </div>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="js/currency-mask.js"></script>
 <script>
 function vendasApp() {
@@ -261,21 +335,97 @@ function vendasApp() {
     saleItemsBySale: {},
     patients: [],
     services: [],
+    users: [],
     paymentMachines: [],
+    planTemplates: [],
+    planTemplateItems: {},
+    selectedTemplateId: '',
     statusFilter: 'todas',
     showNewSaleForm: false,
     patientSearch: '',
     patientDropdownOpen: false,
+    referralPatientSearch: '',
+    referralPatientDropdownOpen: false,
     viewingSale: null,
-    newSale: { patient_id: '', origin: '', validity_months: '', payment_method: '', installments: 1, payment_machine_id: '' },
+    newSale: {
+      patient_id: '', origin: '', validity_months: '',
+      referred_by_patient_id: '', referred_by_user_id: '', referral_commission_percentage: 10,
+      discount_percentage: 0,
+      paymentLines: []
+    },
     draftItem: { service_id: '', quantity: 1, unit_price: '', discount_percentage: 0, is_courtesy: false },
     cart: [],
     feedback: { type: '', message: '' },
 
     async init() {
       await this.loadClinicId();
-      await Promise.all([this.loadSales(), this.loadPatients(), this.loadServices(), this.loadPaymentMachines(), this.loadAllSaleItems()]);
+      await Promise.all([this.loadSales(), this.loadPatients(), this.loadServices(), this.loadUsers(), this.loadPaymentMachines(), this.loadAllSaleItems(), this.loadPlanTemplates()]);
       this.loading = false;
+    },
+
+    async loadUsers() {
+      const { data } = await supabaseClient.from('users').select('id, full_name').order('full_name');
+      this.users = data || [];
+    },
+
+    async loadPlanTemplates() {
+      const [tplRes, itemsRes] = await Promise.all([
+        supabaseClient.from('plan_templates').select('id, name, description').order('name'),
+        supabaseClient.from('plan_template_items').select('id, plan_template_id, service_id, quantity')
+      ]);
+      this.planTemplates = tplRes.error ? [] : (tplRes.data || []);
+      const map = {};
+      (itemsRes.data || []).forEach(item => {
+        if (!map[item.plan_template_id]) map[item.plan_template_id] = [];
+        map[item.plan_template_id].push(item);
+      });
+      this.planTemplateItems = map;
+    },
+
+    addTemplateToCart() {
+      const items = this.planTemplateItems[this.selectedTemplateId] || [];
+      items.forEach(item => {
+        const service = this.services.find(sv => sv.id === item.service_id);
+        this.cart.push({
+          service_id: item.service_id,
+          quantity: item.quantity,
+          unit_price: service && service.price !== null ? numberToCurrencyInput(service.price) : '',
+          discount_percentage: 0,
+          is_courtesy: false
+        });
+      });
+      this.selectedTemplateId = '';
+    },
+
+    filteredPatientsFor(query) {
+      const q = (query || '').trim().toLowerCase();
+      if (!q) return this.patients.slice(0, 20);
+      return this.patients.filter(p => p.full_name.toLowerCase().includes(q)).slice(0, 20);
+    },
+
+    emptyPaymentLine() {
+      return { payment_method: 'Dinheiro', amount: '', installments: 1, payment_machine_id: '' };
+    },
+
+    feeRateFor(machineId, installments) {
+      const machine = this.paymentMachines.find(m => m.id === machineId);
+      if (!machine || !machine.fee_rates) return 0;
+      return Number(machine.fee_rates[String(installments)] || 0);
+    },
+
+    netAmountFor(line) {
+      const amount = parseCurrencyToNumber(line.amount) || 0;
+      if (line.payment_method !== 'Cartão de crédito' || !line.payment_machine_id) return amount;
+      const fee = this.feeRateFor(line.payment_machine_id, line.installments);
+      return Math.round((amount - (amount * fee / 100)) * 100) / 100;
+    },
+
+    paymentLinesTotal(lines) {
+      return (lines || []).reduce((sum, l) => sum + (parseCurrencyToNumber(l.amount) || 0), 0);
+    },
+
+    newSaleGroupId() {
+      return (window.crypto && window.crypto.randomUUID) ? window.crypto.randomUUID() : (Date.now() + '-' + Math.random().toString(16).slice(2));
     },
 
     async loadAllSaleItems() {
@@ -305,7 +455,7 @@ function vendasApp() {
     async loadSales() {
       const { data, error } = await supabaseClient
         .from('sales')
-        .select('id, patient_id, status, origin, validity_months, total_amount, payment_method, installments, payment_machine_id, created_at, approved_at, patients ( full_name )')
+        .select('id, patient_id, status, origin, validity_months, discount_percentage, total_amount, payment_method, installments, payment_machine_id, payment_lines, referred_by_patient_id, referred_by_user_id, referral_commission_percentage, created_at, approved_at, patients ( full_name )')
         .order('created_at', { ascending: false });
       this.sales = error ? [] : (data || []);
       if (error) this.showFeedback('error', 'Erro ao carregar vendas: ' + error.message);
@@ -354,6 +504,39 @@ function vendasApp() {
       return s ? s.name : '—';
     },
 
+    authorizeDiscount() {
+      const settings = window.__prismaClinicSettings;
+      if (!settings || !settings.manager_password_for_discount || !settings.manager_password) return;
+      if (!(Number(this.draftItem.discount_percentage) > 0)) return;
+      const typed = window.prompt('Este desconto exige a senha do gerente. Informe a senha:');
+      if (typed !== settings.manager_password) {
+        this.draftItem.discount_percentage = 0;
+        this.showFeedback('error', 'Senha incorreta. Desconto não aplicado.');
+      }
+    },
+
+    authorizeSaleDiscount() {
+      const settings = window.__prismaClinicSettings;
+      if (!settings || !settings.manager_password_for_discount || !settings.manager_password) return;
+      if (!(Number(this.newSale.discount_percentage) > 0)) return;
+      const typed = window.prompt('Este desconto exige a senha do gerente. Informe a senha:');
+      if (typed !== settings.manager_password) {
+        this.newSale.discount_percentage = 0;
+        this.showFeedback('error', 'Senha incorreta. Desconto não aplicado.');
+      }
+    },
+
+    authorizeCourtesy() {
+      const settings = window.__prismaClinicSettings;
+      if (!settings || !settings.manager_password_for_courtesy || !settings.manager_password) return;
+      if (!this.draftItem.is_courtesy) return;
+      const typed = window.prompt('Marcar como cortesia exige a senha do gerente. Informe a senha:');
+      if (typed !== settings.manager_password) {
+        this.draftItem.is_courtesy = false;
+        this.showFeedback('error', 'Senha incorreta. Cortesia não aplicada.');
+      }
+    },
+
     onDraftServiceChange() {
       const s = this.services.find(sv => sv.id === this.draftItem.service_id);
       this.draftItem.unit_price = s && s.price !== null ? numberToCurrencyInput(s.price) : '';
@@ -371,6 +554,11 @@ function vendasApp() {
       return this.cart.reduce((sum, item) => sum + this.cartItemTotal(item), 0);
     },
 
+    get cartTotalAfterDiscount() {
+      const discount = Number(this.newSale.discount_percentage) || 0;
+      return Math.round(this.cartTotal * (1 - discount / 100) * 100) / 100;
+    },
+
     addDraftItem() {
       if (!this.draftItem.service_id) return;
       this.cart.push({ ...this.draftItem });
@@ -378,27 +566,50 @@ function vendasApp() {
     },
 
     openNewSale() {
-      this.newSale = { patient_id: '', origin: '', validity_months: '', payment_method: '', installments: 1, payment_machine_id: '' };
+      this.newSale = {
+        patient_id: '', origin: '', validity_months: '',
+        referred_by_patient_id: '', referred_by_user_id: '', referral_commission_percentage: 10,
+        discount_percentage: 0,
+        paymentLines: [this.emptyPaymentLine()]
+      };
       this.draftItem = { service_id: '', quantity: 1, unit_price: '', discount_percentage: 0, is_courtesy: false };
       this.cart = [];
       this.patientSearch = '';
+      this.referralPatientSearch = '';
+      this.selectedTemplateId = '';
       this.showNewSaleForm = true;
     },
 
     async submitSale() {
       if (!this.clinicId || !this.newSale.patient_id || this.cart.length === 0) return;
+      const lines = this.newSale.paymentLines.filter(l => (parseCurrencyToNumber(l.amount) || 0) > 0);
+      if (lines.length === 0) {
+        this.showFeedback('error', 'Informe ao menos uma forma de pagamento com valor.');
+        return;
+      }
       this.saving = true;
       const { data: { user } } = await supabaseClient.auth.getUser();
+      const firstLine = lines[0];
       const payload = {
         clinic_id: this.clinicId,
         patient_id: this.newSale.patient_id,
         status: 'pendente',
         origin: this.newSale.origin || null,
         validity_months: this.newSale.validity_months || null,
-        total_amount: this.cartTotal,
-        payment_method: this.newSale.payment_method || null,
-        installments: this.newSale.payment_method === 'Cartão de crédito' ? (this.newSale.installments || 1) : 1,
-        payment_machine_id: this.newSale.payment_method === 'Cartão de crédito' ? (this.newSale.payment_machine_id || null) : null,
+        discount_percentage: this.newSale.discount_percentage || 0,
+        total_amount: this.cartTotalAfterDiscount,
+        payment_method: firstLine.payment_method || null,
+        installments: firstLine.payment_method === 'Cartão de crédito' ? (firstLine.installments || 1) : 1,
+        payment_machine_id: firstLine.payment_method === 'Cartão de crédito' ? (firstLine.payment_machine_id || null) : null,
+        payment_lines: lines.map(l => ({
+          payment_method: l.payment_method,
+          amount: parseCurrencyToNumber(l.amount) || 0,
+          installments: l.payment_method === 'Cartão de crédito' ? (l.installments || 1) : 1,
+          payment_machine_id: l.payment_method === 'Cartão de crédito' ? (l.payment_machine_id || null) : null
+        })),
+        referred_by_patient_id: this.newSale.origin === 'Indicação de paciente' ? (this.newSale.referred_by_patient_id || null) : null,
+        referred_by_user_id: this.newSale.origin === 'Indicação de funcionário' ? (this.newSale.referred_by_user_id || null) : null,
+        referral_commission_percentage: this.newSale.origin === 'Indicação de funcionário' ? (this.newSale.referral_commission_percentage || null) : null,
         created_by: user ? user.id : null
       };
       const { data: sale, error } = await supabaseClient.from('sales').insert(payload).select().single();
@@ -445,8 +656,11 @@ function vendasApp() {
       this.approving = true;
       const items = await this.loadSaleItems(sale.id);
       const { data: { user } } = await supabaseClient.auth.getUser();
+      const today = new Date().toISOString().slice(0, 10);
 
       try {
+        // 1) gera um pacote de sessões por serviço do carrinho, independente
+        // de como o pagamento foi dividido
         for (const item of items) {
           const { data: pkg, error: pkgError } = await supabaseClient
             .from('packages')
@@ -456,29 +670,55 @@ function vendasApp() {
               service_id: item.service_id,
               total_sessions: item.quantity,
               total_price: item.line_total,
-              purchased_at: new Date().toISOString().slice(0, 10)
+              purchased_at: today
             })
             .select()
             .single();
           if (pkgError) throw pkgError;
 
           await supabaseClient.from('sale_items').update({ package_id: pkg.id }).eq('id', item.id);
+        }
 
-          if (Number(item.line_total) > 0) {
-            const { error: txError } = await supabaseClient.from('transactions').insert({
-              clinic_id: this.clinicId,
-              type: 'venda_pacote',
-              patient_id: sale.patient_id,
-              package_id: pkg.id,
-              amount: item.line_total,
-              payment_method: sale.payment_method || null,
-              installments: sale.installments || 1,
-              payment_machine_id: sale.payment_machine_id || null,
-              sale_group_id: sale.id,
-              transaction_date: new Date().toISOString().slice(0, 10)
-            });
-            if (txError) throw txError;
-          }
+        // 2) lança no financeiro uma transação por forma de pagamento
+        // informada na venda (1 ou 2 formas)
+        const lines = (sale.payment_lines && sale.payment_lines.length > 0)
+          ? sale.payment_lines
+          : (sale.payment_method ? [{ payment_method: sale.payment_method, amount: sale.total_amount, installments: sale.installments, payment_machine_id: sale.payment_machine_id }] : []);
+        const saleGroupId = lines.length > 1 ? sale.id : (lines.length === 1 ? sale.id : null);
+        for (const line of lines) {
+          if (!(Number(line.amount) > 0)) continue;
+          const { error: txError } = await supabaseClient.from('transactions').insert({
+            clinic_id: this.clinicId,
+            type: 'venda_pacote',
+            patient_id: sale.patient_id,
+            amount: line.amount,
+            payment_method: line.payment_method || null,
+            installments: line.installments || 1,
+            payment_machine_id: line.payment_machine_id || null,
+            net_amount: this.netAmountFor({ amount: numberToCurrencyInput(line.amount), payment_method: line.payment_method, installments: line.installments, payment_machine_id: line.payment_machine_id }),
+            sale_group_id: saleGroupId,
+            transaction_date: today
+          });
+          if (txError) throw txError;
+        }
+
+        // 3) se a venda veio de indicação de funcionário, gera a comissão
+        // dessa indicação automaticamente
+        if (sale.referred_by_user_id && sale.referral_commission_percentage) {
+          const commissionAmount = Math.round(Number(sale.total_amount) * Number(sale.referral_commission_percentage) / 100 * 100) / 100;
+          const { error: commError } = await supabaseClient.from('transactions').insert({
+            clinic_id: this.clinicId,
+            type: 'comissao_profissional',
+            patient_id: sale.patient_id,
+            professional_id: sale.referred_by_user_id,
+            amount: commissionAmount,
+            commission_percentage: sale.referral_commission_percentage,
+            base_amount: sale.total_amount,
+            payment_method: null,
+            sale_group_id: saleGroupId,
+            transaction_date: today
+          });
+          if (commError) throw commError;
         }
 
         const { error: saleError } = await supabaseClient
@@ -493,6 +733,48 @@ function vendasApp() {
         this.showFeedback('error', 'Erro ao aprovar venda: ' + err.message);
       }
       this.approving = false;
+    },
+
+    downloadReceipt(sale) {
+      const items = this.saleItemsBySale[sale.id] || [];
+      const doc = new window.jspdf.jsPDF();
+      let y = 20;
+      doc.setFontSize(16);
+      doc.text('Comprovante de venda', 14, y);
+      y += 10;
+      doc.setFontSize(10);
+      doc.text('Data da aprovação: ' + this.formatDate(sale.approved_at || sale.created_at), 14, y);
+      y += 6;
+      doc.text('Paciente: ' + ((sale.patients && sale.patients.full_name) || '—'), 14, y);
+      y += 10;
+
+      doc.setFontSize(11);
+      doc.text('Itens', 14, y);
+      y += 6;
+      doc.setFontSize(9);
+      items.forEach(item => {
+        const line = (item.services ? item.services.name : 'Serviço') + (item.is_courtesy ? ' (cortesia)' : '') +
+          ' · ' + item.quantity + ' sessão(ões) · ' + this.formatCurrency(item.line_total);
+        doc.text(line, 14, y);
+        y += 6;
+      });
+
+      y += 4;
+      doc.setFontSize(11);
+      doc.text('Total pago: ' + this.formatCurrency(sale.total_amount), 14, y);
+      y += 8;
+
+      doc.setFontSize(9);
+      const lines = (sale.payment_lines && sale.payment_lines.length > 0) ? sale.payment_lines : [{ payment_method: sale.payment_method, amount: sale.total_amount, installments: sale.installments }];
+      doc.text('Forma de pagamento:', 14, y);
+      y += 6;
+      lines.forEach(line => {
+        const parcelas = line.installments > 1 ? (' em ' + line.installments + 'x') : '';
+        doc.text('- ' + (line.payment_method || 'não informado') + parcelas + ': ' + this.formatCurrency(line.amount), 14, y);
+        y += 6;
+      });
+
+      doc.save('comprovante-' + sale.id.slice(0, 8) + '.pdf');
     },
 
     async cancelSale(sale) {
@@ -571,6 +853,7 @@ function vendasApp() {
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="js/supabase-client.js"></script>
 <script src="js/auth-guard.js"></script>
+<script src="js/topbar.js"></script>
 <script src="js/include.js" defer></script>
 </body>
 </html>

@@ -99,8 +99,8 @@
       </div>
 
       <!-- modal novo/editar serviço -->
-      <div x-show="showForm" x-cloak style="position:fixed;inset:0;background:rgba(31,51,47,.45);z-index:50;display:flex;align-items:center;justify-content:center;padding:20px;" @click.self="showForm = false">
-        <div class="card card-shadow" style="width:100%;max-width:520px;max-height:88vh;overflow-y:auto;">
+      <div x-show="showForm" x-cloak class="modal-overlay" @click.self="showForm = false">
+        <div class="card card-shadow" style="margin:auto;width:100%;max-width:520px;max-height:88vh;overflow-y:auto;">
           <div class="card-header">
             <h3 x-text="editingId ? 'Editar serviço' : 'Novo serviço'"></h3>
             <button class="btn btn-ghost btn-sm" type="button" @click="showForm = false">Fechar</button>
@@ -160,8 +160,8 @@
       </div>
 
       <!-- modal novo/editar insumo -->
-      <div x-show="showProductForm" x-cloak style="position:fixed;inset:0;background:rgba(31,51,47,.45);z-index:50;display:flex;align-items:center;justify-content:center;padding:20px;" @click.self="showProductForm = false">
-        <div class="card card-shadow" style="width:100%;max-width:420px;">
+      <div x-show="showProductForm" x-cloak class="modal-overlay" @click.self="showProductForm = false">
+        <div class="card card-shadow" style="margin:auto;width:100%;max-width:420px;">
           <div class="card-header">
             <h3 x-text="editingProductId ? 'Editar insumo' : 'Novo insumo'"></h3>
             <button class="btn btn-ghost btn-sm" type="button" @click="showProductForm = false">Fechar</button>
@@ -439,6 +439,7 @@ function servicosApp() {
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="js/supabase-client.js"></script>
 <script src="js/auth-guard.js"></script>
+<script src="js/topbar.js"></script>
 <script src="js/include.js" defer></script>
 </body>
 </html>

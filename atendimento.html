@@ -87,6 +87,17 @@
 
               <form @submit.prevent="concludeAttendance()">
                 <div class="form-group">
+                  <label class="label">Pacote vinculado (opcional)</label>
+                  <select class="input" x-model="linkedPackageId">
+                    <option value="">Sessão avulsa (não desconta de pacote)</option>
+                    <template x-for="pk in openPackages" :key="pk.id">
+                      <option :value="pk.id" x-text="(pk.services ? pk.services.name : 'Pacote') + ' · ' + pk.used_sessions + ' de ' + pk.total_sessions + ' usadas'"></option>
+                    </template>
+                  </select>
+                  <p class="input-hint" x-show="openPackages.length === 0">Este paciente não tem pacote em aberto.</p>
+                  <p class="input-hint" x-show="openPackages.length > 0">Ao concluir, desconta uma sessão do pacote selecionado.</p>
+                </div>
+                <div class="form-group">
                   <label class="label">Protocolo aplicado</label>
                   <input class="input" x-model="form.protocol">
                 </div>
@@ -157,8 +168,8 @@
       </div>
 
       <!-- modal remanejar horário -->
-      <div x-show="showRescheduleForm" x-cloak style="position:fixed;inset:0;background:rgba(31,51,47,.45);z-index:50;display:flex;align-items:center;justify-content:center;padding:20px;" @click.self="showRescheduleForm = false">
-        <div class="card card-shadow" style="width:100%;max-width:420px;">
+      <div x-show="showRescheduleForm" x-cloak class="modal-overlay" @click.self="showRescheduleForm = false">
+        <div class="card card-shadow" style="margin:auto;width:100%;max-width:420px;">
           <div class="card-header"><h3>Remanejar horário</h3><button class="btn btn-ghost btn-sm" type="button" @click="showRescheduleForm = false">Fechar</button></div>
           <p class="text-sm text-muted mb-3" x-text="reschedulingAppt ? ((reschedulingAppt.patients ? reschedulingAppt.patients.full_name : 'Paciente') + ' · horário atual: ' + formatTime(reschedulingAppt.scheduled_at)) : ''"></p>
           <form @submit.prevent="confirmReschedule()">
@@ -218,6 +229,8 @@ function atendimentoApp() {
     photoFiles: [],
     photoPreviews: [],
     marketingConsent: false,
+    openPackages: [],
+    linkedPackageId: '',
     history: [],
     historyLoading: false,
     showRescheduleForm: false,
@@ -309,15 +322,32 @@ function atendimentoApp() {
       this.photoFiles = [];
       this.photoPreviews = [];
       this.marketingConsent = false;
+      this.openPackages = [];
+      this.linkedPackageId = appt.package_id || '';
       this.historyLoading = true;
       this.history = [];
-      const { data, error } = await supabaseClient
-        .from('medical_records')
-        .select('protocol, notes, created_at')
-        .eq('patient_id', appt.patient_id)
-        .order('created_at', { ascending: false });
-      if (!error) this.history = data || [];
+      const [recordsRes, packagesRes] = await Promise.all([
+        supabaseClient
+          .from('medical_records')
+          .select('protocol, notes, created_at')
+          .eq('patient_id', appt.patient_id)
+          .order('created_at', { ascending: false }),
+        supabaseClient
+          .from('packages')
+          .select('id, total_sessions, used_sessions, services ( name )')
+          .eq('patient_id', appt.patient_id)
+      ]);
+      if (!recordsRes.error) this.history = recordsRes.data || [];
       this.historyLoading = false;
+      if (!packagesRes.error) {
+        this.openPackages = (packagesRes.data || []).filter(pk => pk.used_sessions < pk.total_sessions);
+        // se o agendamento já tinha um pacote vinculado mas ele não está mais
+        // em aberto (ex.: já foi totalmente usado), mantém a opção visível
+        if (appt.package_id && !this.openPackages.some(pk => pk.id === appt.package_id)) {
+          const linked = (packagesRes.data || []).find(pk => pk.id === appt.package_id);
+          if (linked) this.openPackages.push(linked);
+        }
+      }
     },
 
     onPhotosSelected(event) {
@@ -398,6 +428,7 @@ function atendimentoApp() {
     async concludeAttendance() {
       if (!this.clinicId || !this.selectedAppt) return;
       this.saving = true;
+      const photoErrors = [];
       try {
         const { data: { user } } = await supabaseClient.auth.getUser();
 
@@ -411,36 +442,45 @@ function atendimentoApp() {
         });
         if (recError) throw recError;
 
+        // O upload de fotos roda à parte: se uma foto falhar (rede, formato,
+        // etc.) isso não pode travar a conclusão do atendimento nem o
+        // desconto da sessão do pacote.
         for (const file of this.photoFiles) {
-          const path = this.clinicId + '/' + this.selectedAppt.patient_id + '/' + Date.now() + '_' + this.sanitizeFileName(file.name);
-          const { error: upError } = await supabaseClient.storage.from('patient-photos').upload(path, file);
-          if (upError) throw upError;
-          const { error: photoRowError } = await supabaseClient.from('patient_photos').insert({
-            clinic_id: this.clinicId,
-            patient_id: this.selectedAppt.patient_id,
-            storage_path: path,
-            marketing_consent: this.marketingConsent
-          });
-          if (photoRowError) throw photoRowError;
+          try {
+            const path = this.clinicId + '/' + this.selectedAppt.patient_id + '/' + Date.now() + '_' + this.sanitizeFileName(file.name);
+            const { error: upError } = await supabaseClient.storage.from('patient-photos').upload(path, file);
+            if (upError) throw upError;
+            const { error: photoRowError } = await supabaseClient.from('patient_photos').insert({
+              clinic_id: this.clinicId,
+              patient_id: this.selectedAppt.patient_id,
+              storage_path: path,
+              marketing_consent: this.marketingConsent
+            });
+            if (photoRowError) throw photoRowError;
+          } catch (photoErr) {
+            photoErrors.push(file.name + ': ' + photoErr.message);
+          }
         }
 
         const { error: apptError } = await supabaseClient
           .from('appointments')
-          .update({ status: 'concluido' })
+          .update({ status: 'concluido', package_id: this.linkedPackageId || null })
           .eq('id', this.selectedAppt.id);
         if (apptError) throw apptError;
 
-        if (this.selectedAppt.package_id) {
+        if (this.linkedPackageId) {
           const { data: pkg, error: pkgFetchError } = await supabaseClient
             .from('packages')
             .select('used_sessions')
-            .eq('id', this.selectedAppt.package_id)
+            .eq('id', this.linkedPackageId)
             .single();
-          if (!pkgFetchError && pkg) {
-            await supabaseClient
+          if (pkgFetchError) throw pkgFetchError;
+          if (pkg) {
+            const { error: pkgUpdateError } = await supabaseClient
               .from('packages')
               .update({ used_sessions: pkg.used_sessions + 1 })
-              .eq('id', this.selectedAppt.package_id);
+              .eq('id', this.linkedPackageId);
+            if (pkgUpdateError) throw pkgUpdateError;
           }
         }
 
@@ -464,8 +504,14 @@ function atendimentoApp() {
           });
         }
 
-        this.showFeedback('success', 'Atendimento registrado com sucesso.');
+        if (photoErrors.length > 0) {
+          this.showFeedback('error', 'Atendimento registrado, mas ' + photoErrors.length + ' foto(s) não foram enviadas: ' + photoErrors.join('; '));
+        } else {
+          this.showFeedback('success', 'Atendimento registrado com sucesso.');
+        }
         this.selectedAppt = null;
+        this.openPackages = [];
+        this.linkedPackageId = '';
         await this.loadQueue();
       } catch (err) {
         this.showFeedback('error', 'Erro ao registrar atendimento: ' + err.message);
@@ -484,6 +530,7 @@ function atendimentoApp() {
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="js/supabase-client.js"></script>
 <script src="js/auth-guard.js"></script>
+<script src="js/topbar.js"></script>
 <script src="js/include.js" defer></script>
 </body>
 </html>

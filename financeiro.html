@@ -92,12 +92,37 @@
       <!-- PACOTES -->
       <div x-show="tab==='pacotes'" x-cloak>
         <div class="page-header" style="margin-bottom:20px;">
-          <div><p class="text-sm text-muted" x-text="packages.length + ' pacote(s) vendido(s)'"></p></div>
-          <button class="btn btn-primary btn-sm" type="button" @click="showNewPackageForm = true">Vender pacote</button>
+          <div><h3 style="font-size:16px;">Modelos de pacote</h3><p class="text-sm text-muted">Descreva o que cada pacote oferece (serviços e quantidades). Esses modelos ficam disponíveis para montar o carrinho rápido em Vendas.</p></div>
+          <button class="btn btn-primary btn-sm" type="button" @click="openNewTemplateForm()">Cadastrar pacote</button>
         </div>
 
+        <div class="card card-shadow mb-5" style="padding:0;">
+          <div x-show="planTemplates.length === 0" class="empty-note" style="margin:20px;">Nenhum modelo de pacote cadastrado ainda.</div>
+          <div class="table-wrap" x-show="planTemplates.length > 0">
+            <table class="table">
+              <thead><tr><th>Pacote</th><th>Composição</th><th></th></tr></thead>
+              <tbody>
+                <template x-for="tpl in planTemplates" :key="tpl.id">
+                  <tr>
+                    <td>
+                      <strong x-text="tpl.name"></strong>
+                      <div class="text-xs text-muted" x-show="tpl.description" x-text="tpl.description"></div>
+                    </td>
+                    <td class="text-xs text-muted" x-text="templateItemsSummary(tpl)"></td>
+                    <td class="flex gap-2">
+                      <button class="btn btn-ghost btn-sm" type="button" @click="openEditTemplateForm(tpl)">Editar</button>
+                      <button class="btn btn-ghost btn-sm" type="button" @click="removeTemplate(tpl)">Remover</button>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <h3 style="font-size:16px;" class="mb-3">Pacotes vendidos (histórico)</h3>
         <div class="card card-shadow" style="padding:0;">
-          <div x-show="packages.length === 0" class="empty-note" style="margin:20px;">Nenhum pacote vendido ainda.</div>
+          <div x-show="packages.length === 0" class="empty-note" style="margin:20px;">Nenhum pacote vendido ainda. Vendas de plano são feitas na aba Vendas.</div>
           <div class="table-wrap" x-show="packages.length > 0">
             <table class="table">
               <thead><tr><th>Paciente</th><th>Serviço</th><th>Sessões</th><th>Valor total</th><th>Custo insumos</th><th>Margem</th><th>Validade</th></tr></thead>
@@ -152,8 +177,8 @@
       </div>
 
       <!-- modal nova/editar maquininha -->
-      <div x-show="showMachineForm" x-cloak style="position:fixed;inset:0;background:rgba(31,51,47,.45);z-index:50;display:flex;align-items:center;justify-content:center;padding:20px;" @click.self="showMachineForm=false">
-        <div class="card card-shadow" style="width:100%;max-width:520px;max-height:88vh;overflow-y:auto;">
+      <div x-show="showMachineForm" x-cloak class="modal-overlay" @click.self="showMachineForm=false">
+        <div class="card card-shadow" style="margin:auto;width:100%;max-width:520px;max-height:88vh;overflow-y:auto;">
           <div class="card-header"><h3 x-text="editingMachineId ? 'Editar maquininha' : 'Nova maquininha'"></h3><button class="btn btn-ghost btn-sm" @click="showMachineForm=false">Fechar</button></div>
           <form @submit.prevent="saveMachine()">
             <div class="form-group">
@@ -178,8 +203,8 @@
       </div>
 
       <!-- modal novo lançamento -->
-      <div x-show="showNewTransactionForm" x-cloak style="position:fixed;inset:0;background:rgba(31,51,47,.45);z-index:50;display:flex;align-items:center;justify-content:center;padding:20px;" @click.self="showNewTransactionForm=false">
-        <div class="card card-shadow" style="width:100%;max-width:480px;max-height:88vh;overflow-y:auto;">
+      <div x-show="showNewTransactionForm" x-cloak class="modal-overlay" @click.self="showNewTransactionForm=false">
+        <div class="card card-shadow" style="margin:auto;width:100%;max-width:480px;max-height:88vh;overflow-y:auto;">
           <div class="card-header"><h3>Novo lançamento</h3><button class="btn btn-ghost btn-sm" @click="showNewTransactionForm=false">Fechar</button></div>
           <form @submit.prevent="createTransaction()">
             <div class="form-group">
@@ -190,14 +215,16 @@
                 <option value="comissao_profissional">Comissão de profissional</option>
               </select>
             </div>
-            <div class="form-group">
+            <div class="form-group" style="position:relative;">
               <label class="label">Paciente (opcional)</label>
-              <select class="input" x-model="newTransaction.patient_id">
-                <option value="">Nenhum</option>
-                <template x-for="p in patients" :key="p.id">
-                  <option :value="p.id" x-text="p.full_name"></option>
+              <input class="input" type="text" x-model="transactionPatientSearch" @focus="transactionPatientDropdownOpen = true" @input="transactionPatientDropdownOpen = true; newTransaction.patient_id = ''" placeholder="Digite o nome do paciente" autocomplete="off">
+              <div x-show="transactionPatientDropdownOpen" x-cloak @click.away="transactionPatientDropdownOpen = false"
+                   style="position:absolute;z-index:10;top:100%;left:0;right:0;background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-md);box-shadow:var(--shadow-md);max-height:200px;overflow-y:auto;margin-top:4px;">
+                <div @click="newTransaction.patient_id = ''; transactionPatientSearch = ''; transactionPatientDropdownOpen = false" class="patient-option" style="padding:9px 14px;cursor:pointer;font-size:13.5px;">Nenhum</div>
+                <template x-for="p in filteredPatientsFor(transactionPatientSearch)" :key="p.id">
+                  <div @click="newTransaction.patient_id = p.id; transactionPatientSearch = p.full_name; transactionPatientDropdownOpen = false" class="patient-option" style="padding:9px 14px;cursor:pointer;font-size:13.5px;" x-text="p.full_name"></div>
                 </template>
-              </select>
+              </div>
             </div>
             <div class="form-group" x-show="newTransaction.type === 'comissao_profissional'" x-cloak>
               <label class="label">Profissional</label>
@@ -319,96 +346,46 @@
         </div>
       </div>
 
-      <!-- modal vender pacote -->
-      <div x-show="showNewPackageForm" x-cloak style="position:fixed;inset:0;background:rgba(31,51,47,.45);z-index:50;display:flex;align-items:center;justify-content:center;padding:20px;" @click.self="showNewPackageForm=false">
-        <div class="card card-shadow" style="width:100%;max-width:480px;">
-          <div class="card-header"><h3>Vender pacote</h3><button class="btn btn-ghost btn-sm" @click="showNewPackageForm=false">Fechar</button></div>
-          <form @submit.prevent="createPackage()">
+      <!-- modal cadastrar/editar modelo de pacote -->
+      <div x-show="showNewTemplateForm" x-cloak class="modal-overlay" @click.self="showNewTemplateForm=false">
+        <div class="card card-shadow" style="margin:auto;width:100%;max-width:520px;max-height:88vh;overflow-y:auto;">
+          <div class="card-header"><h3 x-text="editingTemplateId ? 'Editar pacote' : 'Cadastrar pacote'"></h3><button class="btn btn-ghost btn-sm" @click="showNewTemplateForm=false">Fechar</button></div>
+          <form @submit.prevent="saveTemplate()">
             <div class="form-group">
-              <label class="label">Paciente</label>
-              <select class="input" x-model="newPackage.patient_id" required>
-                <option value="" disabled>Selecione</option>
-                <template x-for="p in patients" :key="p.id">
-                  <option :value="p.id" x-text="p.full_name"></option>
-                </template>
-              </select>
+              <label class="label">Nome do pacote</label>
+              <input class="input" x-model="templateForm.name" placeholder="Ex.: Plano Emagrecimento" required>
             </div>
             <div class="form-group">
-              <label class="label">Serviço</label>
-              <select class="input" x-model="newPackage.service_id" required>
-                <option value="" disabled>Selecione</option>
-                <template x-for="s in services" :key="s.id">
-                  <option :value="s.id" x-text="s.name"></option>
-                </template>
-              </select>
+              <label class="label">O que esse pacote oferece (opcional)</label>
+              <textarea class="input" x-model="templateForm.description" rows="2" placeholder="Descrição para a equipe entender o que está incluso"></textarea>
             </div>
-            <div class="grid grid-2 gap-3">
-              <div class="form-group">
-                <label class="label">Quantidade de sessões</label>
-                <input class="input" type="number" min="1" x-model="newPackage.total_sessions" required>
-              </div>
-              <div class="form-group">
-                <label class="label">Validade</label>
-                <input class="input" type="date" x-model="newPackage.expires_at">
-              </div>
-            </div>
-            <p class="text-sm text-muted mb-2" x-show="suggestedPackagePrice() > 0">
-              Sugerido pelo valor do serviço: <strong x-text="formatCurrency(suggestedPackagePrice())"></strong>
-              · <a href="#" @click.prevent="newPackage.paymentLines[0].amount = numberToCurrencyInput(suggestedPackagePrice())">usar sugerido</a>
-            </p>
 
-            <template x-for="(line, idx) in newPackage.paymentLines" :key="idx">
-              <div class="card" style="padding:12px 14px;margin-bottom:10px;background:var(--color-surface-alt);">
-                <div class="flex items-center justify-between mb-2">
-                  <strong class="text-xs text-muted" x-text="'Forma de pagamento ' + (idx + 1)"></strong>
-                  <button type="button" class="btn btn-ghost btn-sm" x-show="newPackage.paymentLines.length > 1" @click="newPackage.paymentLines.splice(idx, 1)">Remover</button>
+            <hr class="divider">
+            <h4 class="text-xs text-muted mb-2" style="text-transform:uppercase;letter-spacing:.04em;">Serviços inclusos</h4>
+            <template x-for="(item, idx) in templateForm.items" :key="idx">
+              <div class="grid grid-2 gap-3" style="align-items:end;">
+                <div class="form-group">
+                  <label class="label">Serviço</label>
+                  <select class="input" x-model="item.service_id">
+                    <option value="">Selecione</option>
+                    <template x-for="s in services" :key="s.id">
+                      <option :value="s.id" x-text="s.name"></option>
+                    </template>
+                  </select>
                 </div>
-                <div class="grid grid-2 gap-3">
-                  <div class="form-group">
-                    <label class="label">Forma</label>
-                    <select class="input" x-model="line.payment_method">
-                      <option value="Dinheiro">Dinheiro</option>
-                      <option value="Pix">Pix</option>
-                      <option value="Cartão de débito">Cartão de débito</option>
-                      <option value="Cartão de crédito">Cartão de crédito</option>
-                      <option value="Transferência">Transferência</option>
-                    </select>
+                <div class="form-group flex gap-2" style="align-items:end;">
+                  <div style="flex:1;">
+                    <label class="label">Qtd. sessões</label>
+                    <input class="input" type="number" min="1" x-model="item.quantity">
                   </div>
-                  <div class="form-group">
-                    <label class="label">Valor (R$)</label>
-                    <input class="input" type="number" step="0.01" min="0" x-model="line.amount" required>
-                  </div>
+                  <button type="button" class="btn btn-ghost btn-sm" style="margin-bottom:2px;" x-show="templateForm.items.length > 1" @click="templateForm.items.splice(idx, 1)">Remover</button>
                 </div>
-                <div class="grid grid-2 gap-3" x-show="line.payment_method === 'Cartão de crédito'" x-cloak>
-                  <div class="form-group">
-                    <label class="label">Maquininha</label>
-                    <select class="input" x-model="line.payment_machine_id">
-                      <option value="">Não informado</option>
-                      <template x-for="m in paymentMachines" :key="m.id">
-                        <option :value="m.id" x-text="m.name"></option>
-                      </template>
-                    </select>
-                  </div>
-                  <div class="form-group">
-                    <label class="label">Parcelas</label>
-                    <select class="input" x-model.number="line.installments">
-                      <template x-for="n in 12" :key="n">
-                        <option :value="n" x-text="n + 'x'"></option>
-                      </template>
-                    </select>
-                  </div>
-                </div>
-                <p class="input-hint" x-show="line.payment_method === 'Cartão de crédito' && line.payment_machine_id">
-                  Valor líquido estimado: <strong x-text="formatCurrency(netAmountFor(line))"></strong>
-                </p>
               </div>
             </template>
-            <button type="button" class="btn btn-secondary btn-sm mb-3" x-show="newPackage.paymentLines.length < 2" @click="newPackage.paymentLines.push(emptyPaymentLine())">+ Adicionar forma de pagamento</button>
-            <p class="text-sm mb-3">Valor total da venda: <strong x-text="formatCurrency(paymentLinesTotal(newPackage.paymentLines))"></strong></p>
-            <p class="input-hint mb-3">Ao salvar, um lançamento de "Venda de pacote" é criado automaticamente no financeiro para cada forma de pagamento informada.</p>
+            <button type="button" class="btn btn-secondary btn-sm mb-3" @click="templateForm.items.push({ service_id: '', quantity: 1 })">+ Adicionar serviço</button>
 
             <button class="btn btn-primary btn-block mt-2" type="submit" :disabled="saving">
-              <span x-show="!saving">Registrar venda</span>
+              <span x-show="!saving">Salvar pacote</span>
               <span x-show="saving" x-cloak>Salvando…</span>
             </button>
           </form>
@@ -433,7 +410,8 @@ function financeiroApp() {
     services: [],
     users: [],
     showNewTransactionForm: false,
-    showNewPackageForm: false,
+    transactionPatientSearch: '',
+    transactionPatientDropdownOpen: false,
     products: [],
     serviceProductsMap: {},
     paymentMachines: [],
@@ -441,15 +419,24 @@ function financeiroApp() {
     editingMachineId: null,
     machineForm: { name: '', rates: {} },
     newTransaction: { type: 'pagamento_procedimento', patient_id: '', professional_id: '', amount: '', base_amount: '', commission_percentage: '', payment_method: '', transaction_date: new Date().toISOString().slice(0,10), paymentLines: [] },
-    newPackage: { patient_id: '', service_id: '', total_sessions: 1, expires_at: '', paymentLines: [] },
+    planTemplates: [],
+    planTemplateItems: {},
+    showNewTemplateForm: false,
+    editingTemplateId: null,
+    templateForm: { name: '', description: '', items: [{ service_id: '', quantity: 1 }] },
     feedback: { type: '', message: '' },
 
     async init() {
       await this.loadClinicId();
-      await Promise.all([this.loadTransactions(), this.loadPackages(), this.loadPatients(), this.loadServices(), this.loadUsers(), this.loadProducts(), this.loadServiceProductsMap(), this.loadPaymentMachines()]);
+      await Promise.all([this.loadTransactions(), this.loadPackages(), this.loadPatients(), this.loadServices(), this.loadUsers(), this.loadProducts(), this.loadServiceProductsMap(), this.loadPaymentMachines(), this.loadPlanTemplates()]);
       this.newTransaction.paymentLines = [this.emptyPaymentLine()];
-      this.newPackage.paymentLines = [this.emptyPaymentLine()];
       this.loading = false;
+    },
+
+    filteredPatientsFor(query) {
+      const q = (query || '').trim().toLowerCase();
+      if (!q) return this.patients.slice(0, 20);
+      return this.patients.filter(p => p.full_name.toLowerCase().includes(q)).slice(0, 20);
     },
 
     async loadClinicId() {
@@ -525,11 +512,95 @@ function financeiroApp() {
       return map;
     },
 
-    suggestedPackagePrice() {
-      const service = this.services.find(s => s.id === this.newPackage.service_id);
-      const sessions = Number(this.newPackage.total_sessions) || 0;
-      if (!service || !service.price || !sessions) return 0;
-      return Number(service.price) * sessions;
+    async loadPlanTemplates() {
+      const [tplRes, itemsRes] = await Promise.all([
+        supabaseClient.from('plan_templates').select('id, name, description').order('name'),
+        supabaseClient.from('plan_template_items').select('id, plan_template_id, service_id, quantity, services ( name )')
+      ]);
+      this.planTemplates = tplRes.error ? [] : (tplRes.data || []);
+      const map = {};
+      (itemsRes.data || []).forEach(item => {
+        if (!map[item.plan_template_id]) map[item.plan_template_id] = [];
+        map[item.plan_template_id].push(item);
+      });
+      this.planTemplateItems = map;
+    },
+
+    templateItemsSummary(tpl) {
+      const items = this.planTemplateItems[tpl.id] || [];
+      if (items.length === 0) return 'Nenhum serviço adicionado';
+      return items.map(i => (i.services ? i.services.name : '—') + ' (' + i.quantity + 'x)').join(' · ');
+    },
+
+    openNewTemplateForm() {
+      this.editingTemplateId = null;
+      this.templateForm = { name: '', description: '', items: [{ service_id: '', quantity: 1 }] };
+      this.showNewTemplateForm = true;
+    },
+
+    openEditTemplateForm(tpl) {
+      this.editingTemplateId = tpl.id;
+      const items = (this.planTemplateItems[tpl.id] || []).map(i => ({ service_id: i.service_id, quantity: i.quantity }));
+      this.templateForm = { name: tpl.name, description: tpl.description || '', items: items.length ? items : [{ service_id: '', quantity: 1 }] };
+      this.showNewTemplateForm = true;
+    },
+
+    async saveTemplate() {
+      if (!this.clinicId || !this.templateForm.name) return;
+      this.saving = true;
+      const validItems = this.templateForm.items.filter(i => i.service_id);
+      if (validItems.length === 0) {
+        this.saving = false;
+        this.showFeedback('error', 'Adicione ao menos um serviço ao pacote.');
+        return;
+      }
+
+      let templateId = this.editingTemplateId;
+      if (templateId) {
+        const { error } = await supabaseClient.from('plan_templates').update({ name: this.templateForm.name, description: this.templateForm.description || null }).eq('id', templateId);
+        if (error) {
+          this.saving = false;
+          this.showFeedback('error', 'Erro ao salvar pacote: ' + error.message);
+          return;
+        }
+        await supabaseClient.from('plan_template_items').delete().eq('plan_template_id', templateId);
+      } else {
+        const { data, error } = await supabaseClient.from('plan_templates').insert({
+          clinic_id: this.clinicId,
+          name: this.templateForm.name,
+          description: this.templateForm.description || null
+        }).select().single();
+        if (error) {
+          this.saving = false;
+          this.showFeedback('error', 'Erro ao salvar pacote: ' + error.message);
+          return;
+        }
+        templateId = data.id;
+      }
+
+      const itemsPayload = validItems.map(i => ({ plan_template_id: templateId, service_id: i.service_id, quantity: Number(i.quantity) || 1 }));
+      const { error: itemsError } = await supabaseClient.from('plan_template_items').insert(itemsPayload);
+      this.saving = false;
+      if (itemsError) {
+        this.showFeedback('error', 'Pacote salvo, mas houve erro ao salvar os serviços: ' + itemsError.message);
+        this.showNewTemplateForm = false;
+        await this.loadPlanTemplates();
+        return;
+      }
+      this.showNewTemplateForm = false;
+      this.showFeedback('success', 'Pacote salvo.');
+      await this.loadPlanTemplates();
+    },
+
+    async removeTemplate(tpl) {
+      if (!window.confirm('Remover o pacote "' + tpl.name + '"? Isso não afeta pacotes já vendidos.')) return;
+      const { error } = await supabaseClient.from('plan_templates').delete().eq('id', tpl.id);
+      if (error) {
+        this.showFeedback('error', 'Erro ao remover pacote: ' + error.message);
+        return;
+      }
+      this.showFeedback('success', 'Pacote removido.');
+      await this.loadPlanTemplates();
     },
 
     unitCostFor(serviceId) {
@@ -715,61 +786,9 @@ function financeiroApp() {
 
       this.showNewTransactionForm = false;
       this.newTransaction = { type: 'pagamento_procedimento', patient_id: '', professional_id: '', amount: '', base_amount: '', commission_percentage: '', payment_method: '', transaction_date: new Date().toISOString().slice(0,10), paymentLines: [this.emptyPaymentLine()] };
+      this.transactionPatientSearch = '';
       this.showFeedback('success', 'Lançamento registrado.');
       await this.loadTransactions();
-    },
-
-    async createPackage() {
-      if (!this.clinicId) return;
-      const lines = this.newPackage.paymentLines.filter(l => (parseCurrencyToNumber(l.amount) || 0) > 0);
-      const totalPrice = this.paymentLinesTotal(this.newPackage.paymentLines);
-      this.saving = true;
-      const payload = {
-        clinic_id: this.clinicId,
-        patient_id: this.newPackage.patient_id,
-        service_id: this.newPackage.service_id,
-        total_sessions: this.newPackage.total_sessions,
-        total_price: totalPrice || null,
-        expires_at: this.newPackage.expires_at || null
-      };
-      const { data: newPkg, error } = await supabaseClient.from('packages').insert(payload).select().single();
-      if (error) {
-        this.saving = false;
-        this.showFeedback('error', 'Erro ao registrar pacote: ' + error.message);
-        return;
-      }
-
-      if (lines.length > 0) {
-        const saleGroupId = lines.length > 1 ? this.newSaleGroupId() : null;
-        const txPayload = lines.map(line => ({
-          clinic_id: this.clinicId,
-          type: 'venda_pacote',
-          patient_id: this.newPackage.patient_id,
-          package_id: newPkg.id,
-          amount: parseCurrencyToNumber(line.amount),
-          payment_method: line.payment_method || null,
-          installments: line.payment_method === 'Cartão de crédito' ? (line.installments || 1) : 1,
-          payment_machine_id: line.payment_method === 'Cartão de crédito' ? (line.payment_machine_id || null) : null,
-          net_amount: this.netAmountFor(line),
-          sale_group_id: saleGroupId,
-          transaction_date: new Date().toISOString().slice(0, 10)
-        }));
-        const { error: txError } = await supabaseClient.from('transactions').insert(txPayload);
-        if (txError) {
-          this.showFeedback('error', 'Pacote registrado, mas houve erro ao lançar a venda no financeiro: ' + txError.message);
-          this.saving = false;
-          this.showNewPackageForm = false;
-          this.newPackage = { patient_id: '', service_id: '', total_sessions: 1, expires_at: '', paymentLines: [this.emptyPaymentLine()] };
-          await Promise.all([this.loadPackages(), this.loadTransactions()]);
-          return;
-        }
-      }
-
-      this.saving = false;
-      this.showNewPackageForm = false;
-      this.newPackage = { patient_id: '', service_id: '', total_sessions: 1, expires_at: '', paymentLines: [this.emptyPaymentLine()] };
-      this.showFeedback('success', 'Pacote registrado e lançado no financeiro.');
-      await Promise.all([this.loadPackages(), this.loadTransactions()]);
     },
 
     showFeedback(type, message) {
@@ -783,6 +802,7 @@ function financeiroApp() {
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="js/supabase-client.js"></script>
 <script src="js/auth-guard.js"></script>
+<script src="js/topbar.js"></script>
 <script src="js/include.js" defer></script>
 </body>
 </html>

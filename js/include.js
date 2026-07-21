@@ -84,7 +84,7 @@ async function fillUserInfo() {
 
     const { data: profile, error } = await supabaseClient
       .from('users')
-      .select('full_name, role, clinics ( name )')
+      .select('clinic_id, full_name, role, clinics ( name )')
       .eq('id', user.id)
       .single();
 
@@ -100,8 +100,41 @@ async function fillUserInfo() {
 
     window.__prismaUserRole = profile.role;
     applyRoleVisibility(profile.role);
+    await applyClinicSettings(profile.clinic_id, profile.role);
   } catch (err) {
     console.error('[include.js] fillUserInfo:', err);
+  }
+}
+
+async function applyClinicSettings(clinicId, role) {
+  if (!clinicId) return;
+  try {
+    const { data: settings } = await supabaseClient
+      .from('clinic_settings')
+      .select('logo_url, theme, prevent_double_booking, agenda_name_format, manager_password, manager_password_for_discount, manager_password_for_courtesy, show_performance_to_staff')
+      .eq('clinic_id', clinicId)
+      .maybeSingle();
+
+    window.__prismaClinicSettings = settings || {};
+
+    document.documentElement.setAttribute('data-theme', settings && settings.theme === 'escuro' ? 'escuro' : 'claro');
+
+    if (settings && settings.logo_url) {
+      const logoImg = document.querySelector('[data-slot="clinic-logo"]');
+      const defaultLogo = document.querySelector('[data-slot="default-logo"]');
+      if (logoImg) { logoImg.src = settings.logo_url; logoImg.style.display = 'block'; }
+      if (defaultLogo) defaultLogo.style.display = 'none';
+    }
+
+    const isAdmin = window.isAdminRole && window.isAdminRole(role);
+    if (settings && settings.show_performance_to_staff === false && !isAdmin) {
+      document.querySelectorAll('.nav-item[data-page="bi"]').forEach((el) => { el.style.display = 'none'; });
+      if (document.body.getAttribute('data-page') === 'bi') {
+        window.location.href = 'dashboard.html';
+      }
+    }
+  } catch (err) {
+    console.error('[include.js] applyClinicSettings:', err);
   }
 }
 

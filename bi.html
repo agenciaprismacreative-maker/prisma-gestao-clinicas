@@ -209,7 +209,7 @@
                     <tr>
                       <td x-text="u.full_name"></td>
                       <td style="max-width:140px;">
-                        <input class="input" type="number" step="0.01" min="0" x-model="goalInputs[u.id]" placeholder="0,00">
+                        <input class="input" type="text" inputmode="decimal" x-model="goalInputs[u.id]" @input="goalInputs[u.id] = maskCurrencyInput($event.target.value)" placeholder="R$ 0,00">
                       </td>
                       <td x-text="formatCurrency(monthRevenueFor(u.id))"></td>
                       <td>
@@ -292,7 +292,7 @@ function biApp() {
       const map = {};
       this.users.forEach(u => {
         const g = this.goals.find(x => x.professional_id === u.id && x.period_month === this.currentPeriodMonth);
-        map[u.id] = g ? g.target_amount : '';
+        map[u.id] = g ? numberToCurrencyInput(g.target_amount) : '';
       });
       this.goalInputs = map;
     },
@@ -563,7 +563,7 @@ function biApp() {
     },
 
     async saveGoal(userId) {
-      const amount = Number(this.goalInputs[userId]);
+      const amount = parseCurrencyToNumber(this.goalInputs[userId]);
       if (!amount || amount <= 0) {
         this.showFeedback('error', 'Informe um valor de meta válido antes de salvar.');
         return;
@@ -598,6 +598,8 @@ function biApp() {
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="js/supabase-client.js"></script>
 <script src="js/auth-guard.js"></script>
+<script src="js/topbar.js"></script>
+<script src="js/currency-mask.js"></script>
 <script src="js/include.js" defer></script>
 </body>
 </html>
