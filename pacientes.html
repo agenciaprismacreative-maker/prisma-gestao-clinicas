@@ -24,7 +24,7 @@
         <div class="flex gap-3">
           <input type="file" accept=".csv" x-ref="csvInput" @change="importCsv($event)" style="display:none;">
           <button class="btn btn-secondary" type="button" @click="$refs.csvInput.click()">Importar CSV</button>
-          <button class="btn btn-primary" type="button" @click="showNewForm = true">
+          <button class="btn btn-primary" type="button" @click="openNewForm()">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
             Novo paciente
           </button>
@@ -96,7 +96,10 @@
                 <div class="avatar avatar-lg" x-text="selected && initials(selected.full_name)"></div>
                 <div>
                   <h3 style="font-size:19px;" x-text="selected && selected.full_name"></h3>
-                  <p class="text-muted text-sm" x-text="selected && (selected.phone || 'sem telefone cadastrado')"></p>
+                  <p class="text-muted text-sm">
+                    <span x-text="selected && (selected.phone || 'sem telefone')"></span>
+                    <span x-show="selected && ageOf(selected.birth_date) !== null"> · <span x-text="selected && ageOf(selected.birth_date)"></span> anos</span>
+                  </p>
                 </div>
                 <span class="badge" style="margin-left:auto;" :class="selected && selected.lgpd_consent_at ? 'badge-success' : 'badge-warning'">
                   <span class="badge-dot"></span>
@@ -104,10 +107,34 @@
                 </span>
               </div>
               <hr class="divider">
-              <h4 class="text-sm text-muted mb-2">Anamnese</h4>
-              <p class="text-sm mb-3" x-text="(selected && selected.anamnesis) || 'Não preenchida.'"></p>
+              <div class="grid grid-2 gap-3 mb-3">
+                <div>
+                  <h4 class="text-xs text-muted mb-1">CPF</h4>
+                  <p class="text-sm" x-text="(selected && selected.cpf) || 'Não informado'"></p>
+                </div>
+                <div>
+                  <h4 class="text-xs text-muted mb-1">E-mail</h4>
+                  <p class="text-sm" x-text="(selected && selected.email) || 'Não informado'"></p>
+                </div>
+              </div>
+
+              <h4 class="text-sm text-muted mb-2">Pontos de atenção clínica</h4>
+              <div x-show="selected && anamnesisFlags(selected).length === 0" class="text-sm text-muted mb-3">Nenhum ponto de atenção marcado na anamnese.</div>
+              <div x-show="selected && anamnesisFlags(selected).length > 0" class="mb-3">
+                <template x-for="(f, i) in (selected ? anamnesisFlags(selected) : [])" :key="i">
+                  <div class="badge badge-warning mb-2" style="display:flex;width:fit-content;">
+                    <span class="badge-dot"></span>
+                    <span x-text="f"></span>
+                  </div>
+                </template>
+              </div>
+
               <h4 class="text-sm text-muted mb-2">Alergias</h4>
-              <p class="text-sm" x-text="(selected && selected.allergies) || 'Nenhuma registrada.'"></p>
+              <p class="text-sm mb-3" x-text="(selected && selected.allergies) || 'Nenhuma registrada.'"></p>
+
+              <h4 class="text-sm text-muted mb-2">Observações complementares</h4>
+              <p class="text-sm" x-text="(selected && selected.anamnesis) || 'Nenhuma.'"></p>
+
               <div class="mt-4" x-show="selected && selected.lgpd_consent_at">
                 <span class="badge badge-info">
                   Consentimento assinado em <span x-text="selected && formatDate(selected.lgpd_consent_at)"></span>
@@ -137,6 +164,13 @@
                 </div>
               </template>
             </div>
+
+            <div class="card card-shadow">
+              <div class="card-header"><div><h3>Análise evolutiva</h3><p>Quadro evolutivo e sugestão de procedimento</p></div></div>
+              <div class="empty-note">
+                Em construção: esta seção vai usar IA (API da OpenAI) para analisar a evolução do paciente com base no histórico de sessões e nas fotos registradas, gerando um quadro evolutivo e sugerindo o próximo procedimento indicado. Depende do histórico de atendimentos já estar sendo alimentado pela tela de Atendimento e Prontuário.
+              </div>
+            </div>
           </div>
 
         </div>
@@ -144,42 +178,81 @@
 
       <!-- modal novo paciente -->
       <div x-show="showNewForm" x-cloak style="position:fixed;inset:0;background:rgba(31,51,47,.45);z-index:50;display:flex;align-items:center;justify-content:center;padding:20px;" @click.self="showNewForm = false">
-        <div class="card card-shadow" style="width:100%;max-width:480px;max-height:88vh;overflow-y:auto;">
+        <div class="card card-shadow" style="width:100%;max-width:560px;max-height:88vh;overflow-y:auto;">
           <div class="card-header">
             <h3>Novo paciente</h3>
             <button class="btn btn-ghost btn-sm" type="button" @click="showNewForm = false">Fechar</button>
           </div>
           <form @submit.prevent="createPatient()">
+
+            <h4 class="text-xs text-muted mb-2" style="text-transform:uppercase;letter-spacing:.04em;">Dados pessoais</h4>
+
             <div class="form-group">
               <label class="label">Nome completo</label>
               <input class="input" x-model="newPatient.full_name" required>
             </div>
+
             <div class="grid grid-2 gap-3">
               <div class="form-group">
-                <label class="label">WhatsApp</label>
-                <input class="input" x-model="newPatient.phone" placeholder="(11) 90000-0000">
+                <label class="label">CPF</label>
+                <input class="input" x-model="newPatient.cpf" @input="newPatient.cpf = maskCpf($event.target.value)" placeholder="000.000.000-00" maxlength="14">
+                <p class="input-hint" x-show="newPatient.cpf && !isValidCpf(newPatient.cpf)" style="color:var(--color-danger);">CPF incompleto ou inválido.</p>
               </div>
               <div class="form-group">
                 <label class="label">Nascimento</label>
                 <input class="input" type="date" x-model="newPatient.birth_date">
               </div>
             </div>
-            <div class="form-group">
-              <label class="label">E-mail</label>
-              <input class="input" type="email" x-model="newPatient.email">
+
+            <div class="grid grid-2 gap-3">
+              <div class="form-group">
+                <label class="label">WhatsApp</label>
+                <input class="input" x-model="newPatient.phone" @input="newPatient.phone = maskPhone($event.target.value)" placeholder="(11) 90000-0000" maxlength="15">
+              </div>
+              <div class="form-group">
+                <label class="label">E-mail</label>
+                <input class="input" type="email" x-model="newPatient.email" placeholder="paciente@email.com">
+                <p class="input-hint" x-show="newPatient.email && !isValidEmail(newPatient.email)" style="color:var(--color-danger);">E-mail em formato inválido.</p>
+              </div>
             </div>
-            <div class="form-group">
-              <label class="label">Anamnese</label>
-              <textarea class="input" x-model="newPatient.anamnesis" rows="2"></textarea>
+
+            <hr class="divider">
+
+            <h4 class="text-xs text-muted mb-2" style="text-transform:uppercase;letter-spacing:.04em;">Anamnese</h4>
+            <p class="text-xs text-soft mb-3">Marque os itens que se aplicam ao paciente. Serve de base para segurança do procedimento e, futuramente, para a análise evolutiva por IA.</p>
+
+            <template x-for="q in questions" :key="q.key">
+              <div class="form-group" style="border-bottom:1px solid var(--color-border);padding-bottom:12px;">
+                <div class="flex items-center gap-2">
+                  <input type="checkbox" :id="'q_' + q.key" x-model="newPatient.anamnesis_answers[q.key].answer" style="width:auto;">
+                  <label :for="'q_' + q.key" class="text-sm" style="margin:0;" x-text="q.label"></label>
+                </div>
+                <input
+                  x-show="q.hasDetail && newPatient.anamnesis_answers[q.key].answer"
+                  x-cloak
+                  class="input mt-2"
+                  x-model="newPatient.anamnesis_answers[q.key].detail"
+                  placeholder="Qual?">
+              </div>
+            </template>
+
+            <div class="form-group mt-3">
+              <label class="label">Observações complementares</label>
+              <textarea class="input" x-model="newPatient.anamnesis" rows="2" placeholder="Qualquer outra informação relevante"></textarea>
             </div>
+
             <div class="form-group">
               <label class="label">Alergias</label>
               <input class="input" x-model="newPatient.allergies">
             </div>
+
+            <hr class="divider">
+
             <div class="form-group flex items-center gap-2">
               <input type="checkbox" x-model="newPatient.lgpd_consent" id="lgpd" style="width:auto;">
               <label for="lgpd" class="text-sm" style="margin:0;">Paciente autorizou o tratamento de dados de saúde (LGPD) agora</label>
             </div>
+
             <button class="btn btn-primary btn-block mt-2" type="submit" :disabled="saving">
               <span x-show="!saving">Salvar paciente</span>
               <span x-show="saving" x-cloak>Salvando…</span>
@@ -193,6 +266,67 @@
 </div>
 
 <script>
+const ANAMNESIS_QUESTIONS = [
+  { key: 'diabetes', label: 'Possui diabetes?' },
+  { key: 'hipertensao', label: 'Possui hipertensão (pressão alta)?' },
+  { key: 'coagulacao', label: 'Possui problema de coagulação sanguínea?' },
+  { key: 'doenca_autoimune', label: 'Possui doença autoimune?' },
+  { key: 'epilepsia', label: 'Possui epilepsia?' },
+  { key: 'doenca_pele_ativa', label: 'Possui doença de pele ativa (psoríase, dermatite, etc.)?' },
+  { key: 'gestante_lactante', label: 'Está gestante ou amamentando?' },
+  { key: 'medicacao_continua', label: 'Faz uso de medicação contínua?', hasDetail: true },
+  { key: 'alergia_medicamento', label: 'Possui alergia a medicamentos?', hasDetail: true },
+  { key: 'alergia_cosmetico', label: 'Possui alergia a cosméticos ou produtos tópicos?', hasDetail: true },
+  { key: 'isotretinoina_6meses', label: 'Usou isotretinoína (Roacutan) nos últimos 6 meses?' },
+  { key: 'marcapasso_implante', label: 'Possui marca-passo ou implante metálico?' },
+  { key: 'queloide', label: 'Tem histórico de queloide (cicatrização excessiva)?' },
+  { key: 'herpes_labial', label: 'Tem histórico de herpes labial recorrente?' },
+  { key: 'fumante', label: 'É fumante?' },
+  { key: 'exposicao_solar_recente', label: 'Teve exposição solar intensa nos últimos 15 dias?' }
+];
+
+function emptyAnamnesisAnswers() {
+  const obj = {};
+  ANAMNESIS_QUESTIONS.forEach(q => { obj[q.key] = { answer: false, detail: '' }; });
+  return obj;
+}
+
+function maskPhone(value) {
+  let v = (value || '').replace(/\D/g, '').slice(0, 11);
+  if (v.length > 10) return v.replace(/(\d{2})(\d{5})(\d{0,4})/, '($1) $2-$3').trim();
+  if (v.length > 6) return v.replace(/(\d{2})(\d{4})(\d{0,4})/, '($1) $2-$3').trim();
+  if (v.length > 2) return v.replace(/(\d{2})(\d{0,5})/, '($1) $2').trim();
+  return v.replace(/(\d{0,2})/, '($1').trim();
+}
+
+function maskCpf(value) {
+  let v = (value || '').replace(/\D/g, '').slice(0, 11);
+  v = v.replace(/(\d{3})(\d)/, '$1.$2');
+  v = v.replace(/(\d{3})(\d)/, '$1.$2');
+  v = v.replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+  return v;
+}
+
+function isValidEmail(value) {
+  if (!value) return true;
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+function isValidCpf(value) {
+  const cpf = (value || '').replace(/\D/g, '');
+  if (cpf.length !== 11 || /^(\d)\1{10}$/.test(cpf)) return false;
+  let sum = 0;
+  for (let i = 0; i < 9; i++) sum += parseInt(cpf[i], 10) * (10 - i);
+  let rev = 11 - (sum % 11);
+  if (rev >= 10) rev = 0;
+  if (rev !== parseInt(cpf[9], 10)) return false;
+  sum = 0;
+  for (let i = 0; i < 10; i++) sum += parseInt(cpf[i], 10) * (11 - i);
+  rev = 11 - (sum % 11);
+  if (rev >= 10) rev = 0;
+  return rev === parseInt(cpf[10], 10);
+}
+
 function pacientesApp() {
   return {
     loading: true,
@@ -202,10 +336,17 @@ function pacientesApp() {
     patients: [],
     clinicId: null,
     showNewForm: false,
-    newPatient: { full_name: '', phone: '', email: '', birth_date: '', anamnesis: '', allergies: '', lgpd_consent: false },
+    questions: ANAMNESIS_QUESTIONS,
+    newPatient: {
+      full_name: '', cpf: '', phone: '', email: '', birth_date: '',
+      anamnesis: '', allergies: '', lgpd_consent: false,
+      anamnesis_answers: emptyAnamnesisAnswers()
+    },
     history: [],
     historyLoading: false,
     feedback: { type: '', message: '' },
+
+    maskPhone, maskCpf, isValidEmail, isValidCpf,
 
     async init() {
       await this.loadClinicId();
@@ -259,6 +400,34 @@ function pacientesApp() {
       return d.toLocaleDateString('pt-BR');
     },
 
+    ageOf(birthDate) {
+      if (!birthDate) return null;
+      const b = new Date(birthDate);
+      if (isNaN(b)) return null;
+      const today = new Date();
+      let age = today.getFullYear() - b.getFullYear();
+      const m = today.getMonth() - b.getMonth();
+      if (m < 0 || (m === 0 && today.getDate() < b.getDate())) age--;
+      return age;
+    },
+
+    anamnesisFlags(patient) {
+      const answers = patient && patient.anamnesis_answers;
+      if (!answers) return [];
+      return ANAMNESIS_QUESTIONS
+        .filter(q => answers[q.key] && answers[q.key].answer)
+        .map(q => q.hasDetail && answers[q.key].detail ? (q.label.replace('?', '') + ': ' + answers[q.key].detail) : q.label);
+    },
+
+    openNewForm() {
+      this.newPatient = {
+        full_name: '', cpf: '', phone: '', email: '', birth_date: '',
+        anamnesis: '', allergies: '', lgpd_consent: false,
+        anamnesis_answers: emptyAnamnesisAnswers()
+      };
+      this.showNewForm = true;
+    },
+
     async selectPatient(p) {
       this.selected = p;
       this.historyLoading = true;
@@ -277,14 +446,24 @@ function pacientesApp() {
         this.showFeedback('error', 'Não foi possível identificar sua clínica. Recarregue a página e tente de novo.');
         return;
       }
+      if (this.newPatient.email && !isValidEmail(this.newPatient.email)) {
+        this.showFeedback('error', 'Corrija o e-mail antes de salvar.');
+        return;
+      }
+      if (this.newPatient.cpf && !isValidCpf(this.newPatient.cpf)) {
+        this.showFeedback('error', 'Corrija o CPF antes de salvar.');
+        return;
+      }
       this.saving = true;
       const payload = {
         clinic_id: this.clinicId,
         full_name: this.newPatient.full_name,
+        cpf: this.newPatient.cpf || null,
         phone: this.newPatient.phone || null,
         email: this.newPatient.email || null,
         birth_date: this.newPatient.birth_date || null,
         anamnesis: this.newPatient.anamnesis || null,
+        anamnesis_answers: this.newPatient.anamnesis_answers,
         allergies: this.newPatient.allergies || null
       };
       if (this.newPatient.lgpd_consent) {
@@ -298,7 +477,6 @@ function pacientesApp() {
         return;
       }
       this.showNewForm = false;
-      this.newPatient = { full_name: '', phone: '', email: '', birth_date: '', anamnesis: '', allergies: '', lgpd_consent: false };
       this.showFeedback('success', 'Paciente cadastrado com sucesso.');
       await this.loadPatients();
     },
@@ -308,7 +486,7 @@ function pacientesApp() {
       if (!file || !this.clinicId) return;
       const text = await file.text();
       const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
-      const rows = lines.slice(1); // pula a linha de cabeçalho
+      const rows = lines.slice(1);
       const payload = rows.map(line => {
         const cols = line.split(',').map(s => (s || '').trim());
         return {
