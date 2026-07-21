@@ -215,7 +215,12 @@ function pacientesApp() {
     async loadClinicId() {
       const { data: { user } } = await supabaseClient.auth.getUser();
       if (!user) return;
-      const { data } = await supabaseClient.from('users').select('clinic_id').eq('id', user.id).single();
+      const { data, error } = await supabaseClient.from('users').select('clinic_id').eq('id', user.id).single();
+      if (error) {
+        console.error('[loadClinicId]', error);
+        this.showFeedback('error', 'Erro ao identificar sua clínica: ' + error.message);
+        return;
+      }
       this.clinicId = data ? data.clinic_id : null;
     },
 
