@@ -9,11 +9,12 @@
 -- ============================================================================
 -- 006: papéis (Esteticista / Atendente / Administrador) + trava de segurança
 -- ============================================================================
+alter table public.users drop constraint if exists users_role_check;
+
 update public.users set role = 'esteticista' where role = 'profissional';
 update public.users set role = 'atendente' where role = 'recepcao';
 update public.users set role = 'administrador' where role in ('gestor', 'financeiro');
 
-alter table public.users drop constraint if exists users_role_check;
 alter table public.users add constraint users_role_check check (
   role in ('esteticista', 'atendente', 'administrador', 'equipe_prisma')
 );

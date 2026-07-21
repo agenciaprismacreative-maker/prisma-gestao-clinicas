@@ -6,7 +6,12 @@
 -- Seguro rodar mais de uma vez.
 -- ============================================================================
 
--- 1) Migra os valores existentes
+-- 1) Remove a trava antiga da coluna role antes de renomear os valores
+-- (senão o UPDATE abaixo esbarra na trava antiga, que não conhece os nomes
+-- novos)
+alter table public.users drop constraint if exists users_role_check;
+
+-- 2) Migra os valores existentes
 update public.users set role = 'esteticista' where role = 'profissional';
 update public.users set role = 'atendente' where role = 'recepcao';
 update public.users set role = 'administrador' where role in ('gestor', 'financeiro');
@@ -14,8 +19,7 @@ update public.users set role = 'administrador' where role in ('gestor', 'finance
 -- Prisma Creative, com acesso a todas as clínicas, e não aparece nas opções
 -- de cadastro que o cliente vê na tela de Equipe.
 
--- 2) Atualiza o check constraint da coluna role
-alter table public.users drop constraint if exists users_role_check;
+-- 3) Recria o check constraint já com os nomes novos
 alter table public.users add constraint users_role_check check (
   role in ('esteticista', 'atendente', 'administrador', 'equipe_prisma')
 );
