@@ -77,13 +77,22 @@ async function fillUserInfo() {
     const { data: { user } } = await supabaseClient.auth.getUser();
     if (!user) return;
 
+    // Preenche com o e-mail imediatamente, para nunca ficar travado em
+    // "Carregando…" mesmo se a consulta de perfil abaixo falhar.
+    if (nameEl) nameEl.textContent = user.email;
+    if (initialsEl) initialsEl.textContent = getInitials(user.email);
+
     const { data: profile, error } = await supabaseClient
       .from('users')
       .select('full_name, role, clinics ( name )')
       .eq('id', user.id)
       .single();
 
-    if (error || !profile) return;
+    if (error) {
+      console.error('[fillUserInfo] erro ao buscar perfil em public.users:', error);
+      return;
+    }
+    if (!profile) return;
 
     if (nameEl) nameEl.textContent = profile.full_name || user.email;
     if (clinicEl) clinicEl.textContent = profile.clinics ? profile.clinics.name : '';
