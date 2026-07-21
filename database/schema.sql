@@ -29,6 +29,9 @@ create table public.users (
   role text not null check (
     role in ('recepcao', 'profissional', 'gestor', 'financeiro', 'equipe_prisma')
   ),
+  professional_register text,
+  specialties text,
+  bio text,
   created_at timestamptz not null default now()
 );
 
@@ -52,13 +55,58 @@ create table public.patients (
   id uuid primary key default gen_random_uuid(),
   clinic_id uuid not null references public.clinics (id) on delete cascade,
   full_name text not null,
+  cpf text,
   phone text,
   email text,
   birth_date date,
   anamnesis text,
+  anamnesis_answers jsonb not null default '{}'::jsonb,
   allergies text,
   lgpd_consent_at timestamptz,
   lgpd_consent_text text,
+
+  -- documentos
+  rg text,
+  rg_orgao_emissor text,
+  rg_data_emissao date,
+
+  -- contato expandido
+  phone2 text,
+  landline text,
+  instagram text,
+  facebook text,
+
+  -- endereço
+  address_cep text,
+  address_street text,
+  address_number text,
+  address_neighborhood text,
+  address_complement text,
+  address_city text,
+  address_state text,
+
+  -- origem do lead / indicação
+  lead_source text,
+  referred_by_patient_id uuid references public.patients (id) on delete set null,
+  referred_by_name text,
+
+  -- responsável legal (paciente menor de idade ou dependente)
+  legal_guardian_name text,
+  legal_guardian_cpf text,
+  legal_guardian_notes text,
+
+  -- dados complementares
+  naturality text,
+  father_name text,
+  mother_name text,
+  profession text,
+  workplace text,
+  record_number text,
+  gender text,
+  marital_status text,
+  blood_type text,
+  client_type text default 'particular',
+
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -201,6 +249,19 @@ create table public.communications_log (
 );
 
 -- ============================================================================
+-- 13. SCHEDULE_BLOCKS (bloqueios de agenda: feriado, folga, manutenção etc.)
+-- ============================================================================
+create table public.schedule_blocks (
+  id uuid primary key default gen_random_uuid(),
+  clinic_id uuid not null references public.clinics (id) on delete cascade,
+  professional_id uuid references public.users (id) on delete cascade,
+  start_at timestamptz not null,
+  end_at timestamptz not null,
+  reason text,
+  created_at timestamptz not null default now()
+);
+
+-- ============================================================================
 -- ÍNDICES (consultas mais comuns: por clínica e por data)
 -- ============================================================================
 create index idx_patients_clinic on public.patients (clinic_id);
@@ -210,6 +271,7 @@ create index idx_tasks_clinic_status on public.tasks (clinic_id, status);
 create index idx_transactions_clinic_date on public.transactions (clinic_id, transaction_date);
 create index idx_leads_clinic_status on public.leads (clinic_id, funnel_status);
 create index idx_communications_patient on public.communications_log (patient_id);
+create index idx_schedule_blocks_clinic_date on public.schedule_blocks (clinic_id, start_at);
 
 -- ============================================================================
 -- FUNÇÕES AUXILIARES PARA AS POLÍTICAS DE RLS
@@ -252,6 +314,7 @@ alter table public.tasks enable row level security;
 alter table public.transactions enable row level security;
 alter table public.leads enable row level security;
 alter table public.communications_log enable row level security;
+alter table public.schedule_blocks enable row level security;
 
 -- clinics: qualquer usuário autenticado enxerga apenas a própria clínica
 create policy "clinics_select" on public.clinics for select
@@ -260,6 +323,14 @@ create policy "clinics_select" on public.clinics for select
 -- users: cada usuário vê os colegas da própria clínica
 create policy "users_select" on public.users for select
   using (clinic_id = public.auth_clinic_id() or public.auth_is_prisma_team());
+
+-- users: vincular (insert) e editar (update) integrantes da própria clínica
+create policy "users_insert" on public.users for insert
+  with check (clinic_id = public.auth_clinic_id() or public.auth_is_prisma_team());
+
+create policy "users_update" on public.users for update
+  using (clinic_id = public.auth_clinic_id() or public.auth_is_prisma_team())
+  with check (clinic_id = public.auth_clinic_id() or public.auth_is_prisma_team());
 
 -- Bloco repetido para as tabelas operacionais: select, insert, update, delete
 -- restritos à clínica do usuário autenticado, com acesso total para a equipe Prisma.
@@ -301,6 +372,10 @@ create policy "leads_all" on public.leads for all
   with check (clinic_id = public.auth_clinic_id() or public.auth_is_prisma_team());
 
 create policy "communications_log_all" on public.communications_log for all
+  using (clinic_id = public.auth_clinic_id() or public.auth_is_prisma_team())
+  with check (clinic_id = public.auth_clinic_id() or public.auth_is_prisma_team());
+
+create policy "schedule_blocks_all" on public.schedule_blocks for all
   using (clinic_id = public.auth_clinic_id() or public.auth_is_prisma_team())
   with check (clinic_id = public.auth_clinic_id() or public.auth_is_prisma_team());
 

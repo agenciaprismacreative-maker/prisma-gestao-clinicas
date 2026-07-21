@@ -56,6 +56,7 @@
                     <td><span class="badge badge-neutral" x-text="statusLabel(appt.status)"></span></td>
                     <td class="flex gap-2">
                       <button class="btn btn-primary btn-sm" type="button" @click="selectAppointment(appt)">Atender</button>
+                      <button class="btn btn-ghost btn-sm" type="button" @click="openReschedule(appt)">Remanejar</button>
                       <button class="btn btn-ghost btn-sm" type="button" @click="markNoShow(appt)">Marcar falta</button>
                     </td>
                   </tr>
@@ -98,9 +99,14 @@
                   <label class="label">Fotos de evolução</label>
                   <input type="file" accept="image/*" multiple x-ref="photoInput" @change="onPhotosSelected($event)" style="display:none;">
                   <button type="button" class="btn btn-secondary btn-sm" @click="$refs.photoInput.click()">Selecionar fotos</button>
+                  <p class="input-hint" x-show="photoPreviews.length > 0" x-text="photoPreviews.length + ' foto(s) selecionada(s). Clique em uma nova seleção para adicionar mais, ou no × para remover.'"></p>
                   <div class="grid grid-3 gap-2 mt-3" x-show="photoPreviews.length > 0">
                     <template x-for="(src, i) in photoPreviews" :key="i">
-                      <img :src="src" style="width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:var(--radius-md);border:1px solid var(--color-border);">
+                      <div style="position:relative;">
+                        <img :src="src" style="width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:var(--radius-md);border:1px solid var(--color-border);">
+                        <button type="button" @click="removePhoto(i)" title="Remover"
+                          style="position:absolute;top:6px;right:6px;width:24px;height:24px;border-radius:50%;background:rgba(31,51,47,.75);color:#fff;border:none;display:flex;align-items:center;justify-content:center;font-size:15px;line-height:1;cursor:pointer;">×</button>
+                      </div>
                     </template>
                   </div>
                 </div>
@@ -150,6 +156,30 @@
         </div>
       </div>
 
+      <!-- modal remanejar horário -->
+      <div x-show="showRescheduleForm" x-cloak style="position:fixed;inset:0;background:rgba(31,51,47,.45);z-index:50;display:flex;align-items:center;justify-content:center;padding:20px;" @click.self="showRescheduleForm = false">
+        <div class="card card-shadow" style="width:100%;max-width:420px;">
+          <div class="card-header"><h3>Remanejar horário</h3><button class="btn btn-ghost btn-sm" type="button" @click="showRescheduleForm = false">Fechar</button></div>
+          <p class="text-sm text-muted mb-3" x-text="reschedulingAppt ? ((reschedulingAppt.patients ? reschedulingAppt.patients.full_name : 'Paciente') + ' · horário atual: ' + formatTime(reschedulingAppt.scheduled_at)) : ''"></p>
+          <form @submit.prevent="confirmReschedule()">
+            <div class="grid grid-2 gap-3">
+              <div class="form-group">
+                <label class="label">Nova data</label>
+                <input class="input" type="date" x-model="rescheduleForm.date" required>
+              </div>
+              <div class="form-group">
+                <label class="label">Novo horário</label>
+                <input class="input" type="time" x-model="rescheduleForm.time" required>
+              </div>
+            </div>
+            <button class="btn btn-primary btn-block mt-2" type="submit" :disabled="saving">
+              <span x-show="!saving">Confirmar remanejamento</span>
+              <span x-show="saving" x-cloak>Salvando…</span>
+            </button>
+          </form>
+        </div>
+      </div>
+
     </main>
   </div>
 </div>
@@ -179,6 +209,9 @@ function atendimentoApp() {
     loading: true,
     saving: false,
     clinicId: null,
+    currentUserId: null,
+    userRole: null,
+    isStaff: false,
     queue: [],
     selectedAppt: null,
     form: { protocol: '', notes: '' },
@@ -187,6 +220,9 @@ function atendimentoApp() {
     marketingConsent: false,
     history: [],
     historyLoading: false,
+    showRescheduleForm: false,
+    reschedulingAppt: null,
+    rescheduleForm: { date: '', time: '' },
     feedback: { type: '', message: '' },
 
     async init() {
@@ -197,25 +233,32 @@ function atendimentoApp() {
     async loadClinicId() {
       const { data: { user } } = await supabaseClient.auth.getUser();
       if (!user) return;
-      const { data, error } = await supabaseClient.from('users').select('clinic_id').eq('id', user.id).single();
+      this.currentUserId = user.id;
+      const { data, error } = await supabaseClient.from('users').select('clinic_id, role').eq('id', user.id).single();
       if (error) {
         this.showFeedback('error', 'Erro ao identificar sua clínica: ' + error.message);
         return;
       }
       this.clinicId = data ? data.clinic_id : null;
+      this.userRole = data ? data.role : null;
+      this.isStaff = window.isStaffRole ? window.isStaffRole(this.userRole) : false;
     },
 
     async loadQueue() {
       this.loading = true;
       const start = new Date(); start.setHours(0, 0, 0, 0);
       const end = new Date(); end.setHours(23, 59, 59, 999);
-      const { data, error } = await supabaseClient
+      let query = supabaseClient
         .from('appointments')
-        .select('id, scheduled_at, duration_minutes, status, patient_id, service_id, patients ( full_name, anamnesis_answers, allergies ), services ( name )')
+        .select('id, scheduled_at, duration_minutes, status, patient_id, service_id, professional_id, patients ( full_name, anamnesis_answers, allergies ), services ( name )')
         .gte('scheduled_at', start.toISOString())
         .lte('scheduled_at', end.toISOString())
         .in('status', ['agendado', 'confirmado', 'em_atendimento'])
         .order('scheduled_at', { ascending: true });
+      if (this.isStaff && this.currentUserId) {
+        query = query.eq('professional_id', this.currentUserId);
+      }
+      const { data, error } = await query;
       if (error) {
         this.showFeedback('error', 'Erro ao carregar a fila: ' + error.message);
         this.queue = [];
@@ -278,8 +321,65 @@ function atendimentoApp() {
     },
 
     onPhotosSelected(event) {
-      this.photoFiles = Array.from(event.target.files);
-      this.photoPreviews = this.photoFiles.map(f => URL.createObjectURL(f));
+      const newFiles = Array.from(event.target.files);
+      newFiles.forEach(file => {
+        this.photoFiles.push(file);
+        this.photoPreviews.push(URL.createObjectURL(file));
+      });
+      event.target.value = '';
+    },
+
+    removePhoto(index) {
+      URL.revokeObjectURL(this.photoPreviews[index]);
+      this.photoFiles.splice(index, 1);
+      this.photoPreviews.splice(index, 1);
+    },
+
+    sanitizeFileName(name) {
+      const dotIndex = name.lastIndexOf('.');
+      const base = dotIndex > 0 ? name.slice(0, dotIndex) : name;
+      const ext = dotIndex > 0 ? name.slice(dotIndex).toLowerCase().replace(/[^a-z0-9.]/g, '') : '';
+      const noAccents = base.normalize('NFD').replace(/[̀-ͯ]/g, '');
+      const safeBase = noAccents
+        .replace(/[^a-zA-Z0-9-_]+/g, '_')
+        .replace(/^_+|_+$/g, '')
+        .slice(0, 60) || 'foto';
+      return safeBase + ext;
+    },
+
+    toDateInputValue(d) {
+      const offset = d.getTimezoneOffset();
+      const local = new Date(d.getTime() - offset * 60000);
+      return local.toISOString().slice(0, 10);
+    },
+
+    openReschedule(appt) {
+      this.reschedulingAppt = appt;
+      const d = new Date(appt.scheduled_at);
+      this.rescheduleForm = {
+        date: this.toDateInputValue(d),
+        time: d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+      };
+      this.showRescheduleForm = true;
+    },
+
+    async confirmReschedule() {
+      if (!this.reschedulingAppt) return;
+      this.saving = true;
+      const newScheduledAt = new Date(this.rescheduleForm.date + 'T' + this.rescheduleForm.time + ':00');
+      const { error } = await supabaseClient
+        .from('appointments')
+        .update({ scheduled_at: newScheduledAt.toISOString() })
+        .eq('id', this.reschedulingAppt.id);
+      this.saving = false;
+      if (error) {
+        this.showFeedback('error', 'Erro ao remanejar horário: ' + error.message);
+        return;
+      }
+      this.showRescheduleForm = false;
+      this.reschedulingAppt = null;
+      this.showFeedback('success', 'Horário remanejado com sucesso.');
+      await this.loadQueue();
     },
 
     async markNoShow(appt) {
@@ -309,7 +409,7 @@ function atendimentoApp() {
         if (recError) throw recError;
 
         for (const file of this.photoFiles) {
-          const path = this.clinicId + '/' + this.selectedAppt.patient_id + '/' + Date.now() + '_' + file.name;
+          const path = this.clinicId + '/' + this.selectedAppt.patient_id + '/' + Date.now() + '_' + this.sanitizeFileName(file.name);
           const { error: upError } = await supabaseClient.storage.from('patient-photos').upload(path, file);
           if (upError) throw upError;
           const { error: photoRowError } = await supabaseClient.from('patient_photos').insert({

@@ -349,3 +349,77 @@ textarea.input { resize: vertical; min-height: 80px; }
 .agenda-event.status-cancelado { background: var(--color-surface-alt); border-color: var(--color-text-soft); color: var(--color-text-muted); }
 .agenda-event.status-cancelado strong { text-decoration: line-through; }
 .agenda-event.status-pendente { background: #EFEDE7; border-color: var(--color-text-soft); color: var(--color-text-muted); }
+
+/* ---------- agenda: alternância de visão (dia / semana / mês) ---------- */
+.agenda-view-switch { display: flex; gap: 2px; background: var(--color-surface-alt); border-radius: var(--radius-md); padding: 3px; }
+.agenda-view-switch button {
+  border: none; background: transparent; padding: 6px 14px; border-radius: var(--radius-sm);
+  font-size: 12.5px; font-weight: 500; color: var(--color-text-muted);
+}
+.agenda-view-switch button.active { background: var(--color-surface); color: var(--color-primary); box-shadow: var(--shadow-sm); }
+
+/* ---------- agenda: bloqueio de horário ---------- */
+.agenda-block {
+  position: absolute; left: 5px; right: 5px; border-radius: 8px; padding: 6px 9px;
+  font-size: 11px; color: var(--color-text-muted);
+  background: repeating-linear-gradient(45deg, var(--color-surface-alt), var(--color-surface-alt) 6px, var(--color-border) 6px, var(--color-border) 12px);
+  border: 1px dashed var(--color-text-soft);
+  pointer-events: none;
+}
+
+/* ---------- agenda: menu de contexto (clique direito) ---------- */
+.context-menu {
+  position: fixed; z-index: 60; background: var(--color-surface); border: 1px solid var(--color-border);
+  border-radius: var(--radius-md); box-shadow: var(--shadow-lg); padding: 6px; min-width: 190px;
+}
+.context-menu button {
+  display: block; width: 100%; text-align: left; background: none; border: none;
+  padding: 9px 12px; font-size: 13px; color: var(--color-text); border-radius: var(--radius-sm);
+}
+.context-menu button:hover { background: var(--color-surface-alt); }
+
+/* ---------- agenda: visão semanal ---------- */
+.agenda-week-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; background: var(--color-border); border: 1px solid var(--color-border); border-radius: var(--radius-md); overflow: hidden; }
+.agenda-week-day { background: var(--color-surface); min-height: 320px; display: flex; flex-direction: column; }
+.agenda-week-day-header {
+  padding: 10px 6px; text-align: center; font-size: 12px; font-weight: 600; color: var(--color-text-muted);
+  border-bottom: 1px solid var(--color-border); background: var(--color-surface-alt); cursor: pointer;
+}
+.agenda-week-day-header:hover { color: var(--color-primary); }
+.agenda-week-day-header.is-today { color: var(--color-primary); background: var(--color-primary-light); }
+.agenda-week-day-body { padding: 8px; display: flex; flex-direction: column; gap: 6px; flex: 1; overflow-y: auto; }
+.agenda-week-item { border-left: 3px solid var(--color-warning); background: var(--color-warning-bg); border-radius: 6px; padding: 6px 8px; font-size: 11px; }
+.agenda-week-item strong { display: block; font-size: 11.5px; }
+.agenda-week-item.status-confirmado { border-color: var(--color-success); background: var(--color-success-bg); }
+.agenda-week-item.status-faltou { border-color: var(--color-danger); background: var(--color-danger-bg); }
+.agenda-week-item.status-cancelado { border-color: var(--color-text-soft); background: var(--color-surface-alt); }
+.agenda-week-item-block { border-color: var(--color-text-soft); background: var(--color-surface-alt); color: var(--color-text-muted); }
+
+/* ---------- agenda: visão mensal ---------- */
+.agenda-month-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; font-size: 11.5px; color: var(--color-text-soft); padding: 10px 0; border-bottom: 1px solid var(--color-border); }
+.agenda-month-cells { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; background: var(--color-border); border: 1px solid var(--color-border); border-top: none; border-radius: 0 0 var(--radius-md) var(--radius-md); overflow: hidden; }
+.agenda-month-cell { background: var(--color-surface); min-height: 88px; padding: 8px; cursor: pointer; display: flex; flex-direction: column; gap: 4px; }
+.agenda-month-cell:hover { background: var(--color-surface-alt); }
+.agenda-month-cell.is-other-month { opacity: .4; }
+.agenda-month-cell.is-today .agenda-month-daynum {
+  background: var(--color-primary); color: #fff; width: 22px; height: 22px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+}
+.agenda-month-daynum { font-size: 12.5px; font-weight: 600; }
+.agenda-month-count { font-size: 10.5px; color: var(--color-accent); font-weight: 600; }
+
+/* ---------- combobox de busca (paciente no agendamento) ---------- */
+.patient-option:hover { background: var(--color-surface-alt); }
+
+/* ---------- BI: barra de proporção ---------- */
+.bi-bar { height: 7px; border-radius: var(--radius-full); background: var(--color-surface-alt); overflow: hidden; }
+.bi-bar-fill { height: 100%; background: var(--color-primary); border-radius: var(--radius-full); }
+
+/* ---------- impressão da agenda ---------- */
+@media print {
+  .sidebar, .topbar, .page-header button, .agenda-view-switch, .context-menu,
+  .btn, .sidebar-backdrop { display: none !important; }
+  .main { margin-left: 0 !important; }
+  .content { padding: 0 !important; }
+  body { background: #fff !important; }
+}

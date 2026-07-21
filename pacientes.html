@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="stylesheet" href="css/styles.css">
 </head>
-<body data-page="pacientes" data-title="Pacientes" data-subtitle="" x-data="{ sidebarOpen:false }">
+<body data-page="pacientes" data-title="Pacientes" data-subtitle="" data-admin-only="true" x-data="{ sidebarOpen:false }">
 
 <div class="app-shell">
   <div data-include="partials/sidebar.html"></div>
@@ -52,7 +52,7 @@
           <div class="table-wrap" x-show="!loading && patients.length > 0">
             <table class="table">
               <thead>
-                <tr><th>Paciente</th><th>WhatsApp</th><th>Nascimento</th><th>LGPD</th><th></th></tr>
+                <tr><th>Paciente</th><th>WhatsApp</th><th>Origem</th><th>Nascimento</th><th>LGPD</th><th></th></tr>
               </thead>
               <tbody>
                 <template x-for="p in filtered" :key="p.id">
@@ -64,6 +64,7 @@
                       </div>
                     </td>
                     <td x-text="p.phone || '—'"></td>
+                    <td><span class="badge badge-neutral" x-text="leadSourceLabel(p.lead_source)"></span></td>
                     <td x-text="formatDate(p.birth_date)"></td>
                     <td>
                       <span class="badge" :class="p.lgpd_consent_at ? 'badge-success' : 'badge-warning'">
@@ -116,8 +117,52 @@
                   <h4 class="text-xs text-muted mb-1">E-mail</h4>
                   <p class="text-sm" x-text="(selected && selected.email) || 'Não informado'"></p>
                 </div>
+                <div>
+                  <h4 class="text-xs text-muted mb-1">RG</h4>
+                  <p class="text-sm" x-text="(selected && selected.rg) || 'Não informado'"></p>
+                </div>
+                <div>
+                  <h4 class="text-xs text-muted mb-1">Outro telefone</h4>
+                  <p class="text-sm" x-text="(selected && (selected.phone2 || selected.landline)) || 'Não informado'"></p>
+                </div>
+                <div>
+                  <h4 class="text-xs text-muted mb-1">Instagram</h4>
+                  <p class="text-sm" x-text="(selected && selected.instagram) || 'Não informado'"></p>
+                </div>
+                <div>
+                  <h4 class="text-xs text-muted mb-1">Endereço</h4>
+                  <p class="text-sm" x-text="selected ? formatAddress(selected) : ''"></p>
+                </div>
               </div>
 
+              <hr class="divider">
+              <h4 class="text-sm text-muted mb-2">Origem e indicação</h4>
+              <div class="flex items-center gap-2 mb-3" style="flex-wrap:wrap;">
+                <span class="badge badge-accent" x-text="selected ? leadSourceLabel(selected.lead_source) : ''"></span>
+                <span class="text-sm text-muted" x-show="selected && (selected.referred_by_name || selected.referred_by_patient_id)" x-text="'Indicado(a) por ' + (selected ? referrerName(selected) : '')"></span>
+              </div>
+
+              <div x-show="selected && (selected.naturality || selected.father_name || selected.mother_name || selected.profession || selected.workplace || selected.record_number)">
+                <hr class="divider">
+                <h4 class="text-sm text-muted mb-2">Dados complementares</h4>
+                <div class="grid grid-2 gap-3 mb-3">
+                  <div x-show="selected && selected.naturality"><h4 class="text-xs text-muted mb-1">Naturalidade</h4><p class="text-sm" x-text="selected && selected.naturality"></p></div>
+                  <div x-show="selected && selected.profession"><h4 class="text-xs text-muted mb-1">Profissão</h4><p class="text-sm" x-text="selected && selected.profession"></p></div>
+                  <div x-show="selected && selected.workplace"><h4 class="text-xs text-muted mb-1">Local de trabalho</h4><p class="text-sm" x-text="selected && selected.workplace"></p></div>
+                  <div x-show="selected && selected.record_number"><h4 class="text-xs text-muted mb-1">Nº de prontuário</h4><p class="text-sm" x-text="selected && selected.record_number"></p></div>
+                  <div x-show="selected && selected.father_name"><h4 class="text-xs text-muted mb-1">Nome do pai</h4><p class="text-sm" x-text="selected && selected.father_name"></p></div>
+                  <div x-show="selected && selected.mother_name"><h4 class="text-xs text-muted mb-1">Nome da mãe</h4><p class="text-sm" x-text="selected && selected.mother_name"></p></div>
+                </div>
+              </div>
+
+              <div x-show="selected && selected.legal_guardian_name">
+                <hr class="divider">
+                <h4 class="text-sm text-muted mb-2">Responsável legal</h4>
+                <p class="text-sm" x-text="selected && selected.legal_guardian_name"></p>
+                <p class="text-xs text-muted" x-text="selected && selected.legal_guardian_notes"></p>
+              </div>
+
+              <hr class="divider">
               <h4 class="text-sm text-muted mb-2">Pontos de atenção clínica</h4>
               <div x-show="selected && anamnesisFlags(selected).length === 0" class="text-sm text-muted mb-3">Nenhum ponto de atenção marcado na anamnese.</div>
               <div x-show="selected && anamnesisFlags(selected).length > 0" class="mb-3">
@@ -144,7 +189,7 @@
 
             <div class="card card-shadow">
               <div class="card-header"><div><h3>Fotos de evolução</h3><p>Comparador antes / depois</p></div></div>
-              <p class="text-sm text-muted">O upload de fotos por sessão fica disponível na tela de Atendimento e Prontuário, ainda em construção.</p>
+              <p class="text-sm text-muted">O upload de fotos por sessão fica disponível na tela de Atendimento e Prontuário.</p>
             </div>
 
           </div>
@@ -178,79 +223,291 @@
 
       <!-- modal novo paciente -->
       <div x-show="showNewForm" x-cloak style="position:fixed;inset:0;background:rgba(31,51,47,.45);z-index:50;display:flex;align-items:center;justify-content:center;padding:20px;" @click.self="showNewForm = false">
-        <div class="card card-shadow" style="width:100%;max-width:560px;max-height:88vh;overflow-y:auto;">
+        <div class="card card-shadow" style="width:100%;max-width:640px;max-height:88vh;overflow-y:auto;">
           <div class="card-header">
             <h3>Novo paciente</h3>
             <button class="btn btn-ghost btn-sm" type="button" @click="showNewForm = false">Fechar</button>
           </div>
+
+          <div class="flex gap-2 mb-4" style="flex-wrap:wrap;">
+            <button type="button" class="btn btn-sm" :class="formTab==='gerais' ? 'btn-primary' : 'btn-secondary'" @click="formTab='gerais'">Gerais</button>
+            <button type="button" class="btn btn-sm" :class="formTab==='documentos' ? 'btn-primary' : 'btn-secondary'" @click="formTab='documentos'">Documentos</button>
+            <button type="button" class="btn btn-sm" :class="formTab==='endereco' ? 'btn-primary' : 'btn-secondary'" @click="formTab='endereco'">Endereço</button>
+            <button type="button" class="btn btn-sm" :class="formTab==='origem' ? 'btn-primary' : 'btn-secondary'" @click="formTab='origem'">Origem</button>
+            <button type="button" class="btn btn-sm" :class="formTab==='anamnese' ? 'btn-primary' : 'btn-secondary'" @click="formTab='anamnese'">Anamnese</button>
+            <button type="button" class="btn btn-sm" :class="formTab==='outros' ? 'btn-primary' : 'btn-secondary'" @click="formTab='outros'">Complementares</button>
+          </div>
+
           <form @submit.prevent="createPatient()">
 
-            <h4 class="text-xs text-muted mb-2" style="text-transform:uppercase;letter-spacing:.04em;">Dados pessoais</h4>
-
-            <div class="form-group">
-              <label class="label">Nome completo</label>
-              <input class="input" x-model="newPatient.full_name" required>
-            </div>
-
-            <div class="grid grid-2 gap-3">
+            <!-- GERAIS -->
+            <div x-show="formTab==='gerais'">
               <div class="form-group">
-                <label class="label">CPF</label>
-                <input class="input" x-model="newPatient.cpf" @input="newPatient.cpf = maskCpf($event.target.value)" placeholder="000.000.000-00" maxlength="14">
-                <p class="input-hint" x-show="newPatient.cpf && !isValidCpf(newPatient.cpf)" style="color:var(--color-danger);">CPF incompleto ou inválido.</p>
+                <label class="label">Nome completo</label>
+                <input class="input" x-model="newPatient.full_name" required>
               </div>
-              <div class="form-group">
-                <label class="label">Nascimento</label>
-                <input class="input" type="date" x-model="newPatient.birth_date">
-              </div>
-            </div>
 
-            <div class="grid grid-2 gap-3">
-              <div class="form-group">
-                <label class="label">WhatsApp</label>
-                <input class="input" x-model="newPatient.phone" @input="newPatient.phone = maskPhone($event.target.value)" placeholder="(11) 90000-0000" maxlength="15">
-              </div>
-              <div class="form-group">
-                <label class="label">E-mail</label>
-                <input class="input" type="email" x-model="newPatient.email" placeholder="paciente@email.com">
-                <p class="input-hint" x-show="newPatient.email && !isValidEmail(newPatient.email)" style="color:var(--color-danger);">E-mail em formato inválido.</p>
-              </div>
-            </div>
-
-            <hr class="divider">
-
-            <h4 class="text-xs text-muted mb-2" style="text-transform:uppercase;letter-spacing:.04em;">Anamnese</h4>
-            <p class="text-xs text-soft mb-3">Marque os itens que se aplicam ao paciente. Serve de base para segurança do procedimento e, futuramente, para a análise evolutiva por IA.</p>
-
-            <template x-for="q in questions" :key="q.key">
-              <div class="form-group" style="border-bottom:1px solid var(--color-border);padding-bottom:12px;">
-                <div class="flex items-center gap-2">
-                  <input type="checkbox" :id="'q_' + q.key" x-model="newPatient.anamnesis_answers[q.key].answer" style="width:auto;">
-                  <label :for="'q_' + q.key" class="text-sm" style="margin:0;" x-text="q.label"></label>
+              <div class="grid grid-2 gap-3">
+                <div class="form-group">
+                  <label class="label">CPF</label>
+                  <input class="input" x-model="newPatient.cpf" @input="newPatient.cpf = maskCpf($event.target.value)" placeholder="000.000.000-00" maxlength="14">
+                  <p class="input-hint" x-show="newPatient.cpf && !isValidCpf(newPatient.cpf)" style="color:var(--color-danger);">CPF incompleto ou inválido.</p>
                 </div>
-                <input
-                  x-show="q.hasDetail && newPatient.anamnesis_answers[q.key].answer"
-                  x-cloak
-                  class="input mt-2"
-                  x-model="newPatient.anamnesis_answers[q.key].detail"
-                  placeholder="Qual?">
+                <div class="form-group">
+                  <label class="label">Nascimento</label>
+                  <input class="input" type="date" x-model="newPatient.birth_date">
+                </div>
               </div>
-            </template>
 
-            <div class="form-group mt-3">
-              <label class="label">Observações complementares</label>
-              <textarea class="input" x-model="newPatient.anamnesis" rows="2" placeholder="Qualquer outra informação relevante"></textarea>
+              <div class="grid grid-2 gap-3">
+                <div class="form-group">
+                  <label class="label">WhatsApp</label>
+                  <input class="input" x-model="newPatient.phone" @input="newPatient.phone = maskPhone($event.target.value)" placeholder="(11) 90000-0000" maxlength="15">
+                </div>
+                <div class="form-group">
+                  <label class="label">E-mail</label>
+                  <input class="input" type="email" x-model="newPatient.email" placeholder="paciente@email.com">
+                  <p class="input-hint" x-show="newPatient.email && !isValidEmail(newPatient.email)" style="color:var(--color-danger);">E-mail em formato inválido.</p>
+                </div>
+              </div>
+
+              <div class="grid grid-2 gap-3">
+                <div class="form-group">
+                  <label class="label">Sexo</label>
+                  <select class="input" x-model="newPatient.gender">
+                    <option value="">Não informado</option>
+                    <option value="feminino">Feminino</option>
+                    <option value="masculino">Masculino</option>
+                    <option value="outro">Outro</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label class="label">Estado civil</label>
+                  <select class="input" x-model="newPatient.marital_status">
+                    <option value="">Não informado</option>
+                    <option value="solteiro">Solteiro(a)</option>
+                    <option value="casado">Casado(a)</option>
+                    <option value="divorciado">Divorciado(a)</option>
+                    <option value="viuvo">Viúvo(a)</option>
+                    <option value="uniao_estavel">União estável</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="label">Tipo de cliente</label>
+                <select class="input" x-model="newPatient.client_type">
+                  <option value="particular">Particular</option>
+                  <option value="convenio">Convênio</option>
+                  <option value="parceria">Parceria/permuta</option>
+                </select>
+              </div>
             </div>
 
-            <div class="form-group">
-              <label class="label">Alergias</label>
-              <input class="input" x-model="newPatient.allergies">
+            <!-- DOCUMENTOS E CONTATO -->
+            <div x-show="formTab==='documentos'" x-cloak>
+              <h4 class="text-xs text-muted mb-2" style="text-transform:uppercase;letter-spacing:.04em;">Documento de identidade</h4>
+              <div class="grid grid-2 gap-3">
+                <div class="form-group">
+                  <label class="label">RG</label>
+                  <input class="input" x-model="newPatient.rg">
+                </div>
+                <div class="form-group">
+                  <label class="label">Órgão emissor</label>
+                  <input class="input" x-model="newPatient.rg_orgao_emissor" placeholder="Ex.: SSP-SP">
+                </div>
+              </div>
+              <div class="form-group">
+                <label class="label">Data de emissão</label>
+                <input class="input" type="date" x-model="newPatient.rg_data_emissao">
+              </div>
+
+              <hr class="divider">
+              <h4 class="text-xs text-muted mb-2" style="text-transform:uppercase;letter-spacing:.04em;">Contato adicional</h4>
+              <div class="grid grid-2 gap-3">
+                <div class="form-group">
+                  <label class="label">Telefone 2</label>
+                  <input class="input" x-model="newPatient.phone2" @input="newPatient.phone2 = maskPhone($event.target.value)" placeholder="(11) 90000-0000" maxlength="15">
+                </div>
+                <div class="form-group">
+                  <label class="label">Telefone fixo</label>
+                  <input class="input" x-model="newPatient.landline" placeholder="(11) 3000-0000">
+                </div>
+              </div>
+              <div class="grid grid-2 gap-3">
+                <div class="form-group">
+                  <label class="label">Instagram</label>
+                  <input class="input" x-model="newPatient.instagram" placeholder="@usuario">
+                </div>
+                <div class="form-group">
+                  <label class="label">Facebook</label>
+                  <input class="input" x-model="newPatient.facebook">
+                </div>
+              </div>
             </div>
 
-            <hr class="divider">
+            <!-- ENDEREÇO -->
+            <div x-show="formTab==='endereco'" x-cloak>
+              <div class="grid grid-2 gap-3">
+                <div class="form-group">
+                  <label class="label">CEP</label>
+                  <input class="input" x-model="newPatient.address_cep" @input="newPatient.address_cep = maskCep($event.target.value)" placeholder="00000-000" maxlength="9">
+                </div>
+                <div class="form-group">
+                  <label class="label">UF</label>
+                  <input class="input" x-model="newPatient.address_state" maxlength="2" style="text-transform:uppercase;" placeholder="SP">
+                </div>
+              </div>
+              <div class="form-group">
+                <label class="label">Rua</label>
+                <input class="input" x-model="newPatient.address_street">
+              </div>
+              <div class="grid grid-2 gap-3">
+                <div class="form-group">
+                  <label class="label">Número</label>
+                  <input class="input" x-model="newPatient.address_number">
+                </div>
+                <div class="form-group">
+                  <label class="label">Complemento</label>
+                  <input class="input" x-model="newPatient.address_complement">
+                </div>
+              </div>
+              <div class="grid grid-2 gap-3">
+                <div class="form-group">
+                  <label class="label">Bairro</label>
+                  <input class="input" x-model="newPatient.address_neighborhood">
+                </div>
+                <div class="form-group">
+                  <label class="label">Cidade</label>
+                  <input class="input" x-model="newPatient.address_city">
+                </div>
+              </div>
+            </div>
 
-            <div class="form-group flex items-center gap-2">
-              <input type="checkbox" x-model="newPatient.lgpd_consent" id="lgpd" style="width:auto;">
-              <label for="lgpd" class="text-sm" style="margin:0;">Paciente autorizou o tratamento de dados de saúde (LGPD) agora</label>
+            <!-- ORIGEM -->
+            <div x-show="formTab==='origem'" x-cloak>
+              <div class="form-group">
+                <label class="label">Canal de origem</label>
+                <select class="input" x-model="newPatient.lead_source">
+                  <option value="">Não informado</option>
+                  <option value="indicacao">Indicação</option>
+                  <option value="instagram">Instagram</option>
+                  <option value="facebook">Facebook</option>
+                  <option value="google">Google (busca orgânica)</option>
+                  <option value="google_ads">Google Ads</option>
+                  <option value="facebook_ads">Facebook/Instagram Ads</option>
+                  <option value="site">Site</option>
+                  <option value="walk_in">Passou na porta</option>
+                  <option value="outro">Outro</option>
+                </select>
+              </div>
+
+              <div x-show="newPatient.lead_source === 'indicacao'" x-cloak>
+                <div class="form-group">
+                  <label class="label">Paciente que indicou (se já cadastrado)</label>
+                  <select class="input" x-model="newPatient.referred_by_patient_id">
+                    <option value="">Não é um paciente cadastrado</option>
+                    <template x-for="p in patients" :key="p.id">
+                      <option :value="p.id" x-text="p.full_name"></option>
+                    </template>
+                  </select>
+                </div>
+                <div class="form-group" x-show="!newPatient.referred_by_patient_id">
+                  <label class="label">Nome de quem indicou</label>
+                  <input class="input" x-model="newPatient.referred_by_name" placeholder="Ex.: amigo, familiar, parceiro">
+                </div>
+              </div>
+
+              <hr class="divider">
+              <h4 class="text-xs text-muted mb-2" style="text-transform:uppercase;letter-spacing:.04em;">Responsável legal</h4>
+              <p class="text-xs text-soft mb-3">Preencher apenas se o paciente for menor de idade ou dependente de outra pessoa.</p>
+              <div class="grid grid-2 gap-3">
+                <div class="form-group">
+                  <label class="label">Nome do responsável</label>
+                  <input class="input" x-model="newPatient.legal_guardian_name">
+                </div>
+                <div class="form-group">
+                  <label class="label">CPF do responsável</label>
+                  <input class="input" x-model="newPatient.legal_guardian_cpf" @input="newPatient.legal_guardian_cpf = maskCpf($event.target.value)" maxlength="14">
+                </div>
+              </div>
+              <div class="form-group">
+                <label class="label">Observações sobre o responsável</label>
+                <textarea class="input" x-model="newPatient.legal_guardian_notes" rows="2"></textarea>
+              </div>
+            </div>
+
+            <!-- ANAMNESE -->
+            <div x-show="formTab==='anamnese'" x-cloak>
+              <p class="text-xs text-soft mb-3">Marque os itens que se aplicam ao paciente. Serve de base para segurança do procedimento e, futuramente, para a análise evolutiva por IA.</p>
+
+              <template x-for="q in questions" :key="q.key">
+                <div class="form-group" style="border-bottom:1px solid var(--color-border);padding-bottom:12px;">
+                  <div class="flex items-center gap-2">
+                    <input type="checkbox" :id="'q_' + q.key" x-model="newPatient.anamnesis_answers[q.key].answer" style="width:auto;">
+                    <label :for="'q_' + q.key" class="text-sm" style="margin:0;" x-text="q.label"></label>
+                  </div>
+                  <input
+                    x-show="q.hasDetail && newPatient.anamnesis_answers[q.key].answer"
+                    x-cloak
+                    class="input mt-2"
+                    x-model="newPatient.anamnesis_answers[q.key].detail"
+                    placeholder="Qual?">
+                </div>
+              </template>
+            </div>
+
+            <!-- COMPLEMENTARES -->
+            <div x-show="formTab==='outros'" x-cloak>
+              <div class="grid grid-2 gap-3">
+                <div class="form-group">
+                  <label class="label">Naturalidade</label>
+                  <input class="input" x-model="newPatient.naturality" placeholder="Cidade/UF onde nasceu">
+                </div>
+                <div class="form-group">
+                  <label class="label">Nº de prontuário</label>
+                  <input class="input" x-model="newPatient.record_number">
+                </div>
+              </div>
+              <div class="grid grid-2 gap-3">
+                <div class="form-group">
+                  <label class="label">Nome do pai</label>
+                  <input class="input" x-model="newPatient.father_name">
+                </div>
+                <div class="form-group">
+                  <label class="label">Nome da mãe</label>
+                  <input class="input" x-model="newPatient.mother_name">
+                </div>
+              </div>
+              <div class="grid grid-2 gap-3">
+                <div class="form-group">
+                  <label class="label">Profissão</label>
+                  <input class="input" x-model="newPatient.profession">
+                </div>
+                <div class="form-group">
+                  <label class="label">Local de trabalho</label>
+                  <input class="input" x-model="newPatient.workplace">
+                </div>
+              </div>
+
+              <hr class="divider">
+
+              <div class="form-group">
+                <label class="label">Observações complementares</label>
+                <textarea class="input" x-model="newPatient.anamnesis" rows="2" placeholder="Qualquer outra informação relevante"></textarea>
+              </div>
+
+              <div class="form-group">
+                <label class="label">Alergias</label>
+                <input class="input" x-model="newPatient.allergies">
+              </div>
+
+              <hr class="divider">
+
+              <div class="form-group flex items-center gap-2">
+                <input type="checkbox" x-model="newPatient.lgpd_consent" id="lgpd" style="width:auto;">
+                <label for="lgpd" class="text-sm" style="margin:0;">Paciente autorizou o tratamento de dados de saúde (LGPD) agora</label>
+              </div>
             </div>
 
             <button class="btn btn-primary btn-block mt-2" type="submit" :disabled="saving">
@@ -307,6 +564,12 @@ function maskCpf(value) {
   return v;
 }
 
+function maskCep(value) {
+  let v = (value || '').replace(/\D/g, '').slice(0, 8);
+  if (v.length > 5) return v.replace(/(\d{5})(\d{0,3})/, '$1-$2');
+  return v;
+}
+
 function isValidEmail(value) {
   if (!value) return true;
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
@@ -327,6 +590,21 @@ function isValidCpf(value) {
   return rev === parseInt(cpf[10], 10);
 }
 
+function emptyNewPatient() {
+  return {
+    full_name: '', cpf: '', phone: '', email: '', birth_date: '',
+    gender: '', marital_status: '', client_type: 'particular',
+    rg: '', rg_orgao_emissor: '', rg_data_emissao: '',
+    phone2: '', landline: '', instagram: '', facebook: '',
+    address_cep: '', address_street: '', address_number: '', address_neighborhood: '', address_complement: '', address_city: '', address_state: '',
+    lead_source: '', referred_by_patient_id: '', referred_by_name: '',
+    legal_guardian_name: '', legal_guardian_cpf: '', legal_guardian_notes: '',
+    naturality: '', father_name: '', mother_name: '', profession: '', workplace: '', record_number: '',
+    anamnesis: '', allergies: '', lgpd_consent: false,
+    anamnesis_answers: emptyAnamnesisAnswers()
+  };
+}
+
 function pacientesApp() {
   return {
     loading: true,
@@ -336,17 +614,14 @@ function pacientesApp() {
     patients: [],
     clinicId: null,
     showNewForm: false,
+    formTab: 'gerais',
     questions: ANAMNESIS_QUESTIONS,
-    newPatient: {
-      full_name: '', cpf: '', phone: '', email: '', birth_date: '',
-      anamnesis: '', allergies: '', lgpd_consent: false,
-      anamnesis_answers: emptyAnamnesisAnswers()
-    },
+    newPatient: emptyNewPatient(),
     history: [],
     historyLoading: false,
     feedback: { type: '', message: '' },
 
-    maskPhone, maskCpf, isValidEmail, isValidCpf,
+    maskPhone, maskCpf, maskCep, isValidEmail, isValidCpf,
 
     async init() {
       await this.loadClinicId();
@@ -400,6 +675,31 @@ function pacientesApp() {
       return d.toLocaleDateString('pt-BR');
     },
 
+    formatAddress(patient) {
+      const parts = [];
+      if (patient.address_street) parts.push(patient.address_street + (patient.address_number ? ', ' + patient.address_number : ''));
+      if (patient.address_neighborhood) parts.push(patient.address_neighborhood);
+      if (patient.address_city) parts.push(patient.address_city + (patient.address_state ? '/' + patient.address_state : ''));
+      return parts.length ? parts.join(' · ') : 'Não informado';
+    },
+
+    leadSourceLabel(value) {
+      const map = {
+        indicacao: 'Indicação', instagram: 'Instagram', facebook: 'Facebook',
+        google: 'Google', google_ads: 'Google Ads', facebook_ads: 'Facebook/Instagram Ads',
+        site: 'Site', walk_in: 'Passou na porta', outro: 'Outro'
+      };
+      return map[value] || 'Não informado';
+    },
+
+    referrerName(patient) {
+      if (patient.referred_by_patient_id) {
+        const p = this.patients.find(pp => pp.id === patient.referred_by_patient_id);
+        if (p) return p.full_name;
+      }
+      return patient.referred_by_name || '—';
+    },
+
     ageOf(birthDate) {
       if (!birthDate) return null;
       const b = new Date(birthDate);
@@ -420,11 +720,8 @@ function pacientesApp() {
     },
 
     openNewForm() {
-      this.newPatient = {
-        full_name: '', cpf: '', phone: '', email: '', birth_date: '',
-        anamnesis: '', allergies: '', lgpd_consent: false,
-        anamnesis_answers: emptyAnamnesisAnswers()
-      };
+      this.newPatient = emptyNewPatient();
+      this.formTab = 'gerais';
       this.showNewForm = true;
     },
 
@@ -462,6 +759,35 @@ function pacientesApp() {
         phone: this.newPatient.phone || null,
         email: this.newPatient.email || null,
         birth_date: this.newPatient.birth_date || null,
+        gender: this.newPatient.gender || null,
+        marital_status: this.newPatient.marital_status || null,
+        client_type: this.newPatient.client_type || 'particular',
+        rg: this.newPatient.rg || null,
+        rg_orgao_emissor: this.newPatient.rg_orgao_emissor || null,
+        rg_data_emissao: this.newPatient.rg_data_emissao || null,
+        phone2: this.newPatient.phone2 || null,
+        landline: this.newPatient.landline || null,
+        instagram: this.newPatient.instagram || null,
+        facebook: this.newPatient.facebook || null,
+        address_cep: this.newPatient.address_cep || null,
+        address_street: this.newPatient.address_street || null,
+        address_number: this.newPatient.address_number || null,
+        address_neighborhood: this.newPatient.address_neighborhood || null,
+        address_complement: this.newPatient.address_complement || null,
+        address_city: this.newPatient.address_city || null,
+        address_state: this.newPatient.address_state || null,
+        lead_source: this.newPatient.lead_source || null,
+        referred_by_patient_id: this.newPatient.referred_by_patient_id || null,
+        referred_by_name: this.newPatient.referred_by_name || null,
+        legal_guardian_name: this.newPatient.legal_guardian_name || null,
+        legal_guardian_cpf: this.newPatient.legal_guardian_cpf || null,
+        legal_guardian_notes: this.newPatient.legal_guardian_notes || null,
+        naturality: this.newPatient.naturality || null,
+        father_name: this.newPatient.father_name || null,
+        mother_name: this.newPatient.mother_name || null,
+        profession: this.newPatient.profession || null,
+        workplace: this.newPatient.workplace || null,
+        record_number: this.newPatient.record_number || null,
         anamnesis: this.newPatient.anamnesis || null,
         anamnesis_answers: this.newPatient.anamnesis_answers,
         allergies: this.newPatient.allergies || null

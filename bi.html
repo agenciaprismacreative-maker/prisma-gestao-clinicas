@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>BI · Prisma Gestão de Clínicas</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body data-page="bi" data-title="BI (Business Intelligence)" data-subtitle="" data-admin-only="true" x-data="{ sidebarOpen:false }">
+
+<div class="app-shell">
+  <div data-include="partials/sidebar.html"></div>
+
+  <div class="main">
+    <header class="topbar" data-include="partials/topbar.html"></header>
+
+    <main class="content" x-data="biApp()" x-init="init()">
+
+      <div class="page-header">
+        <div>
+          <h2>BI · Business Intelligence</h2>
+          <p>Visão executiva consolidada da clínica, por área. Indicadores dos últimos 30 dias, salvo indicação em contrário.</p>
+        </div>
+      </div>
+
+      <div x-show="feedback.message" x-cloak class="card mb-4" :style="'padding:12px 16px;border-color:' + (feedback.type==='error' ? 'var(--color-danger)' : 'var(--color-success)')">
+        <span class="text-sm" x-text="feedback.message" :style="'color:' + (feedback.type==='error' ? 'var(--color-danger)' : 'var(--color-success)')"></span>
+      </div>
+
+      <div x-show="loading" class="text-sm text-muted">Calculando indicadores…</div>
+
+      <div x-show="!loading">
+        <div class="flex gap-2 mb-5" style="flex-wrap:wrap;">
+          <button class="btn btn-sm" :class="tab==='comercial' ? 'btn-primary' : 'btn-secondary'" @click="tab='comercial'">Comercial</button>
+          <button class="btn btn-sm" :class="tab==='estoque' ? 'btn-primary' : 'btn-secondary'" @click="tab='estoque'">Estoque</button>
+          <button class="btn btn-sm" :class="tab==='fidelizacao' ? 'btn-primary' : 'btn-secondary'" @click="tab='fidelizacao'">Fidelização</button>
+          <button class="btn btn-sm" :class="tab==='financeiro' ? 'btn-primary' : 'btn-secondary'" @click="tab='financeiro'">Financeiro</button>
+          <button class="btn btn-sm" :class="tab==='marketing' ? 'btn-primary' : 'btn-secondary'" @click="tab='marketing'">Marketing</button>
+          <button class="btn btn-sm" :class="tab==='operacional' ? 'btn-primary' : 'btn-secondary'" @click="tab='operacional'">Operacional</button>
+        </div>
+
+        <!-- ===================== COMERCIAL ===================== -->
+        <div x-show="tab==='comercial'">
+          <div class="grid grid-4 mb-5">
+            <div class="stat-card"><div class="stat-label">Pacientes cadastrados</div><div class="stat-value" x-text="patients.length"></div></div>
+            <div class="stat-card"><div class="stat-label">Novos (30 dias)</div><div class="stat-value" x-text="newPatients30d"></div></div>
+            <div class="stat-card"><div class="stat-label">Ticket médio</div><div class="stat-value" x-text="formatCurrency(averageTicket)"></div></div>
+            <div class="stat-card"><div class="stat-label">Conversão de agenda (30 dias)</div><div class="stat-value" x-text="conversionRate + '%'"></div></div>
+          </div>
+          <div class="card card-shadow">
+            <h3 class="mb-4" style="font-size:15px;">Origem dos pacientes</h3>
+            <div x-show="leadSourceBreakdown.length === 0" class="text-sm text-muted">Nenhum dado de origem registrado ainda.</div>
+            <template x-for="row in leadSourceBreakdown" :key="row.key">
+              <div class="mb-3">
+                <div class="flex items-center justify-between mb-1">
+                  <span class="text-sm" x-text="row.label"></span>
+                  <span class="text-xs text-muted" x-text="row.count + ' (' + row.pct + '%)'"></span>
+                </div>
+                <div class="bi-bar"><div class="bi-bar-fill" :style="'width:' + row.pct + '%'"></div></div>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <!-- ===================== ESTOQUE ===================== -->
+        <div x-show="tab==='estoque'" x-cloak>
+          <div class="empty-note">
+            Módulo de estoque ainda não implementado. Quando estiver pronto, esta área vai reunir quantidade de insumos, valores investidos, estoque mínimo/máximo e custo por procedimento.
+          </div>
+        </div>
+
+        <!-- ===================== FIDELIZAÇÃO ===================== -->
+        <div x-show="tab==='fidelizacao'" x-cloak>
+          <div class="grid grid-3 mb-5">
+            <div class="stat-card"><div class="stat-label">Elegíveis à reativação</div><div class="stat-value" x-text="reactivationCandidates.length"></div></div>
+            <div class="stat-card"><div class="stat-label">Contatos de reativação (30 dias)</div><div class="stat-value" x-text="reactivationContacts30d"></div></div>
+            <div class="stat-card"><div class="stat-label">Taxa de comparecimento (30 dias)</div><div class="stat-value" x-text="attendanceRate === null ? '—' : attendanceRate + '%'"></div></div>
+          </div>
+          <div class="card card-shadow" style="padding:0;">
+            <div style="padding:20px 20px 0;"><h3 style="font-size:15px;">Pacientes elegíveis à reativação</h3></div>
+            <div x-show="reactivationCandidates.length === 0" class="empty-note" style="margin:20px;">Nenhum paciente no intervalo de retorno ainda.</div>
+            <div class="table-wrap" x-show="reactivationCandidates.length > 0">
+              <table class="table">
+                <thead><tr><th>Paciente</th><th>Serviço</th><th>Dias sem retorno</th></tr></thead>
+                <tbody>
+                  <template x-for="c in reactivationCandidates.slice(0, 8)" :key="c.patient_id">
+                    <tr>
+                      <td x-text="c.patients ? c.patients.full_name : ''"></td>
+                      <td x-text="c.services ? c.services.name : ''"></td>
+                      <td><span class="badge badge-warning" x-text="c.daysSince + ' dias'"></span></td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+            <p class="text-xs text-soft" style="padding:12px 20px;" x-show="reactivationCandidates.length > 8">Mostrando 8 de <span x-text="reactivationCandidates.length"></span>. Lista completa em Pós-venda.</p>
+          </div>
+        </div>
+
+        <!-- ===================== FINANCEIRO ===================== -->
+        <div x-show="tab==='financeiro'" x-cloak>
+          <div class="grid grid-4 mb-5">
+            <div class="stat-card"><div class="stat-label">Faturado (30 dias)</div><div class="stat-value" x-text="formatCurrency(totalFaturado30d)"></div></div>
+            <div class="stat-card"><div class="stat-label">Pagamentos + pacotes</div><div class="stat-value" x-text="formatCurrency(totalPorTipo.pagamento_procedimento + totalPorTipo.venda_pacote)"></div></div>
+            <div class="stat-card"><div class="stat-label">Comissões</div><div class="stat-value" x-text="formatCurrency(totalPorTipo.comissao_profissional)"></div></div>
+            <div class="stat-card"><div class="stat-label">Pacotes ativos</div><div class="stat-value" x-text="activePackages"></div></div>
+          </div>
+          <div class="card card-shadow">
+            <h3 class="mb-4" style="font-size:15px;">Faturamento por forma de pagamento (30 dias)</h3>
+            <div x-show="paymentMethodBreakdown.length === 0" class="text-sm text-muted">Nenhum lançamento no período.</div>
+            <template x-for="row in paymentMethodBreakdown" :key="row.key">
+              <div class="mb-3">
+                <div class="flex items-center justify-between mb-1">
+                  <span class="text-sm" x-text="row.key"></span>
+                  <span class="text-xs text-muted" x-text="formatCurrency(row.total) + ' (' + row.pct + '%)'"></span>
+                </div>
+                <div class="bi-bar"><div class="bi-bar-fill" :style="'width:' + row.pct + '%'"></div></div>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <!-- ===================== MARKETING ===================== -->
+        <div x-show="tab==='marketing'" x-cloak>
+          <div class="grid grid-3 mb-5">
+            <div class="stat-card"><div class="stat-label">Leads em aberto</div><div class="stat-value" x-text="openLeads"></div></div>
+            <div class="stat-card"><div class="stat-label">Taxa de conversão de leads</div><div class="stat-value" x-text="leadConversionRate === null ? '—' : leadConversionRate + '%'"></div></div>
+            <div class="stat-card"><div class="stat-label">Novos pacientes (30 dias)</div><div class="stat-value" x-text="newPatients30d"></div></div>
+          </div>
+          <div class="card card-shadow">
+            <h3 class="mb-4" style="font-size:15px;">Origem dos pacientes</h3>
+            <div x-show="leadSourceBreakdown.length === 0" class="text-sm text-muted">Nenhum dado de origem registrado ainda.</div>
+            <template x-for="row in leadSourceBreakdown" :key="'mkt-' + row.key">
+              <div class="mb-3">
+                <div class="flex items-center justify-between mb-1">
+                  <span class="text-sm" x-text="row.label"></span>
+                  <span class="text-xs text-muted" x-text="row.count + ' (' + row.pct + '%)'"></span>
+                </div>
+                <div class="bi-bar"><div class="bi-bar-fill" :style="'width:' + row.pct + '%'"></div></div>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <!-- ===================== OPERACIONAL ===================== -->
+        <div x-show="tab==='operacional'" x-cloak>
+          <div class="grid grid-4 mb-5">
+            <div class="stat-card"><div class="stat-label">Agendamentos hoje</div><div class="stat-value" x-text="appointmentsToday"></div></div>
+            <div class="stat-card"><div class="stat-label">Taxa de comparecimento (30 dias)</div><div class="stat-value" x-text="attendanceRate === null ? '—' : attendanceRate + '%'"></div></div>
+            <div class="stat-card"><div class="stat-label">Tarefas pendentes</div><div class="stat-value" x-text="pendingTasks"></div></div>
+            <div class="stat-card"><div class="stat-label">Bloqueios ativos (30 dias)</div><div class="stat-value" x-text="blocksCount"></div></div>
+          </div>
+          <div class="card card-shadow" style="padding:0;">
+            <div style="padding:20px 20px 0;"><h3 style="font-size:15px;">Atendimentos por profissional (30 dias)</h3></div>
+            <div x-show="appointmentsByProfessional.length === 0" class="empty-note" style="margin:20px;">Nenhum agendamento no período.</div>
+            <div class="table-wrap" x-show="appointmentsByProfessional.length > 0">
+              <table class="table">
+                <thead><tr><th>Profissional</th><th>Agendamentos</th><th>Concluídos</th></tr></thead>
+                <tbody>
+                  <template x-for="row in appointmentsByProfessional" :key="row.professionalId">
+                    <tr>
+                      <td x-text="row.name"></td>
+                      <td x-text="row.total"></td>
+                      <td x-text="row.concluded"></td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<script>
+function biApp() {
+  return {
+    loading: true,
+    clinicId: null,
+    tab: 'comercial',
+    patients: [],
+    appointments: [],
+    transactions: [],
+    packages: [],
+    leads: [],
+    communications: [],
+    tasks: [],
+    users: [],
+    blocks: [],
+    feedback: { type: '', message: '' },
+
+    async init() {
+      await this.loadClinicId();
+      await Promise.all([
+        this.loadPatients(), this.loadAppointments(), this.loadTransactions(),
+        this.loadPackages(), this.loadLeads(), this.loadCommunications(),
+        this.loadTasks(), this.loadUsers(), this.loadBlocks()
+      ]);
+      this.loading = false;
+    },
+
+    async loadClinicId() {
+      const { data: { user } } = await supabaseClient.auth.getUser();
+      if (!user) return;
+      const { data, error } = await supabaseClient.from('users').select('clinic_id').eq('id', user.id).single();
+      if (error) {
+        this.showFeedback('error', 'Erro ao identificar sua clínica: ' + error.message);
+        return;
+      }
+      this.clinicId = data ? data.clinic_id : null;
+    },
+
+    async loadPatients() {
+      const { data, error } = await supabaseClient.from('patients').select('id, full_name, lead_source, created_at');
+      this.patients = error ? [] : (data || []);
+    },
+
+    async loadAppointments() {
+      const { data, error } = await supabaseClient
+        .from('appointments')
+        .select('id, scheduled_at, status, professional_id, patient_id, patients ( full_name ), services ( name, return_interval_days )');
+      this.appointments = error ? [] : (data || []);
+    },
+
+    async loadTransactions() {
+      const { data, error } = await supabaseClient.from('transactions').select('id, type, amount, payment_method, transaction_date');
+      this.transactions = error ? [] : (data || []);
+    },
+
+    async loadPackages() {
+      const { data, error } = await supabaseClient.from('packages').select('id, used_sessions, total_sessions, expires_at');
+      this.packages = error ? [] : (data || []);
+    },
+
+    async loadLeads() {
+      const { data, error } = await supabaseClient.from('leads').select('id, funnel_status');
+      this.leads = error ? [] : (data || []);
+    },
+
+    async loadCommunications() {
+      const { data, error } = await supabaseClient.from('communications_log').select('id, message_type, created_at');
+      this.communications = error ? [] : (data || []);
+    },
+
+    async loadTasks() {
+      const { data, error } = await supabaseClient.from('tasks').select('id, status');
+      this.tasks = error ? [] : (data || []);
+    },
+
+    async loadUsers() {
+      const { data, error } = await supabaseClient.from('users').select('id, full_name');
+      this.users = error ? [] : (data || []);
+    },
+
+    async loadBlocks() {
+      const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 30);
+      const { data, error } = await supabaseClient.from('schedule_blocks').select('id, start_at').gte('start_at', cutoff.toISOString());
+      this.blocks = error ? [] : (data || []);
+    },
+
+    formatCurrency(value) {
+      return (Number(value) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    },
+
+    leadSourceLabel(value) {
+      const map = {
+        indicacao: 'Indicação', instagram: 'Instagram', facebook: 'Facebook',
+        google: 'Google', google_ads: 'Google Ads', facebook_ads: 'Facebook/Instagram Ads',
+        site: 'Site', walk_in: 'Passou na porta', outro: 'Outro', nao_informado: 'Não informado'
+      };
+      return map[value] || 'Não informado';
+    },
+
+    get newPatients30d() {
+      const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 30);
+      return this.patients.filter(p => p.created_at && new Date(p.created_at) >= cutoff).length;
+    },
+
+    get leadSourceBreakdown() {
+      const total = this.patients.length;
+      if (total === 0) return [];
+      const counts = {};
+      this.patients.forEach(p => {
+        const key = p.lead_source || 'nao_informado';
+        counts[key] = (counts[key] || 0) + 1;
+      });
+      return Object.entries(counts)
+        .map(([key, count]) => ({ key, label: this.leadSourceLabel(key), count, pct: Math.round((count / total) * 100) }))
+        .sort((a, b) => b.count - a.count);
+    },
+
+    get appointments30d() {
+      const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 30);
+      return this.appointments.filter(a => new Date(a.scheduled_at) >= cutoff);
+    },
+
+    get conversionRate() {
+      const list = this.appointments30d;
+      if (list.length === 0) return 0;
+      const concluded = list.filter(a => a.status === 'concluido').length;
+      return Math.round((concluded / list.length) * 100);
+    },
+
+    get attendanceRate() {
+      const relevant = this.appointments30d.filter(a => a.status === 'concluido' || a.status === 'faltou');
+      if (relevant.length === 0) return null;
+      const attended = relevant.filter(a => a.status === 'concluido').length;
+      return Math.round((attended / relevant.length) * 100);
+    },
+
+    get averageTicket() {
+      if (this.transactions.length === 0) return 0;
+      const total = this.transactions.reduce((s, t) => s + Number(t.amount || 0), 0);
+      return total / this.transactions.length;
+    },
+
+    get transactions30d() {
+      const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 30);
+      return this.transactions.filter(t => new Date(t.transaction_date) >= cutoff);
+    },
+
+    get totalFaturado30d() {
+      return this.transactions30d.reduce((s, t) => s + Number(t.amount || 0), 0);
+    },
+
+    get totalPorTipo() {
+      const map = { pagamento_procedimento: 0, venda_pacote: 0, comissao_profissional: 0 };
+      this.transactions30d.forEach(t => { map[t.type] = (map[t.type] || 0) + Number(t.amount || 0); });
+      return map;
+    },
+
+    get paymentMethodBreakdown() {
+      const list = this.transactions30d;
+      const total = list.reduce((s, t) => s + Number(t.amount || 0), 0);
+      if (total === 0) return [];
+      const sums = {};
+      list.forEach(t => {
+        const key = t.payment_method || 'Não informado';
+        sums[key] = (sums[key] || 0) + Number(t.amount || 0);
+      });
+      return Object.entries(sums)
+        .map(([key, sum]) => ({ key, total: sum, pct: Math.round((sum / total) * 100) }))
+        .sort((a, b) => b.total - a.total);
+    },
+
+    get activePackages() {
+      const now = new Date();
+      return this.packages.filter(p => p.used_sessions < p.total_sessions && (!p.expires_at || new Date(p.expires_at) >= now)).length;
+    },
+
+    get reactivationCandidates() {
+      const latestByPatient = {};
+      this.appointments
+        .filter(a => a.status === 'concluido')
+        .forEach(appt => {
+          if (!appt.services || !appt.services.return_interval_days) return;
+          const current = latestByPatient[appt.patient_id];
+          if (!current || new Date(appt.scheduled_at) > new Date(current.scheduled_at)) {
+            latestByPatient[appt.patient_id] = appt;
+          }
+        });
+      const now = new Date();
+      return Object.values(latestByPatient)
+        .map(appt => {
+          const last = new Date(appt.scheduled_at);
+          const daysSince = Math.floor((now - last) / 86400000);
+          return Object.assign({}, appt, { daysSince, interval: appt.services.return_interval_days });
+        })
+        .filter(c => c.daysSince >= c.interval)
+        .sort((a, b) => b.daysSince - a.daysSince);
+    },
+
+    get reactivationContacts30d() {
+      const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 30);
+      return this.communications.filter(c => c.message_type === 'reativacao' && new Date(c.created_at) >= cutoff).length;
+    },
+
+    get openLeads() {
+      return this.leads.filter(l => !['convertido', 'perdido'].includes(l.funnel_status)).length;
+    },
+
+    get leadConversionRate() {
+      if (this.leads.length === 0) return null;
+      const converted = this.leads.filter(l => l.funnel_status === 'convertido').length;
+      return Math.round((converted / this.leads.length) * 100);
+    },
+
+    get appointmentsToday() {
+      const today = new Date();
+      return this.appointments.filter(a => {
+        const d = new Date(a.scheduled_at);
+        return d.getFullYear() === today.getFullYear() && d.getMonth() === today.getMonth() && d.getDate() === today.getDate();
+      }).length;
+    },
+
+    get pendingTasks() {
+      return this.tasks.filter(t => t.status === 'pendente').length;
+    },
+
+    get blocksCount() {
+      return this.blocks.length;
+    },
+
+    get appointmentsByProfessional() {
+      const map = {};
+      this.appointments30d.forEach(a => {
+        const key = a.professional_id || 'sem_profissional';
+        if (!map[key]) map[key] = { professionalId: key, total: 0, concluded: 0 };
+        map[key].total++;
+        if (a.status === 'concluido') map[key].concluded++;
+      });
+      return Object.values(map)
+        .map(row => {
+          const u = this.users.find(us => us.id === row.professionalId);
+          return Object.assign({}, row, { name: u ? u.full_name : 'Sem profissional' });
+        })
+        .sort((a, b) => b.total - a.total);
+    },
+
+    showFeedback(type, message) {
+      this.feedback = { type, message };
+      setTimeout(() => { this.feedback = { type: '', message: '' }; }, 5000);
+    }
+  };
+}
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="js/supabase-client.js"></script>
+<script src="js/auth-guard.js"></script>
+<script src="js/include.js" defer></script>
+</body>
+</html>

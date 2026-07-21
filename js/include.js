@@ -97,9 +97,19 @@ async function fillUserInfo() {
     if (nameEl) nameEl.textContent = profile.full_name || user.email;
     if (clinicEl) clinicEl.textContent = profile.clinics ? profile.clinics.name : '';
     if (initialsEl) initialsEl.textContent = getInitials(profile.full_name);
+
+    window.__prismaUserRole = profile.role;
+    applyRoleVisibility(profile.role);
   } catch (err) {
     console.error('[include.js] fillUserInfo:', err);
   }
+}
+
+function applyRoleVisibility(role) {
+  if (!window.isStaffRole || !window.isStaffRole(role)) return; // administrador vê o menu inteiro
+  document.querySelectorAll('[data-admin-only="true"]').forEach((el) => {
+    el.style.display = 'none';
+  });
 }
 
 function startAlpine() {

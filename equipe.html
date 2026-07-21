@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="stylesheet" href="css/styles.css">
 </head>
-<body data-page="equipe" data-title="Equipe e tarefas" data-subtitle="" x-data="{ sidebarOpen:false }">
+<body data-page="equipe" data-title="Equipe e tarefas" data-subtitle="" data-admin-only="true" x-data="{ sidebarOpen:false }">
 
 <div class="app-shell">
   <div data-include="partials/sidebar.html"></div>
@@ -99,13 +99,14 @@
         <div class="card card-shadow" style="padding:0;">
           <div class="table-wrap">
             <table class="table">
-              <thead><tr><th>Nome</th><th>E-mail</th><th>Papel</th><th></th></tr></thead>
+              <thead><tr><th>Nome</th><th>E-mail</th><th>Papel</th><th>Especialidades</th><th></th></tr></thead>
               <tbody>
                 <template x-for="u in users" :key="u.id">
                   <tr>
                     <td><div class="row-name"><div class="avatar" x-text="initials(u.full_name)"></div><strong x-text="u.full_name"></strong></div></td>
                     <td x-text="u.email || '—'"></td>
                     <td><span class="badge badge-neutral" x-text="roleLabel(u.role)"></span></td>
+                    <td x-text="u.specialties || '—'"></td>
                     <td><button class="btn btn-ghost btn-sm" type="button" @click="openEditUser(u)">Editar</button></td>
                   </tr>
                 </template>
@@ -186,7 +187,24 @@
                 <option value="financeiro">Financeiro</option>
                 <option value="equipe_prisma">Equipe Prisma</option>
               </select>
+              <p class="input-hint">Gestor, Financeiro e Equipe Prisma têm acesso de Administrador (menu completo). Recepção e Profissional têm acesso de Funcionário (Atendimento e Agenda própria).</p>
             </div>
+
+            <hr class="divider">
+            <h4 class="text-xs text-muted mb-2" style="text-transform:uppercase;letter-spacing:.04em;">Qualificação profissional (opcional)</h4>
+            <div class="form-group">
+              <label class="label">Registro profissional</label>
+              <input class="input" x-model="newMember.professional_register" placeholder="Ex.: CRO-SP 12345">
+            </div>
+            <div class="form-group">
+              <label class="label">Especialidades</label>
+              <input class="input" x-model="newMember.specialties" placeholder="Ex.: Harmonização facial, Peeling químico">
+            </div>
+            <div class="form-group">
+              <label class="label">Biografia / qualificação</label>
+              <textarea class="input" x-model="newMember.bio" rows="3" placeholder="Formação, cursos, tempo de experiência…"></textarea>
+            </div>
+
             <button class="btn btn-primary btn-block mt-2" type="submit" :disabled="saving">
               <span x-show="!saving">Vincular</span>
               <span x-show="saving" x-cloak>Salvando…</span>
@@ -214,6 +232,22 @@
                 <option value="equipe_prisma">Equipe Prisma</option>
               </select>
             </div>
+
+            <hr class="divider">
+            <h4 class="text-xs text-muted mb-2" style="text-transform:uppercase;letter-spacing:.04em;">Qualificação profissional (opcional)</h4>
+            <div class="form-group">
+              <label class="label">Registro profissional</label>
+              <input class="input" x-model="editingUser.professional_register" placeholder="Ex.: CRO-SP 12345">
+            </div>
+            <div class="form-group">
+              <label class="label">Especialidades</label>
+              <input class="input" x-model="editingUser.specialties" placeholder="Ex.: Harmonização facial, Peeling químico">
+            </div>
+            <div class="form-group">
+              <label class="label">Biografia / qualificação</label>
+              <textarea class="input" x-model="editingUser.bio" rows="3" placeholder="Formação, cursos, tempo de experiência…"></textarea>
+            </div>
+
             <button class="btn btn-primary btn-block mt-2" type="submit" :disabled="saving">
               <span x-show="!saving">Salvar</span>
               <span x-show="saving" x-cloak>Salvando…</span>
@@ -241,7 +275,7 @@ function equipeApp() {
     showEditUserForm: false,
     editingUser: null,
     newTask: { title: '', description: '', assigned_to: '', due_date: '', patient_id: '' },
-    newMember: { id: '', full_name: '', role: 'recepcao' },
+    newMember: { id: '', full_name: '', role: 'recepcao', professional_register: '', specialties: '', bio: '' },
     feedback: { type: '', message: '' },
 
     async init() {
@@ -262,7 +296,7 @@ function equipeApp() {
     },
 
     async loadUsers() {
-      const { data, error } = await supabaseClient.from('users').select('id, full_name, email, role').order('full_name');
+      const { data, error } = await supabaseClient.from('users').select('id, full_name, email, role, professional_register, specialties, bio').order('full_name');
       this.users = error ? [] : (data || []);
     },
 
@@ -345,7 +379,10 @@ function equipeApp() {
         id: this.newMember.id,
         clinic_id: this.clinicId,
         full_name: this.newMember.full_name,
-        role: this.newMember.role
+        role: this.newMember.role,
+        professional_register: this.newMember.professional_register || null,
+        specialties: this.newMember.specialties || null,
+        bio: this.newMember.bio || null
       });
       this.saving = false;
       if (error) {
@@ -353,13 +390,18 @@ function equipeApp() {
         return;
       }
       this.showNewMemberForm = false;
-      this.newMember = { id: '', full_name: '', role: 'recepcao' };
+      this.newMember = { id: '', full_name: '', role: 'recepcao', professional_register: '', specialties: '', bio: '' };
       this.showFeedback('success', 'Integrante vinculado com sucesso.');
       await this.loadUsers();
     },
 
     openEditUser(u) {
-      this.editingUser = { id: u.id, full_name: u.full_name, role: u.role };
+      this.editingUser = {
+        id: u.id, full_name: u.full_name, role: u.role,
+        professional_register: u.professional_register || '',
+        specialties: u.specialties || '',
+        bio: u.bio || ''
+      };
       this.showEditUserForm = true;
     },
 
@@ -367,7 +409,13 @@ function equipeApp() {
       this.saving = true;
       const { error } = await supabaseClient
         .from('users')
-        .update({ full_name: this.editingUser.full_name, role: this.editingUser.role })
+        .update({
+          full_name: this.editingUser.full_name,
+          role: this.editingUser.role,
+          professional_register: this.editingUser.professional_register || null,
+          specialties: this.editingUser.specialties || null,
+          bio: this.editingUser.bio || null
+        })
         .eq('id', this.editingUser.id);
       this.saving = false;
       if (error) {

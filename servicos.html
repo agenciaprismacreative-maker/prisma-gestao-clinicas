@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Serviços · Prisma Gestão de Clínicas</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body data-page="servicos" data-title="Serviços" data-subtitle="" data-admin-only="true" x-data="{ sidebarOpen:false }">
+
+<div class="app-shell">
+  <div data-include="partials/sidebar.html"></div>
+
+  <div class="main">
+    <header class="topbar" data-include="partials/topbar.html"></header>
+
+    <main class="content" x-data="servicosApp()" x-init="init()">
+
+      <div class="page-header">
+        <div>
+          <h2>Serviços</h2>
+          <p>Catálogo de procedimentos oferecidos pela clínica</p>
+        </div>
+        <button class="btn btn-primary" type="button" @click="openNewForm()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+          Novo serviço
+        </button>
+      </div>
+
+      <div x-show="feedback.message" x-cloak class="card mb-4" :style="'padding:12px 16px;border-color:' + (feedback.type==='error' ? 'var(--color-danger)' : 'var(--color-success)')">
+        <span class="text-sm" x-text="feedback.message" :style="'color:' + (feedback.type==='error' ? 'var(--color-danger)' : 'var(--color-success)')"></span>
+      </div>
+
+      <div x-show="loading" class="text-sm text-muted">Carregando serviços…</div>
+
+      <div class="card card-shadow" style="padding:0;" x-show="!loading">
+        <div x-show="services.length === 0" class="empty-note" style="margin:20px;">
+          Nenhum serviço cadastrado ainda. Use "Novo serviço" para começar a montar o catálogo.
+        </div>
+        <div class="table-wrap" x-show="services.length > 0">
+          <table class="table">
+            <thead><tr><th>Serviço</th><th>Duração padrão</th><th>Preço</th><th>Intervalo de retorno</th><th></th></tr></thead>
+            <tbody>
+              <template x-for="s in services" :key="s.id">
+                <tr>
+                  <td><strong x-text="s.name"></strong></td>
+                  <td x-text="s.default_duration_minutes + ' min'"></td>
+                  <td x-text="s.price !== null ? formatCurrency(s.price) : '—'"></td>
+                  <td x-text="s.return_interval_days ? (s.return_interval_days + ' dias') : 'Não definido'"></td>
+                  <td class="flex gap-2">
+                    <button class="btn btn-ghost btn-sm" type="button" @click="openEditForm(s)">Editar</button>
+                    <button class="btn btn-ghost btn-sm" type="button" @click="removeService(s)">Remover</button>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- modal novo/editar serviço -->
+      <div x-show="showForm" x-cloak style="position:fixed;inset:0;background:rgba(31,51,47,.45);z-index:50;display:flex;align-items:center;justify-content:center;padding:20px;" @click.self="showForm = false">
+        <div class="card card-shadow" style="width:100%;max-width:460px;">
+          <div class="card-header">
+            <h3 x-text="editingId ? 'Editar serviço' : 'Novo serviço'"></h3>
+            <button class="btn btn-ghost btn-sm" type="button" @click="showForm = false">Fechar</button>
+          </div>
+          <form @submit.prevent="saveService()">
+            <div class="form-group">
+              <label class="label">Nome do serviço</label>
+              <input class="input" x-model="form.name" required placeholder="Ex.: Limpeza de pele">
+            </div>
+            <div class="grid grid-2 gap-3">
+              <div class="form-group">
+                <label class="label">Duração padrão (minutos)</label>
+                <input class="input" type="number" min="5" step="5" x-model="form.default_duration_minutes" required>
+              </div>
+              <div class="form-group">
+                <label class="label">Preço (R$)</label>
+                <input class="input" type="number" min="0" step="0.01" x-model="form.price" placeholder="0,00">
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="label">Intervalo de retorno (dias)</label>
+              <input class="input" type="number" min="0" x-model="form.return_interval_days" placeholder="Ex.: 90">
+              <p class="input-hint">Usado em Pós-venda para sugerir reativação quando o paciente passa desse prazo sem retornar.</p>
+            </div>
+            <button class="btn btn-primary btn-block mt-2" type="submit" :disabled="saving">
+              <span x-show="!saving">Salvar serviço</span>
+              <span x-show="saving" x-cloak>Salvando…</span>
+            </button>
+          </form>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<script>
+function servicosApp() {
+  return {
+    loading: true,
+    saving: false,
+    clinicId: null,
+    services: [],
+    showForm: false,
+    editingId: null,
+    form: { name: '', default_duration_minutes: 60, price: '', return_interval_days: '' },
+    feedback: { type: '', message: '' },
+
+    async init() {
+      await this.loadClinicId();
+      await this.loadServices();
+    },
+
+    async loadClinicId() {
+      const { data: { user } } = await supabaseClient.auth.getUser();
+      if (!user) return;
+      const { data, error } = await supabaseClient.from('users').select('clinic_id').eq('id', user.id).single();
+      if (error) {
+        this.showFeedback('error', 'Erro ao identificar sua clínica: ' + error.message);
+        return;
+      }
+      this.clinicId = data ? data.clinic_id : null;
+    },
+
+    async loadServices() {
+      this.loading = true;
+      const { data, error } = await supabaseClient
+        .from('services')
+        .select('id, name, default_duration_minutes, price, return_interval_days')
+        .order('name', { ascending: true });
+      if (error) {
+        this.showFeedback('error', 'Erro ao carregar serviços: ' + error.message);
+        this.services = [];
+      } else {
+        this.services = data || [];
+      }
+      this.loading = false;
+    },
+
+    formatCurrency(value) {
+      return (Number(value) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    },
+
+    openNewForm() {
+      this.editingId = null;
+      this.form = { name: '', default_duration_minutes: 60, price: '', return_interval_days: '' };
+      this.showForm = true;
+    },
+
+    openEditForm(s) {
+      this.editingId = s.id;
+      this.form = {
+        name: s.name,
+        default_duration_minutes: s.default_duration_minutes,
+        price: s.price !== null ? s.price : '',
+        return_interval_days: s.return_interval_days !== null ? s.return_interval_days : ''
+      };
+      this.showForm = true;
+    },
+
+    async saveService() {
+      if (!this.clinicId) {
+        this.showFeedback('error', 'Não foi possível identificar sua clínica. Recarregue a página.');
+        return;
+      }
+      this.saving = true;
+      const payload = {
+        name: this.form.name,
+        default_duration_minutes: this.form.default_duration_minutes || 60,
+        price: this.form.price === '' ? null : this.form.price,
+        return_interval_days: this.form.return_interval_days === '' ? null : this.form.return_interval_days
+      };
+
+      let error;
+      if (this.editingId) {
+        ({ error } = await supabaseClient.from('services').update(payload).eq('id', this.editingId));
+      } else {
+        ({ error } = await supabaseClient.from('services').insert({ ...payload, clinic_id: this.clinicId }));
+      }
+
+      this.saving = false;
+      if (error) {
+        this.showFeedback('error', 'Erro ao salvar serviço: ' + error.message);
+        return;
+      }
+      this.showForm = false;
+      this.showFeedback('success', this.editingId ? 'Serviço atualizado.' : 'Serviço cadastrado.');
+      await this.loadServices();
+    },
+
+    async removeService(s) {
+      if (!window.confirm('Remover o serviço "' + s.name + '"? Essa ação não pode ser desfeita.')) return;
+      const { error } = await supabaseClient.from('services').delete().eq('id', s.id);
+      if (error) {
+        if (error.code === '23503') {
+          this.showFeedback('error', 'Não é possível remover: este serviço já está vinculado a agendamentos ou pacotes existentes.');
+        } else {
+          this.showFeedback('error', 'Erro ao remover serviço: ' + error.message);
+        }
+        return;
+      }
+      this.showFeedback('success', 'Serviço removido.');
+      await this.loadServices();
+    },
+
+    showFeedback(type, message) {
+      this.feedback = { type, message };
+      setTimeout(() => { this.feedback = { type: '', message: '' }; }, 5000);
+    }
+  };
+}
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="js/supabase-client.js"></script>
+<script src="js/auth-guard.js"></script>
+<script src="js/include.js" defer></script>
+</body>
+</html>

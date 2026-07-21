@@ -19,7 +19,7 @@
       <div class="page-header">
         <div>
           <h2>Agenda</h2>
-          <p>Visão diária por profissional</p>
+          <p>Visão diária, semanal e mensal por profissional</p>
         </div>
         <button class="btn btn-primary" type="button" @click="openNewForm()">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
@@ -33,16 +33,23 @@
 
       <div class="card card-shadow" style="padding:0;">
 
-        <div class="agenda-toolbar flex items-center justify-between">
+        <div class="agenda-toolbar flex items-center justify-between" style="flex-wrap:wrap;gap:12px;">
           <div class="flex items-center gap-3">
-            <button class="icon-btn" type="button" style="width:32px;height:32px;" @click="changeDay(-1)">
+            <button class="icon-btn" type="button" style="width:32px;height:32px;" @click="navPrev()">
               <svg class="icon" style="width:16px;height:16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
             </button>
-            <strong class="text-sm" x-text="formatDayLabel()"></strong>
-            <button class="icon-btn" type="button" style="width:32px;height:32px;" @click="changeDay(1)">
+            <strong class="text-sm" x-text="periodLabel()" style="min-width:170px;"></strong>
+            <button class="icon-btn" type="button" style="width:32px;height:32px;" @click="navNext()">
               <svg class="icon" style="width:16px;height:16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
             </button>
           </div>
+
+          <div class="agenda-view-switch">
+            <button type="button" :class="{ active: view === 'dia' }" @click="setView('dia')">Dia</button>
+            <button type="button" :class="{ active: view === 'semana' }" @click="setView('semana')">Semana</button>
+            <button type="button" :class="{ active: view === 'mes' }" @click="setView('mes')">Mês</button>
+          </div>
+
           <div class="agenda-legend">
             <span class="badge badge-success"><span class="badge-dot"></span>Confirmado</span>
             <span class="badge badge-warning"><span class="badge-dot"></span>Agendado</span>
@@ -53,36 +60,70 @@
 
         <div x-show="loading" class="text-sm text-muted" style="padding:24px;">Carregando agenda…</div>
 
-        <div x-show="!loading && professionals.length === 0" class="empty-note" style="margin:20px;">
-          Nenhum usuário cadastrado na clínica ainda para servir de coluna de profissional. Assim que a tela de Equipe estiver pronta, cadastre os profissionais por lá.
-        </div>
-
-        <div class="agenda-wrap" x-show="!loading && professionals.length > 0">
-
-          <div class="agenda-hours">
-            <div class="agenda-hours-spacer"></div>
-            <div class="agenda-hour-label" style="top:44px;">08:00</div>
-            <div class="agenda-hour-label" style="top:116px;">09:00</div>
-            <div class="agenda-hour-label" style="top:188px;">10:00</div>
-            <div class="agenda-hour-label" style="top:260px;">11:00</div>
-            <div class="agenda-hour-label" style="top:332px;">12:00</div>
-            <div class="agenda-hour-label" style="top:404px;">13:00</div>
-            <div class="agenda-hour-label" style="top:476px;">14:00</div>
-            <div class="agenda-hour-label" style="top:548px;">15:00</div>
-            <div class="agenda-hour-label" style="top:620px;">16:00</div>
-            <div class="agenda-hour-label" style="top:692px;">17:00</div>
-            <div class="agenda-hour-label" style="top:764px;">18:00</div>
+        <!-- ================= VISÃO DIÁRIA ================= -->
+        <div x-show="!loading && view === 'dia'">
+          <div x-show="professionals.length === 0" class="empty-note" style="margin:20px;">
+            Nenhum usuário cadastrado na clínica ainda para servir de coluna de profissional. Cadastre os profissionais em "Equipe e tarefas".
           </div>
 
-          <div class="agenda-columns" :style="'grid-template-columns: repeat(' + professionals.length + ', minmax(180px, 1fr))'">
-            <template x-for="prof in professionals" :key="prof.id">
-              <div class="agenda-col">
-                <div class="agenda-col-header" x-text="prof.full_name"></div>
-                <div class="agenda-col-body" style="height:792px;">
-                  <template x-for="appt in apptsFor(prof.id)" :key="appt.id">
-                    <div class="agenda-event" :class="statusClass(appt.status)" :style="'top:' + topFor(appt.scheduled_at) + 'px; height:' + heightFor(appt.duration_minutes) + 'px;'">
-                      <strong x-text="appt.patients ? appt.patients.full_name : 'Paciente'"></strong>
-                      <span x-text="(appt.services ? appt.services.name + ' · ' : '') + formatTime(appt.scheduled_at) + ' · ' + statusLabel(appt.status)"></span>
+          <div class="agenda-wrap" x-show="professionals.length > 0">
+
+            <div class="agenda-hours">
+              <div class="agenda-hours-spacer"></div>
+              <div class="agenda-hour-label" style="top:44px;">08:00</div>
+              <div class="agenda-hour-label" style="top:116px;">09:00</div>
+              <div class="agenda-hour-label" style="top:188px;">10:00</div>
+              <div class="agenda-hour-label" style="top:260px;">11:00</div>
+              <div class="agenda-hour-label" style="top:332px;">12:00</div>
+              <div class="agenda-hour-label" style="top:404px;">13:00</div>
+              <div class="agenda-hour-label" style="top:476px;">14:00</div>
+              <div class="agenda-hour-label" style="top:548px;">15:00</div>
+              <div class="agenda-hour-label" style="top:620px;">16:00</div>
+              <div class="agenda-hour-label" style="top:692px;">17:00</div>
+              <div class="agenda-hour-label" style="top:764px;">18:00</div>
+            </div>
+
+            <div class="agenda-columns" :style="'grid-template-columns: repeat(' + professionals.length + ', minmax(180px, 1fr))'">
+              <template x-for="prof in professionals" :key="prof.id">
+                <div class="agenda-col">
+                  <div class="agenda-col-header" x-text="prof.full_name"></div>
+                  <div class="agenda-col-body" style="height:792px;" @contextmenu.prevent="onContextMenu($event, prof.id)">
+                    <template x-for="appt in apptsFor(prof.id)" :key="appt.id">
+                      <div class="agenda-event" :class="statusClass(appt.status)" :style="'top:' + topFor(appt.scheduled_at) + 'px; height:' + heightFor(appt.duration_minutes) + 'px;'">
+                        <strong x-text="appt.patients ? appt.patients.full_name : 'Paciente'"></strong>
+                        <span x-text="(appt.services ? appt.services.name + ' · ' : '') + formatTime(appt.scheduled_at) + ' · ' + statusLabel(appt.status)"></span>
+                      </div>
+                    </template>
+                    <template x-for="blk in blocksFor(prof.id)" :key="'blk-' + blk.id">
+                      <div class="agenda-block" :style="'top:' + topFor(blk.start_at) + 'px; height:' + heightForRange(blk.start_at, blk.end_at) + 'px;'">
+                        <span x-text="'Bloqueado' + (blk.reason ? ': ' + blk.reason : '')"></span>
+                      </div>
+                    </template>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+        </div>
+
+        <!-- ================= VISÃO SEMANAL ================= -->
+        <div x-show="!loading && view === 'semana'" style="padding:20px;">
+          <div class="agenda-week-grid">
+            <template x-for="day in weekDays" :key="day.toISOString()">
+              <div class="agenda-week-day">
+                <div class="agenda-week-day-header" :class="{ 'is-today': isToday(day) }" @click="goToDay(day)" x-text="weekDayLabel(day)"></div>
+                <div class="agenda-week-day-body">
+                  <div x-show="apptsForDay(day).length === 0 && blocksForDay(day).length === 0" class="text-xs text-soft">Livre</div>
+                  <template x-for="appt in apptsForDay(day)" :key="appt.id">
+                    <div class="agenda-week-item" :class="statusClass(appt.status)">
+                      <strong x-text="formatTime(appt.scheduled_at)"></strong>
+                      <span x-text="(appt.patients ? appt.patients.full_name : 'Paciente') + ' · ' + professionalName(appt.professional_id)"></span>
+                    </div>
+                  </template>
+                  <template x-for="blk in blocksForDay(day)" :key="'blk-' + blk.id">
+                    <div class="agenda-week-item agenda-week-item-block">
+                      <strong x-text="formatTime(blk.start_at) + '–' + formatTime(blk.end_at)"></strong>
+                      <span x-text="'Bloqueado' + (blk.reason ? ': ' + blk.reason : '')"></span>
                     </div>
                   </template>
                 </div>
@@ -90,6 +131,31 @@
             </template>
           </div>
         </div>
+
+        <!-- ================= VISÃO MENSAL ================= -->
+        <div x-show="!loading && view === 'mes'" style="padding:20px;">
+          <div class="agenda-month-weekdays">
+            <span>Dom</span><span>Seg</span><span>Ter</span><span>Qua</span><span>Qui</span><span>Sex</span><span>Sáb</span>
+          </div>
+          <div class="agenda-month-cells">
+            <template x-for="cell in monthCells" :key="cell.date.toISOString()">
+              <div class="agenda-month-cell" :class="{ 'is-other-month': !cell.inMonth, 'is-today': isToday(cell.date) }" @click="goToDay(cell.date)">
+                <span class="agenda-month-daynum" x-text="cell.date.getDate()"></span>
+                <span class="agenda-month-count" x-show="apptsForDay(cell.date).length > 0" x-text="apptsForDay(cell.date).length + ' agend.'"></span>
+                <span class="agenda-month-count" x-show="blocksForDay(cell.date).length > 0" x-text="blocksForDay(cell.date).length + ' bloq.'" style="color:var(--color-text-soft);"></span>
+              </div>
+            </template>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- menu de contexto (clique direito na visão diária) -->
+      <div x-show="contextMenu.show" x-cloak @click.away="contextMenu.show = false" class="context-menu" :style="'top:' + contextMenu.y + 'px; left:' + contextMenu.x + 'px;'">
+        <button type="button" @click="ctxIncluir()">Incluir</button>
+        <button type="button" @click="ctxBloquear()">Bloquear horário</button>
+        <button type="button" @click="ctxGerenciarBloqueios()">Gerenciar bloqueios</button>
+        <button type="button" @click="ctxImprimir()">Imprimir</button>
       </div>
 
       <!-- modal novo agendamento -->
@@ -105,14 +171,17 @@
           </div>
 
           <form @submit.prevent="createAppointment()" x-show="patients.length > 0">
-            <div class="form-group">
+            <div class="form-group" style="position:relative;">
               <label class="label">Paciente</label>
-              <select class="input" x-model="newAppt.patient_id" required>
-                <option value="" disabled>Selecione</option>
-                <template x-for="p in patients" :key="p.id">
-                  <option :value="p.id" x-text="p.full_name"></option>
+              <input class="input" type="text" x-model="patientSearch" @focus="patientDropdownOpen = true" @input="patientDropdownOpen = true; newAppt.patient_id = ''" placeholder="Buscar paciente por nome…" autocomplete="off">
+              <div x-show="patientDropdownOpen" x-cloak @click.away="patientDropdownOpen = false"
+                   style="position:absolute;z-index:10;top:100%;left:0;right:0;background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-md);box-shadow:var(--shadow-md);max-height:220px;overflow-y:auto;margin-top:4px;">
+                <div x-show="filteredPatientsForSearch.length === 0" class="text-xs text-muted" style="padding:10px 14px;">Nenhum paciente encontrado.</div>
+                <template x-for="p in filteredPatientsForSearch" :key="p.id">
+                  <div @click="selectPatientForAppt(p)" class="patient-option" style="padding:9px 14px;cursor:pointer;font-size:13.5px;" x-text="p.full_name"></div>
                 </template>
-              </select>
+              </div>
+              <p class="input-hint" x-show="!newAppt.patient_id && patientSearch" style="color:var(--color-danger);">Selecione um paciente da lista.</p>
             </div>
             <div class="form-group">
               <label class="label">Profissional</label>
@@ -150,8 +219,66 @@
         </div>
       </div>
 
+      <!-- modal bloquear horário -->
+      <div x-show="showBlockForm" x-cloak style="position:fixed;inset:0;background:rgba(31,51,47,.45);z-index:50;display:flex;align-items:center;justify-content:center;padding:20px;" @click.self="showBlockForm = false">
+        <div class="card card-shadow" style="width:100%;max-width:440px;">
+          <div class="card-header"><h3>Bloquear horário</h3><button class="btn btn-ghost btn-sm" type="button" @click="showBlockForm = false">Fechar</button></div>
+          <form @submit.prevent="createBlock()">
+            <div class="form-group">
+              <label class="label">Profissional</label>
+              <select class="input" x-model="newBlock.professional_id">
+                <option value="">Toda a clínica</option>
+                <template x-for="pr in professionals" :key="pr.id">
+                  <option :value="pr.id" x-text="pr.full_name"></option>
+                </template>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="label">Data</label>
+              <input class="input" type="date" x-model="newBlock.date" required>
+            </div>
+            <div class="grid grid-2 gap-3">
+              <div class="form-group">
+                <label class="label">Início</label>
+                <input class="input" type="time" x-model="newBlock.start_time" required>
+              </div>
+              <div class="form-group">
+                <label class="label">Fim</label>
+                <input class="input" type="time" x-model="newBlock.end_time" required>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="label">Motivo</label>
+              <input class="input" x-model="newBlock.reason" placeholder="Ex.: feriado, folga, manutenção de sala">
+            </div>
+            <button class="btn btn-primary btn-block mt-2" type="submit" :disabled="saving">
+              <span x-show="!saving">Bloquear</span>
+              <span x-show="saving" x-cloak>Salvando…</span>
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <!-- modal gerenciar bloqueios -->
+      <div x-show="showManageBlocks" x-cloak style="position:fixed;inset:0;background:rgba(31,51,47,.45);z-index:50;display:flex;align-items:center;justify-content:center;padding:20px;" @click.self="showManageBlocks = false">
+        <div class="card card-shadow" style="width:100%;max-width:520px;max-height:80vh;overflow-y:auto;">
+          <div class="card-header"><h3>Gerenciar bloqueios</h3><button class="btn btn-ghost btn-sm" type="button" @click="showManageBlocks = false">Fechar</button></div>
+          <p class="text-xs text-soft mb-3">Bloqueios do período exibido na visão atual da agenda.</p>
+          <div x-show="blocks.length === 0" class="empty-note">Nenhum bloqueio no período exibido.</div>
+          <template x-for="b in blocks" :key="b.id">
+            <div class="flex items-center justify-between mb-3" style="border-bottom:1px solid var(--color-border);padding-bottom:12px;">
+              <div>
+                <strong class="text-sm" x-text="formatBlockRange(b)"></strong>
+                <p class="text-xs text-muted mt-1" x-text="professionalName(b.professional_id) + (b.reason ? ' · ' + b.reason : '')"></p>
+              </div>
+              <button class="btn btn-ghost btn-sm" type="button" @click="deleteBlock(b)">Remover</button>
+            </div>
+          </template>
+        </div>
+      </div>
+
       <p class="text-xs text-soft mt-3">
-        Clique em "Novo agendamento" para marcar um horário. A confirmação automática via WhatsApp entra numa etapa seguinte, junto da integração com a Z-API.
+        Clique com o botão direito em um horário livre da visão diária para incluir um agendamento ou bloquear o horário. A confirmação automática via WhatsApp entra numa etapa seguinte, junto da integração com a Z-API.
       </p>
 
     </main>
@@ -164,36 +291,54 @@ function agendaApp() {
     loading: true,
     saving: false,
     clinicId: null,
+    currentUserId: null,
+    userRole: null,
+    isStaff: false,
+    view: 'dia',
     currentDate: new Date(),
     professionals: [],
     patients: [],
     services: [],
     appointments: [],
+    blocks: [],
     showNewForm: false,
+    showBlockForm: false,
+    showManageBlocks: false,
+    patientSearch: '',
+    patientDropdownOpen: false,
     newAppt: { patient_id: '', professional_id: '', service_id: '', date: '', time: '09:00' },
+    newBlock: { professional_id: '', date: '', start_time: '09:00', end_time: '10:00', reason: '' },
+    contextMenu: { show: false, x: 0, y: 0, professionalId: null, time: '09:00' },
     feedback: { type: '', message: '' },
 
     async init() {
       await this.loadClinicId();
       await Promise.all([this.loadProfessionals(), this.loadPatients(), this.loadServices()]);
-      await this.loadAppointments();
+      await this.loadAll();
     },
 
     async loadClinicId() {
       const { data: { user } } = await supabaseClient.auth.getUser();
       if (!user) return;
-      const { data, error } = await supabaseClient.from('users').select('clinic_id').eq('id', user.id).single();
+      this.currentUserId = user.id;
+      const { data, error } = await supabaseClient.from('users').select('clinic_id, role').eq('id', user.id).single();
       if (error) {
         console.error('[loadClinicId]', error);
         this.showFeedback('error', 'Erro ao identificar sua clínica: ' + error.message);
         return;
       }
       this.clinicId = data ? data.clinic_id : null;
+      this.userRole = data ? data.role : null;
+      this.isStaff = window.isStaffRole ? window.isStaffRole(this.userRole) : false;
     },
 
     async loadProfessionals() {
       const { data, error } = await supabaseClient.from('users').select('id, full_name').order('full_name');
-      this.professionals = error ? [] : (data || []);
+      let list = error ? [] : (data || []);
+      if (this.isStaff && this.currentUserId) {
+        list = list.filter(p => p.id === this.currentUserId);
+      }
+      this.professionals = list;
     },
 
     async loadPatients() {
@@ -206,27 +351,113 @@ function agendaApp() {
       this.services = error ? [] : (data || []);
     },
 
-    async loadAppointments() {
+    async loadAll() {
       this.loading = true;
-      const start = new Date(this.currentDate); start.setHours(0, 0, 0, 0);
-      const end = new Date(this.currentDate); end.setHours(23, 59, 59, 999);
-      const { data, error } = await supabaseClient
+      await Promise.all([this.loadAppointments(), this.loadBlocks()]);
+      this.loading = false;
+    },
+
+    currentRange() {
+      if (this.view === 'dia') {
+        const start = new Date(this.currentDate); start.setHours(0, 0, 0, 0);
+        const end = new Date(this.currentDate); end.setHours(23, 59, 59, 999);
+        return { start, end };
+      }
+      if (this.view === 'semana') {
+        const days = this.weekDays;
+        const start = new Date(days[0]); start.setHours(0, 0, 0, 0);
+        const end = new Date(days[6]); end.setHours(23, 59, 59, 999);
+        return { start, end };
+      }
+      const cells = this.monthCells;
+      const start = new Date(cells[0].date); start.setHours(0, 0, 0, 0);
+      const end = new Date(cells[cells.length - 1].date); end.setHours(23, 59, 59, 999);
+      return { start, end };
+    },
+
+    async loadAppointments() {
+      const { start, end } = this.currentRange();
+      let query = supabaseClient
         .from('appointments')
         .select('id, scheduled_at, duration_minutes, status, professional_id, patients ( full_name ), services ( name )')
         .gte('scheduled_at', start.toISOString())
         .lte('scheduled_at', end.toISOString())
         .order('scheduled_at', { ascending: true });
+      if (this.isStaff && this.currentUserId) {
+        query = query.eq('professional_id', this.currentUserId);
+      }
+      const { data, error } = await query;
       if (error) {
         this.showFeedback('error', 'Erro ao carregar agenda: ' + error.message);
         this.appointments = [];
       } else {
         this.appointments = data || [];
       }
-      this.loading = false;
+    },
+
+    async loadBlocks() {
+      const { start, end } = this.currentRange();
+      const { data, error } = await supabaseClient
+        .from('schedule_blocks')
+        .select('id, professional_id, start_at, end_at, reason')
+        .gte('start_at', start.toISOString())
+        .lte('start_at', end.toISOString())
+        .order('start_at', { ascending: true });
+      let result = error ? [] : (data || []);
+      if (this.isStaff && this.currentUserId) {
+        result = result.filter(b => b.professional_id === this.currentUserId || b.professional_id === null);
+      }
+      this.blocks = result;
+    },
+
+    get weekDays() {
+      const start = new Date(this.currentDate);
+      start.setDate(start.getDate() - start.getDay());
+      start.setHours(0, 0, 0, 0);
+      return Array.from({ length: 7 }, (_, i) => {
+        const d = new Date(start);
+        d.setDate(d.getDate() + i);
+        return d;
+      });
+    },
+
+    get monthCells() {
+      const year = this.currentDate.getFullYear();
+      const month = this.currentDate.getMonth();
+      const firstOfMonth = new Date(year, month, 1);
+      const gridStart = new Date(firstOfMonth);
+      gridStart.setDate(gridStart.getDate() - firstOfMonth.getDay());
+      return Array.from({ length: 42 }, (_, i) => {
+        const d = new Date(gridStart);
+        d.setDate(d.getDate() + i);
+        return { date: d, inMonth: d.getMonth() === month };
+      });
     },
 
     apptsFor(profId) {
       return this.appointments.filter(a => a.professional_id === profId);
+    },
+
+    blocksFor(profId) {
+      return this.blocks.filter(b => b.professional_id === profId || b.professional_id === null);
+    },
+
+    isSameDate(a, b) {
+      return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+    },
+
+    isToday(day) {
+      return this.isSameDate(day, new Date());
+    },
+
+    apptsForDay(day) {
+      return this.appointments
+        .filter(a => this.isSameDate(new Date(a.scheduled_at), day))
+        .sort((a, b) => new Date(a.scheduled_at) - new Date(b.scheduled_at));
+    },
+
+    blocksForDay(day) {
+      return this.blocks.filter(b => this.isSameDate(new Date(b.start_at), day));
     },
 
     topFor(scheduledAt) {
@@ -239,13 +470,33 @@ function agendaApp() {
       return Math.max(24, Math.round((durationMinutes || 60) * 1.2));
     },
 
+    heightForRange(startAt, endAt) {
+      const mins = (new Date(endAt) - new Date(startAt)) / 60000;
+      return Math.max(20, Math.round(mins * 1.2));
+    },
+
     formatTime(value) {
       const d = new Date(value);
       return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
     },
 
-    formatDayLabel() {
-      const label = this.currentDate.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
+    weekDayLabel(day) {
+      const label = day.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' });
+      return label.charAt(0).toUpperCase() + label.slice(1);
+    },
+
+    periodLabel() {
+      if (this.view === 'dia') {
+        const label = this.currentDate.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
+        return label.charAt(0).toUpperCase() + label.slice(1);
+      }
+      if (this.view === 'semana') {
+        const days = this.weekDays;
+        const firstLabel = days[0].toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+        const lastLabel = days[6].toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        return firstLabel + ' a ' + lastLabel;
+      }
+      const label = this.currentDate.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
       return label.charAt(0).toUpperCase() + label.slice(1);
     },
 
@@ -269,11 +520,54 @@ function agendaApp() {
       return map[status] || status;
     },
 
+    professionalName(id) {
+      if (!id) return 'Toda a clínica';
+      const p = this.professionals.find(pr => pr.id === id);
+      return p ? p.full_name : '—';
+    },
+
+    navPrev() {
+      if (this.view === 'dia') return this.changeDay(-1);
+      if (this.view === 'semana') return this.changeWeek(-1);
+      return this.changeMonth(-1);
+    },
+
+    navNext() {
+      if (this.view === 'dia') return this.changeDay(1);
+      if (this.view === 'semana') return this.changeWeek(1);
+      return this.changeMonth(1);
+    },
+
     changeDay(delta) {
       const d = new Date(this.currentDate);
       d.setDate(d.getDate() + delta);
       this.currentDate = d;
-      this.loadAppointments();
+      this.loadAll();
+    },
+
+    changeWeek(delta) {
+      const d = new Date(this.currentDate);
+      d.setDate(d.getDate() + delta * 7);
+      this.currentDate = d;
+      this.loadAll();
+    },
+
+    changeMonth(delta) {
+      const d = new Date(this.currentDate);
+      d.setMonth(d.getMonth() + delta);
+      this.currentDate = d;
+      this.loadAll();
+    },
+
+    goToDay(day) {
+      this.currentDate = new Date(day);
+      this.view = 'dia';
+      this.loadAll();
+    },
+
+    setView(v) {
+      this.view = v;
+      this.loadAll();
     },
 
     toDateInputValue(d) {
@@ -282,14 +576,80 @@ function agendaApp() {
       return local.toISOString().slice(0, 10);
     },
 
+    addMinutes(timeStr, minsToAdd) {
+      const [h, m] = timeStr.split(':').map(Number);
+      const total = (h * 60 + m + minsToAdd + 1440) % 1440;
+      const hh = Math.floor(total / 60);
+      const mm = total % 60;
+      return String(hh).padStart(2, '0') + ':' + String(mm).padStart(2, '0');
+    },
+
+    onContextMenu(event, profId) {
+      const rect = event.currentTarget.getBoundingClientRect();
+      const offsetY = event.clientY - rect.top;
+      const minutesFromEight = offsetY / 1.2;
+      let totalMinutes = Math.round((480 + minutesFromEight) / 15) * 15;
+      totalMinutes = Math.max(0, Math.min(1439, totalMinutes));
+      const hh = Math.floor(totalMinutes / 60);
+      const mm = totalMinutes % 60;
+      const time = String(hh).padStart(2, '0') + ':' + String(mm).padStart(2, '0');
+      this.contextMenu = { show: true, x: event.clientX, y: event.clientY, professionalId: profId, time };
+    },
+
+    ctxIncluir() {
+      const profId = this.contextMenu.professionalId;
+      const time = this.contextMenu.time;
+      this.contextMenu.show = false;
+      this.newAppt = { patient_id: '', professional_id: profId, service_id: '', date: this.toDateInputValue(this.currentDate), time };
+      this.patientSearch = '';
+      this.patientDropdownOpen = false;
+      this.showNewForm = true;
+    },
+
+    ctxBloquear() {
+      const profId = this.contextMenu.professionalId;
+      const time = this.contextMenu.time;
+      this.contextMenu.show = false;
+      this.newBlock = { professional_id: profId || '', date: this.toDateInputValue(this.currentDate), start_time: time, end_time: this.addMinutes(time, 60), reason: '' };
+      this.showBlockForm = true;
+    },
+
+    ctxGerenciarBloqueios() {
+      this.contextMenu.show = false;
+      this.showManageBlocks = true;
+    },
+
+    ctxImprimir() {
+      this.contextMenu.show = false;
+      window.print();
+    },
+
+    get filteredPatientsForSearch() {
+      const q = this.patientSearch.trim().toLowerCase();
+      if (!q) return this.patients.slice(0, 20);
+      return this.patients.filter(p => p.full_name.toLowerCase().includes(q)).slice(0, 20);
+    },
+
+    selectPatientForAppt(p) {
+      this.newAppt.patient_id = p.id;
+      this.patientSearch = p.full_name;
+      this.patientDropdownOpen = false;
+    },
+
     openNewForm() {
-      this.newAppt = { patient_id: '', professional_id: '', service_id: '', date: this.toDateInputValue(this.currentDate), time: '09:00' };
+      this.newAppt = { patient_id: '', professional_id: this.isStaff ? this.currentUserId : '', service_id: '', date: this.toDateInputValue(this.currentDate), time: '09:00' };
+      this.patientSearch = '';
+      this.patientDropdownOpen = false;
       this.showNewForm = true;
     },
 
     async createAppointment() {
       if (!this.clinicId) {
         this.showFeedback('error', 'Não foi possível identificar sua clínica. Recarregue a página.');
+        return;
+      }
+      if (!this.newAppt.patient_id) {
+        this.showFeedback('error', 'Selecione um paciente na busca antes de salvar.');
         return;
       }
       this.saving = true;
@@ -312,7 +672,51 @@ function agendaApp() {
       }
       this.showNewForm = false;
       this.showFeedback('success', 'Agendamento criado com sucesso.');
-      await this.loadAppointments();
+      await this.loadAll();
+    },
+
+    async createBlock() {
+      if (!this.clinicId) {
+        this.showFeedback('error', 'Não foi possível identificar sua clínica. Recarregue a página.');
+        return;
+      }
+      this.saving = true;
+      const startAt = new Date(this.newBlock.date + 'T' + this.newBlock.start_time + ':00');
+      const endAt = new Date(this.newBlock.date + 'T' + this.newBlock.end_time + ':00');
+      const { error } = await supabaseClient.from('schedule_blocks').insert({
+        clinic_id: this.clinicId,
+        professional_id: this.newBlock.professional_id || null,
+        start_at: startAt.toISOString(),
+        end_at: endAt.toISOString(),
+        reason: this.newBlock.reason || null
+      });
+      this.saving = false;
+      if (error) {
+        this.showFeedback('error', 'Erro ao bloquear horário: ' + error.message);
+        return;
+      }
+      this.showBlockForm = false;
+      this.showFeedback('success', 'Horário bloqueado.');
+      await this.loadBlocks();
+    },
+
+    async deleteBlock(block) {
+      const { error } = await supabaseClient.from('schedule_blocks').delete().eq('id', block.id);
+      if (error) {
+        this.showFeedback('error', 'Erro ao remover bloqueio: ' + error.message);
+        return;
+      }
+      this.showFeedback('success', 'Bloqueio removido.');
+      await this.loadBlocks();
+    },
+
+    formatBlockRange(b) {
+      const s = new Date(b.start_at);
+      const e = new Date(b.end_at);
+      const dateStr = s.toLocaleDateString('pt-BR');
+      const sTime = s.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+      const eTime = e.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+      return dateStr + ' · ' + sTime + ' às ' + eTime;
     },
 
     showFeedback(type, message) {
