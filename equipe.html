@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Equipe e Tarefas · Prisma Gestão de Clínicas</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body data-page="equipe" data-title="Equipe e tarefas" data-subtitle="" x-data="{ sidebarOpen:false }">
+
+<div class="app-shell">
+  <div data-include="partials/sidebar.html"></div>
+
+  <div class="main">
+    <header class="topbar" data-include="partials/topbar.html"></header>
+
+    <main class="content" x-data="equipeApp()" x-init="init()">
+
+      <div class="page-header">
+        <div>
+          <h2>Equipe e tarefas</h2>
+          <p>Papéis da equipe e organização das tarefas internas</p>
+        </div>
+      </div>
+
+      <div x-show="feedback.message" x-cloak class="card mb-4" :style="'padding:12px 16px;border-color:' + (feedback.type==='error' ? 'var(--color-danger)' : 'var(--color-success)')">
+        <span class="text-sm" x-text="feedback.message" :style="'color:' + (feedback.type==='error' ? 'var(--color-danger)' : 'var(--color-success)')"></span>
+      </div>
+
+      <div class="flex gap-2 mb-5">
+        <button class="btn btn-sm" :class="tab==='tarefas' ? 'btn-primary' : 'btn-secondary'" @click="tab='tarefas'">Tarefas</button>
+        <button class="btn btn-sm" :class="tab==='equipe' ? 'btn-primary' : 'btn-secondary'" @click="tab='equipe'">Equipe</button>
+      </div>
+
+      <!-- TAREFAS -->
+      <div x-show="tab==='tarefas'">
+        <div class="page-header" style="margin-bottom:20px;">
+          <div><p class="text-sm text-muted" x-text="tasks.length + ' tarefa(s) no total'"></p></div>
+          <button class="btn btn-primary btn-sm" type="button" @click="showNewTaskForm = true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+            Nova tarefa
+          </button>
+        </div>
+
+        <div x-show="loading" class="text-sm text-muted">Carregando tarefas…</div>
+
+        <div class="grid grid-3 gap-4" x-show="!loading">
+          <div>
+            <h4 class="text-xs text-muted mb-3" style="text-transform:uppercase;letter-spacing:.04em;">Pendente</h4>
+            <div x-show="tasksByStatus('pendente').length === 0" class="empty-note">Nada por aqui.</div>
+            <template x-for="t in tasksByStatus('pendente')" :key="t.id">
+              <div class="card card-shadow mb-3">
+                <strong class="text-sm" x-text="t.title"></strong>
+                <p class="text-xs text-muted mt-1" x-text="t.users ? t.users.full_name : 'Sem responsável'"></p>
+                <p class="text-xs text-muted" x-show="t.due_date" x-text="'Prazo: ' + formatDate(t.due_date)"></p>
+                <p class="text-xs text-muted" x-show="t.patients" x-text="t.patients ? ('Paciente: ' + t.patients.full_name) : ''"></p>
+                <button class="btn btn-ghost btn-sm mt-2" @click="updateTaskStatus(t, 'em_andamento')">Iniciar →</button>
+              </div>
+            </template>
+          </div>
+
+          <div>
+            <h4 class="text-xs text-muted mb-3" style="text-transform:uppercase;letter-spacing:.04em;">Em andamento</h4>
+            <div x-show="tasksByStatus('em_andamento').length === 0" class="empty-note">Nada por aqui.</div>
+            <template x-for="t in tasksByStatus('em_andamento')" :key="t.id">
+              <div class="card card-shadow mb-3">
+                <strong class="text-sm" x-text="t.title"></strong>
+                <p class="text-xs text-muted mt-1" x-text="t.users ? t.users.full_name : 'Sem responsável'"></p>
+                <p class="text-xs text-muted" x-show="t.due_date" x-text="'Prazo: ' + formatDate(t.due_date)"></p>
+                <div class="flex gap-2 mt-2">
+                  <button class="btn btn-ghost btn-sm" @click="updateTaskStatus(t, 'pendente')">← Voltar</button>
+                  <button class="btn btn-primary btn-sm" @click="updateTaskStatus(t, 'concluida')">Concluir</button>
+                </div>
+              </div>
+            </template>
+          </div>
+
+          <div>
+            <h4 class="text-xs text-muted mb-3" style="text-transform:uppercase;letter-spacing:.04em;">Concluída</h4>
+            <div x-show="tasksByStatus('concluida').length === 0" class="empty-note">Nada por aqui.</div>
+            <template x-for="t in tasksByStatus('concluida')" :key="t.id">
+              <div class="card card-shadow mb-3" style="opacity:.7;">
+                <strong class="text-sm" x-text="t.title" style="text-decoration:line-through;"></strong>
+                <p class="text-xs text-muted mt-1" x-text="t.users ? t.users.full_name : 'Sem responsável'"></p>
+                <button class="btn btn-ghost btn-sm mt-2" @click="updateTaskStatus(t, 'em_andamento')">Reabrir</button>
+              </div>
+            </template>
+          </div>
+        </div>
+      </div>
+
+      <!-- EQUIPE -->
+      <div x-show="tab==='equipe'" x-cloak>
+        <div class="page-header" style="margin-bottom:20px;">
+          <div><p class="text-sm text-muted" x-text="users.length + ' integrante(s)'"></p></div>
+          <button class="btn btn-primary btn-sm" type="button" @click="showNewMemberForm = true">Vincular integrante</button>
+        </div>
+
+        <div class="card card-shadow" style="padding:0;">
+          <div class="table-wrap">
+            <table class="table">
+              <thead><tr><th>Nome</th><th>E-mail</th><th>Papel</th><th></th></tr></thead>
+              <tbody>
+                <template x-for="u in users" :key="u.id">
+                  <tr>
+                    <td><div class="row-name"><div class="avatar" x-text="initials(u.full_name)"></div><strong x-text="u.full_name"></strong></div></td>
+                    <td x-text="u.email || '—'"></td>
+                    <td><span class="badge badge-neutral" x-text="roleLabel(u.role)"></span></td>
+                    <td><button class="btn btn-ghost btn-sm" type="button" @click="openEditUser(u)">Editar</button></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <p class="text-xs text-soft mt-3">
+          Para adicionar alguém novo à equipe, crie o acesso em Authentication → Users no painel do Supabase (marcando "Auto Confirm User"), copie o UUID gerado e use "Vincular integrante" aqui para dar nome e papel a essa pessoa dentro da clínica.
+        </p>
+      </div>
+
+      <!-- modal nova tarefa -->
+      <div x-show="showNewTaskForm" x-cloak style="position:fixed;inset:0;background:rgba(31,51,47,.45);z-index:50;display:flex;align-items:center;justify-content:center;padding:20px;" @click.self="showNewTaskForm=false">
+        <div class="card card-shadow" style="width:100%;max-width:480px;max-height:88vh;overflow-y:auto;">
+          <div class="card-header"><h3>Nova tarefa</h3><button class="btn btn-ghost btn-sm" @click="showNewTaskForm=false">Fechar</button></div>
+          <form @submit.prevent="createTask()">
+            <div class="form-group">
+              <label class="label">Título</label>
+              <input class="input" x-model="newTask.title" required>
+            </div>
+            <div class="form-group">
+              <label class="label">Descrição</label>
+              <textarea class="input" x-model="newTask.description" rows="2"></textarea>
+            </div>
+            <div class="grid grid-2 gap-3">
+              <div class="form-group">
+                <label class="label">Responsável</label>
+                <select class="input" x-model="newTask.assigned_to">
+                  <option value="">Ninguém</option>
+                  <template x-for="u in users" :key="u.id">
+                    <option :value="u.id" x-text="u.full_name"></option>
+                  </template>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="label">Prazo</label>
+                <input class="input" type="date" x-model="newTask.due_date">
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="label">Paciente relacionado (opcional)</label>
+              <select class="input" x-model="newTask.patient_id">
+                <option value="">Nenhum</option>
+                <template x-for="p in patients" :key="p.id">
+                  <option :value="p.id" x-text="p.full_name"></option>
+                </template>
+              </select>
+            </div>
+            <button class="btn btn-primary btn-block mt-2" type="submit" :disabled="saving">
+              <span x-show="!saving">Criar tarefa</span>
+              <span x-show="saving" x-cloak>Salvando…</span>
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <!-- modal vincular integrante -->
+      <div x-show="showNewMemberForm" x-cloak style="position:fixed;inset:0;background:rgba(31,51,47,.45);z-index:50;display:flex;align-items:center;justify-content:center;padding:20px;" @click.self="showNewMemberForm=false">
+        <div class="card card-shadow" style="width:100%;max-width:480px;">
+          <div class="card-header"><h3>Vincular integrante</h3><button class="btn btn-ghost btn-sm" @click="showNewMemberForm=false">Fechar</button></div>
+          <form @submit.prevent="addTeamMember()">
+            <div class="form-group">
+              <label class="label">UUID do usuário (Authentication → Users)</label>
+              <input class="input" x-model="newMember.id" placeholder="ex.: 9ca668c5-4371-455b-8ce3-1567243079d3" required>
+            </div>
+            <div class="form-group">
+              <label class="label">Nome completo</label>
+              <input class="input" x-model="newMember.full_name" required>
+            </div>
+            <div class="form-group">
+              <label class="label">Papel</label>
+              <select class="input" x-model="newMember.role" required>
+                <option value="recepcao">Recepção</option>
+                <option value="profissional">Profissional</option>
+                <option value="gestor">Gestor</option>
+                <option value="financeiro">Financeiro</option>
+                <option value="equipe_prisma">Equipe Prisma</option>
+              </select>
+            </div>
+            <button class="btn btn-primary btn-block mt-2" type="submit" :disabled="saving">
+              <span x-show="!saving">Vincular</span>
+              <span x-show="saving" x-cloak>Salvando…</span>
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <!-- modal editar integrante -->
+      <div x-show="showEditUserForm" x-cloak style="position:fixed;inset:0;background:rgba(31,51,47,.45);z-index:50;display:flex;align-items:center;justify-content:center;padding:20px;" @click.self="showEditUserForm=false">
+        <div class="card card-shadow" style="width:100%;max-width:480px;" x-show="editingUser">
+          <div class="card-header"><h3>Editar integrante</h3><button class="btn btn-ghost btn-sm" @click="showEditUserForm=false">Fechar</button></div>
+          <form @submit.prevent="saveEditUser()" x-show="editingUser">
+            <div class="form-group">
+              <label class="label">Nome completo</label>
+              <input class="input" x-model="editingUser.full_name" required>
+            </div>
+            <div class="form-group">
+              <label class="label">Papel</label>
+              <select class="input" x-model="editingUser.role" required>
+                <option value="recepcao">Recepção</option>
+                <option value="profissional">Profissional</option>
+                <option value="gestor">Gestor</option>
+                <option value="financeiro">Financeiro</option>
+                <option value="equipe_prisma">Equipe Prisma</option>
+              </select>
+            </div>
+            <button class="btn btn-primary btn-block mt-2" type="submit" :disabled="saving">
+              <span x-show="!saving">Salvar</span>
+              <span x-show="saving" x-cloak>Salvando…</span>
+            </button>
+          </form>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<script>
+function equipeApp() {
+  return {
+    loading: true,
+    saving: false,
+    clinicId: null,
+    tab: 'tarefas',
+    users: [],
+    tasks: [],
+    patients: [],
+    showNewTaskForm: false,
+    showNewMemberForm: false,
+    showEditUserForm: false,
+    editingUser: null,
+    newTask: { title: '', description: '', assigned_to: '', due_date: '', patient_id: '' },
+    newMember: { id: '', full_name: '', role: 'recepcao' },
+    feedback: { type: '', message: '' },
+
+    async init() {
+      await this.loadClinicId();
+      await Promise.all([this.loadUsers(), this.loadTasks(), this.loadPatients()]);
+      this.loading = false;
+    },
+
+    async loadClinicId() {
+      const { data: { user } } = await supabaseClient.auth.getUser();
+      if (!user) return;
+      const { data, error } = await supabaseClient.from('users').select('clinic_id').eq('id', user.id).single();
+      if (error) {
+        this.showFeedback('error', 'Erro ao identificar sua clínica: ' + error.message);
+        return;
+      }
+      this.clinicId = data ? data.clinic_id : null;
+    },
+
+    async loadUsers() {
+      const { data, error } = await supabaseClient.from('users').select('id, full_name, email, role').order('full_name');
+      this.users = error ? [] : (data || []);
+    },
+
+    async loadTasks() {
+      const { data, error } = await supabaseClient
+        .from('tasks')
+        .select('id, title, description, due_date, status, assigned_to, patient_id, users ( full_name ), patients ( full_name )')
+        .order('due_date', { ascending: true });
+      if (error) {
+        this.showFeedback('error', 'Erro ao carregar tarefas: ' + error.message);
+        this.tasks = [];
+      } else {
+        this.tasks = data || [];
+      }
+    },
+
+    async loadPatients() {
+      const { data, error } = await supabaseClient.from('patients').select('id, full_name').order('full_name');
+      this.patients = error ? [] : (data || []);
+    },
+
+    tasksByStatus(status) {
+      return this.tasks.filter(t => t.status === status);
+    },
+
+    initials(name) {
+      if (!name) return '--';
+      const parts = name.trim().split(/\s+/);
+      return parts.length === 1 ? parts[0].slice(0, 2).toUpperCase() : (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    },
+
+    formatDate(value) {
+      if (!value) return '—';
+      const d = new Date(value);
+      return isNaN(d) ? '—' : d.toLocaleDateString('pt-BR');
+    },
+
+    roleLabel(role) {
+      const map = { recepcao: 'Recepção', profissional: 'Profissional', gestor: 'Gestor', financeiro: 'Financeiro', equipe_prisma: 'Equipe Prisma' };
+      return map[role] || role;
+    },
+
+    async createTask() {
+      if (!this.clinicId) return;
+      this.saving = true;
+      const payload = {
+        clinic_id: this.clinicId,
+        title: this.newTask.title,
+        description: this.newTask.description || null,
+        assigned_to: this.newTask.assigned_to || null,
+        due_date: this.newTask.due_date || null,
+        patient_id: this.newTask.patient_id || null,
+        status: 'pendente'
+      };
+      const { error } = await supabaseClient.from('tasks').insert(payload);
+      this.saving = false;
+      if (error) {
+        this.showFeedback('error', 'Erro ao criar tarefa: ' + error.message);
+        return;
+      }
+      this.showNewTaskForm = false;
+      this.newTask = { title: '', description: '', assigned_to: '', due_date: '', patient_id: '' };
+      this.showFeedback('success', 'Tarefa criada.');
+      await this.loadTasks();
+    },
+
+    async updateTaskStatus(task, newStatus) {
+      const { error } = await supabaseClient.from('tasks').update({ status: newStatus }).eq('id', task.id);
+      if (error) {
+        this.showFeedback('error', 'Erro ao atualizar tarefa: ' + error.message);
+        return;
+      }
+      await this.loadTasks();
+    },
+
+    async addTeamMember() {
+      if (!this.clinicId) return;
+      this.saving = true;
+      const { error } = await supabaseClient.from('users').insert({
+        id: this.newMember.id,
+        clinic_id: this.clinicId,
+        full_name: this.newMember.full_name,
+        role: this.newMember.role
+      });
+      this.saving = false;
+      if (error) {
+        this.showFeedback('error', 'Erro ao vincular integrante: ' + error.message);
+        return;
+      }
+      this.showNewMemberForm = false;
+      this.newMember = { id: '', full_name: '', role: 'recepcao' };
+      this.showFeedback('success', 'Integrante vinculado com sucesso.');
+      await this.loadUsers();
+    },
+
+    openEditUser(u) {
+      this.editingUser = { id: u.id, full_name: u.full_name, role: u.role };
+      this.showEditUserForm = true;
+    },
+
+    async saveEditUser() {
+      this.saving = true;
+      const { error } = await supabaseClient
+        .from('users')
+        .update({ full_name: this.editingUser.full_name, role: this.editingUser.role })
+        .eq('id', this.editingUser.id);
+      this.saving = false;
+      if (error) {
+        this.showFeedback('error', 'Erro ao salvar: ' + error.message);
+        return;
+      }
+      this.showEditUserForm = false;
+      this.showFeedback('success', 'Integrante atualizado.');
+      await this.loadUsers();
+    },
+
+    showFeedback(type, message) {
+      this.feedback = { type, message };
+      setTimeout(() => { this.feedback = { type: '', message: '' }; }, 5000);
+    }
+  };
+}
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="js/supabase-client.js"></script>
+<script src="js/auth-guard.js"></script>
+<script src="js/include.js" defer></script>
+</body>
+</html>

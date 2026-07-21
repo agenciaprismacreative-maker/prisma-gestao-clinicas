@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Financeiro · Prisma Gestão de Clínicas</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body data-page="financeiro" data-title="Financeiro" data-subtitle="" x-data="{ sidebarOpen:false }">
+
+<div class="app-shell">
+  <div data-include="partials/sidebar.html"></div>
+
+  <div class="main">
+    <header class="topbar" data-include="partials/topbar.html"></header>
+
+    <main class="content" x-data="financeiroApp()" x-init="init()">
+
+      <div class="page-header">
+        <div>
+          <h2>Financeiro</h2>
+          <p>Pagamentos, pacotes de sessão e comissões</p>
+        </div>
+      </div>
+
+      <div x-show="feedback.message" x-cloak class="card mb-4" :style="'padding:12px 16px;border-color:' + (feedback.type==='error' ? 'var(--color-danger)' : 'var(--color-success)')">
+        <span class="text-sm" x-text="feedback.message" :style="'color:' + (feedback.type==='error' ? 'var(--color-danger)' : 'var(--color-success)')"></span>
+      </div>
+
+      <div class="grid grid-3 mb-5">
+        <div class="stat-card">
+          <div class="stat-label">Faturado no período</div>
+          <div class="stat-value" x-text="formatCurrency(totalPeriodo)"></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Pagamentos e pacotes</div>
+          <div class="stat-value" x-text="formatCurrency(totalPorTipo.pagamento_procedimento + totalPorTipo.venda_pacote)"></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Comissões</div>
+          <div class="stat-value" x-text="formatCurrency(totalPorTipo.comissao_profissional)"></div>
+        </div>
+      </div>
+
+      <div class="flex gap-2 mb-5">
+        <button class="btn btn-sm" :class="tab==='transacoes' ? 'btn-primary' : 'btn-secondary'" @click="tab='transacoes'">Transações</button>
+        <button class="btn btn-sm" :class="tab==='pacotes' ? 'btn-primary' : 'btn-secondary'" @click="tab='pacotes'">Pacotes</button>
+      </div>
+
+      <!-- TRANSAÇÕES -->
+      <div x-show="tab==='transacoes'">
+        <div class="page-header" style="margin-bottom:20px;">
+          <div><p class="text-sm text-muted" x-text="transactions.length + ' lançamento(s)'"></p></div>
+          <button class="btn btn-primary btn-sm" type="button" @click="showNewTransactionForm = true">Novo lançamento</button>
+        </div>
+
+        <div x-show="loading" class="text-sm text-muted">Carregando…</div>
+        <div class="card card-shadow" style="padding:0;" x-show="!loading">
+          <div x-show="transactions.length === 0" class="empty-note" style="margin:20px;">Nenhum lançamento registrado ainda.</div>
+          <div class="table-wrap" x-show="transactions.length > 0">
+            <table class="table">
+              <thead><tr><th>Data</th><th>Tipo</th><th>Paciente</th><th>Profissional</th><th>Forma</th><th>Valor</th></tr></thead>
+              <tbody>
+                <template x-for="t in transactions" :key="t.id">
+                  <tr>
+                    <td x-text="formatDate(t.transaction_date)"></td>
+                    <td><span class="badge badge-neutral" x-text="typeLabel(t.type)"></span></td>
+                    <td x-text="(t.patients && t.patients.full_name) || '—'"></td>
+                    <td x-text="(t.users && t.users.full_name) || '—'"></td>
+                    <td x-text="t.payment_method || '—'"></td>
+                    <td x-text="formatCurrency(t.amount)"></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- PACOTES -->
+      <div x-show="tab==='pacotes'" x-cloak>
+        <div class="page-header" style="margin-bottom:20px;">
+          <div><p class="text-sm text-muted" x-text="packages.length + ' pacote(s) vendido(s)'"></p></div>
+          <button class="btn btn-primary btn-sm" type="button" @click="showNewPackageForm = true">Vender pacote</button>
+        </div>
+
+        <div class="card card-shadow" style="padding:0;">
+          <div x-show="packages.length === 0" class="empty-note" style="margin:20px;">Nenhum pacote vendido ainda.</div>
+          <div class="table-wrap" x-show="packages.length > 0">
+            <table class="table">
+              <thead><tr><th>Paciente</th><th>Serviço</th><th>Sessões</th><th>Validade</th></tr></thead>
+              <tbody>
+                <template x-for="pk in packages" :key="pk.id">
+                  <tr>
+                    <td x-text="(pk.patients && pk.patients.full_name) || '—'"></td>
+                    <td x-text="(pk.services && pk.services.name) || '—'"></td>
+                    <td x-text="pk.used_sessions + ' de ' + pk.total_sessions + ' usadas'"></td>
+                    <td x-text="formatDate(pk.expires_at)"></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- modal novo lançamento -->
+      <div x-show="showNewTransactionForm" x-cloak style="position:fixed;inset:0;background:rgba(31,51,47,.45);z-index:50;display:flex;align-items:center;justify-content:center;padding:20px;" @click.self="showNewTransactionForm=false">
+        <div class="card card-shadow" style="width:100%;max-width:480px;max-height:88vh;overflow-y:auto;">
+          <div class="card-header"><h3>Novo lançamento</h3><button class="btn btn-ghost btn-sm" @click="showNewTransactionForm=false">Fechar</button></div>
+          <form @submit.prevent="createTransaction()">
+            <div class="form-group">
+              <label class="label">Tipo</label>
+              <select class="input" x-model="newTransaction.type" required>
+                <option value="pagamento_procedimento">Pagamento de procedimento</option>
+                <option value="venda_pacote">Venda de pacote</option>
+                <option value="comissao_profissional">Comissão de profissional</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="label">Paciente (opcional)</label>
+              <select class="input" x-model="newTransaction.patient_id">
+                <option value="">Nenhum</option>
+                <template x-for="p in patients" :key="p.id">
+                  <option :value="p.id" x-text="p.full_name"></option>
+                </template>
+              </select>
+            </div>
+            <div class="form-group" x-show="newTransaction.type === 'comissao_profissional'">
+              <label class="label">Profissional</label>
+              <select class="input" x-model="newTransaction.professional_id">
+                <option value="">Selecione</option>
+                <template x-for="u in users" :key="u.id">
+                  <option :value="u.id" x-text="u.full_name"></option>
+                </template>
+              </select>
+            </div>
+            <div class="grid grid-2 gap-3">
+              <div class="form-group">
+                <label class="label">Valor (R$)</label>
+                <input class="input" type="number" step="0.01" min="0" x-model="newTransaction.amount" required>
+              </div>
+              <div class="form-group">
+                <label class="label">Data</label>
+                <input class="input" type="date" x-model="newTransaction.transaction_date" required>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="label">Forma de pagamento</label>
+              <select class="input" x-model="newTransaction.payment_method">
+                <option value="">Não informado</option>
+                <option value="Dinheiro">Dinheiro</option>
+                <option value="Pix">Pix</option>
+                <option value="Cartão de débito">Cartão de débito</option>
+                <option value="Cartão de crédito">Cartão de crédito</option>
+                <option value="Transferência">Transferência</option>
+              </select>
+            </div>
+            <button class="btn btn-primary btn-block mt-2" type="submit" :disabled="saving">
+              <span x-show="!saving">Salvar lançamento</span>
+              <span x-show="saving" x-cloak>Salvando…</span>
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <!-- modal vender pacote -->
+      <div x-show="showNewPackageForm" x-cloak style="position:fixed;inset:0;background:rgba(31,51,47,.45);z-index:50;display:flex;align-items:center;justify-content:center;padding:20px;" @click.self="showNewPackageForm=false">
+        <div class="card card-shadow" style="width:100%;max-width:480px;">
+          <div class="card-header"><h3>Vender pacote</h3><button class="btn btn-ghost btn-sm" @click="showNewPackageForm=false">Fechar</button></div>
+          <form @submit.prevent="createPackage()">
+            <div class="form-group">
+              <label class="label">Paciente</label>
+              <select class="input" x-model="newPackage.patient_id" required>
+                <option value="" disabled>Selecione</option>
+                <template x-for="p in patients" :key="p.id">
+                  <option :value="p.id" x-text="p.full_name"></option>
+                </template>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="label">Serviço</label>
+              <select class="input" x-model="newPackage.service_id" required>
+                <option value="" disabled>Selecione</option>
+                <template x-for="s in services" :key="s.id">
+                  <option :value="s.id" x-text="s.name"></option>
+                </template>
+              </select>
+            </div>
+            <div class="grid grid-2 gap-3">
+              <div class="form-group">
+                <label class="label">Quantidade de sessões</label>
+                <input class="input" type="number" min="1" x-model="newPackage.total_sessions" required>
+              </div>
+              <div class="form-group">
+                <label class="label">Validade</label>
+                <input class="input" type="date" x-model="newPackage.expires_at">
+              </div>
+            </div>
+            <button class="btn btn-primary btn-block mt-2" type="submit" :disabled="saving">
+              <span x-show="!saving">Registrar venda</span>
+              <span x-show="saving" x-cloak>Salvando…</span>
+            </button>
+          </form>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<script>
+function financeiroApp() {
+  return {
+    loading: true,
+    saving: false,
+    clinicId: null,
+    tab: 'transacoes',
+    transactions: [],
+    packages: [],
+    patients: [],
+    services: [],
+    users: [],
+    showNewTransactionForm: false,
+    showNewPackageForm: false,
+    newTransaction: { type: 'pagamento_procedimento', patient_id: '', professional_id: '', amount: '', payment_method: '', transaction_date: new Date().toISOString().slice(0,10) },
+    newPackage: { patient_id: '', service_id: '', total_sessions: '', expires_at: '' },
+    feedback: { type: '', message: '' },
+
+    async init() {
+      await this.loadClinicId();
+      await Promise.all([this.loadTransactions(), this.loadPackages(), this.loadPatients(), this.loadServices(), this.loadUsers()]);
+      this.loading = false;
+    },
+
+    async loadClinicId() {
+      const { data: { user } } = await supabaseClient.auth.getUser();
+      if (!user) return;
+      const { data, error } = await supabaseClient.from('users').select('clinic_id').eq('id', user.id).single();
+      if (error) {
+        this.showFeedback('error', 'Erro ao identificar sua clínica: ' + error.message);
+        return;
+      }
+      this.clinicId = data ? data.clinic_id : null;
+    },
+
+    async loadTransactions() {
+      const { data, error } = await supabaseClient
+        .from('transactions')
+        .select('id, type, amount, payment_method, transaction_date, patients ( full_name ), users ( full_name )')
+        .order('transaction_date', { ascending: false });
+      this.transactions = error ? [] : (data || []);
+      if (error) this.showFeedback('error', 'Erro ao carregar transações: ' + error.message);
+    },
+
+    async loadPackages() {
+      const { data, error } = await supabaseClient
+        .from('packages')
+        .select('id, total_sessions, used_sessions, expires_at, patients ( full_name ), services ( name )')
+        .order('purchased_at', { ascending: false });
+      this.packages = error ? [] : (data || []);
+    },
+
+    async loadPatients() {
+      const { data } = await supabaseClient.from('patients').select('id, full_name').order('full_name');
+      this.patients = data || [];
+    },
+
+    async loadServices() {
+      const { data } = await supabaseClient.from('services').select('id, name').order('name');
+      this.services = data || [];
+    },
+
+    async loadUsers() {
+      const { data } = await supabaseClient.from('users').select('id, full_name').order('full_name');
+      this.users = data || [];
+    },
+
+    get totalPeriodo() {
+      return this.transactions.reduce((sum, t) => sum + Number(t.amount || 0), 0);
+    },
+
+    get totalPorTipo() {
+      const map = { pagamento_procedimento: 0, venda_pacote: 0, comissao_profissional: 0 };
+      this.transactions.forEach(t => { map[t.type] = (map[t.type] || 0) + Number(t.amount || 0); });
+      return map;
+    },
+
+    typeLabel(type) {
+      const map = { pagamento_procedimento: 'Pagamento', venda_pacote: 'Venda de pacote', comissao_profissional: 'Comissão' };
+      return map[type] || type;
+    },
+
+    formatCurrency(value) {
+      return (Number(value) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    },
+
+    formatDate(value) {
+      if (!value) return '—';
+      const d = new Date(value);
+      return isNaN(d) ? '—' : d.toLocaleDateString('pt-BR');
+    },
+
+    async createTransaction() {
+      if (!this.clinicId) return;
+      this.saving = true;
+      const payload = {
+        clinic_id: this.clinicId,
+        type: this.newTransaction.type,
+        patient_id: this.newTransaction.patient_id || null,
+        professional_id: this.newTransaction.professional_id || null,
+        amount: this.newTransaction.amount,
+        payment_method: this.newTransaction.payment_method || null,
+        transaction_date: this.newTransaction.transaction_date
+      };
+      const { error } = await supabaseClient.from('transactions').insert(payload);
+      this.saving = false;
+      if (error) {
+        this.showFeedback('error', 'Erro ao salvar lançamento: ' + error.message);
+        return;
+      }
+      this.showNewTransactionForm = false;
+      this.newTransaction = { type: 'pagamento_procedimento', patient_id: '', professional_id: '', amount: '', payment_method: '', transaction_date: new Date().toISOString().slice(0,10) };
+      this.showFeedback('success', 'Lançamento registrado.');
+      await this.loadTransactions();
+    },
+
+    async createPackage() {
+      if (!this.clinicId) return;
+      this.saving = true;
+      const payload = {
+        clinic_id: this.clinicId,
+        patient_id: this.newPackage.patient_id,
+        service_id: this.newPackage.service_id,
+        total_sessions: this.newPackage.total_sessions,
+        expires_at: this.newPackage.expires_at || null
+      };
+      const { error } = await supabaseClient.from('packages').insert(payload);
+      this.saving = false;
+      if (error) {
+        this.showFeedback('error', 'Erro ao registrar pacote: ' + error.message);
+        return;
+      }
+      this.showNewPackageForm = false;
+      this.newPackage = { patient_id: '', service_id: '', total_sessions: '', expires_at: '' };
+      this.showFeedback('success', 'Pacote registrado.');
+      await this.loadPackages();
+    },
+
+    showFeedback(type, message) {
+      this.feedback = { type, message };
+      setTimeout(() => { this.feedback = { type: '', message: '' }; }, 5000);
+    }
+  };
+}
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="js/supabase-client.js"></script>
+<script src="js/auth-guard.js"></script>
+<script src="js/include.js" defer></script>
+</body>
+</html>

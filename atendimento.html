@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Atendimento · Prisma Gestão de Clínicas</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body data-page="atendimento" data-title="Atendimento" data-subtitle="" x-data="{ sidebarOpen:false }">
+
+<div class="app-shell">
+  <div data-include="partials/sidebar.html"></div>
+
+  <div class="main">
+    <header class="topbar" data-include="partials/topbar.html"></header>
+
+    <main class="content" x-data="atendimentoApp()" x-init="init()">
+
+      <div class="page-header">
+        <div>
+          <h2>Atendimento</h2>
+          <p>Fila de hoje e registro de prontuário por sessão</p>
+        </div>
+      </div>
+
+      <div x-show="feedback.message" x-cloak class="card mb-4" :style="'padding:12px 16px;border-color:' + (feedback.type==='error' ? 'var(--color-danger)' : 'var(--color-success)')">
+        <span class="text-sm" x-text="feedback.message" :style="'color:' + (feedback.type==='error' ? 'var(--color-danger)' : 'var(--color-success)')"></span>
+      </div>
+
+      <!-- fila do dia -->
+      <div x-show="!selectedAppt">
+        <div class="card card-shadow" style="padding:0;">
+          <div class="card-header" style="padding:20px 20px 0;">
+            <div><h3>Fila de hoje</h3><p x-text="formatToday()"></p></div>
+          </div>
+          <div x-show="loading" class="text-sm text-muted" style="padding:24px;">Carregando agendamentos…</div>
+          <div x-show="!loading && queue.length === 0" class="empty-note" style="margin:20px;">
+            Nenhum agendamento pendente de atendimento hoje.
+          </div>
+          <div class="table-wrap" x-show="!loading && queue.length > 0">
+            <table class="table">
+              <thead>
+                <tr><th>Horário</th><th>Paciente</th><th>Serviço</th><th>Status</th><th></th></tr>
+              </thead>
+              <tbody>
+                <template x-for="appt in queue" :key="appt.id">
+                  <tr>
+                    <td x-text="formatTime(appt.scheduled_at)"></td>
+                    <td>
+                      <div class="row-name">
+                        <div class="avatar" x-text="initials(appt.patients ? appt.patients.full_name : '')"></div>
+                        <div><strong x-text="appt.patients ? appt.patients.full_name : 'Paciente'"></strong></div>
+                      </div>
+                    </td>
+                    <td x-text="appt.services ? appt.services.name : '—'"></td>
+                    <td><span class="badge badge-neutral" x-text="statusLabel(appt.status)"></span></td>
+                    <td class="flex gap-2">
+                      <button class="btn btn-primary btn-sm" type="button" @click="selectAppointment(appt)">Atender</button>
+                      <button class="btn btn-ghost btn-sm" type="button" @click="markNoShow(appt)">Marcar falta</button>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- painel de atendimento -->
+      <div x-show="selectedAppt" x-cloak>
+        <button class="btn btn-ghost btn-sm mb-4" type="button" @click="selectedAppt = null">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;"><path d="M19 12H5"/><path d="M11 18l-6-6 6-6"/></svg>
+          Voltar para a fila
+        </button>
+
+        <div class="grid grid-main-side">
+
+          <div class="flex" style="flex-direction:column;gap:24px;">
+            <div class="card card-shadow">
+              <div class="card-header">
+                <div>
+                  <h3 x-text="selectedAppt && selectedAppt.patients ? selectedAppt.patients.full_name : ''"></h3>
+                  <p x-text="selectedAppt ? (formatTime(selectedAppt.scheduled_at) + ' · ' + (selectedAppt.services ? selectedAppt.services.name : 'Sem serviço definido')) : ''"></p>
+                </div>
+              </div>
+
+              <form @submit.prevent="concludeAttendance()">
+                <div class="form-group">
+                  <label class="label">Protocolo aplicado</label>
+                  <input class="input" x-model="form.protocol">
+                </div>
+                <div class="form-group">
+                  <label class="label">Evolução da sessão</label>
+                  <textarea class="input" x-model="form.notes" rows="4" placeholder="Observações do profissional sobre a sessão"></textarea>
+                </div>
+
+                <div class="form-group">
+                  <label class="label">Fotos de evolução</label>
+                  <input type="file" accept="image/*" multiple x-ref="photoInput" @change="onPhotosSelected($event)" style="display:none;">
+                  <button type="button" class="btn btn-secondary btn-sm" @click="$refs.photoInput.click()">Selecionar fotos</button>
+                  <div class="grid grid-3 gap-2 mt-3" x-show="photoPreviews.length > 0">
+                    <template x-for="(src, i) in photoPreviews" :key="i">
+                      <img :src="src" style="width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:var(--radius-md);border:1px solid var(--color-border);">
+                    </template>
+                  </div>
+                </div>
+
+                <div class="form-group flex items-center gap-2">
+                  <input type="checkbox" x-model="marketingConsent" id="mkt" style="width:auto;">
+                  <label for="mkt" class="text-sm" style="margin:0;">Paciente autoriza uso destas fotos em conteúdo de marketing</label>
+                </div>
+
+                <button class="btn btn-primary btn-block mt-2" type="submit" :disabled="saving">
+                  <span x-show="!saving">Concluir atendimento</span>
+                  <span x-show="saving" x-cloak>Salvando…</span>
+                </button>
+              </form>
+            </div>
+          </div>
+
+          <div class="flex" style="flex-direction:column;gap:24px;">
+            <div class="card card-shadow">
+              <h3 class="mb-3" style="font-size:15px;">Antes de começar</h3>
+              <h4 class="text-xs text-muted mb-2">Pontos de atenção clínica</h4>
+              <div x-show="patientFlags.length === 0" class="text-sm text-muted mb-3">Nenhum ponto de atenção marcado.</div>
+              <template x-for="(f, i) in patientFlags" :key="i">
+                <div class="badge badge-warning mb-2" style="display:flex;width:fit-content;">
+                  <span class="badge-dot"></span><span x-text="f"></span>
+                </div>
+              </template>
+              <h4 class="text-xs text-muted mb-2 mt-3">Alergias</h4>
+              <p class="text-sm" x-text="(selectedAppt && selectedAppt.patients && selectedAppt.patients.allergies) || 'Nenhuma registrada.'"></p>
+            </div>
+
+            <div class="card card-shadow">
+              <h3 class="mb-3" style="font-size:15px;">Histórico anterior</h3>
+              <div x-show="historyLoading" class="text-sm text-muted">Carregando…</div>
+              <div x-show="!historyLoading && history.length === 0" class="text-sm text-muted">Nenhum atendimento anterior.</div>
+              <template x-for="(h, i) in history" :key="i">
+                <div class="flex items-center justify-between mb-3">
+                  <div>
+                    <strong class="text-sm" x-text="h.protocol || 'Atendimento'"></strong>
+                    <div class="text-xs text-muted" x-text="formatDate(h.created_at)"></div>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<script>
+const ATENDIMENTO_ANAMNESIS_QUESTIONS = [
+  { key: 'diabetes', label: 'Diabetes' },
+  { key: 'hipertensao', label: 'Hipertensão' },
+  { key: 'coagulacao', label: 'Problema de coagulação' },
+  { key: 'doenca_autoimune', label: 'Doença autoimune' },
+  { key: 'epilepsia', label: 'Epilepsia' },
+  { key: 'doenca_pele_ativa', label: 'Doença de pele ativa' },
+  { key: 'gestante_lactante', label: 'Gestante ou lactante' },
+  { key: 'medicacao_continua', label: 'Medicação contínua', hasDetail: true },
+  { key: 'alergia_medicamento', label: 'Alergia a medicamento', hasDetail: true },
+  { key: 'alergia_cosmetico', label: 'Alergia a cosmético', hasDetail: true },
+  { key: 'isotretinoina_6meses', label: 'Isotretinoína nos últimos 6 meses' },
+  { key: 'marcapasso_implante', label: 'Marca-passo ou implante metálico' },
+  { key: 'queloide', label: 'Histórico de queloide' },
+  { key: 'herpes_labial', label: 'Herpes labial recorrente' },
+  { key: 'fumante', label: 'Fumante' },
+  { key: 'exposicao_solar_recente', label: 'Exposição solar recente' }
+];
+
+function atendimentoApp() {
+  return {
+    loading: true,
+    saving: false,
+    clinicId: null,
+    queue: [],
+    selectedAppt: null,
+    form: { protocol: '', notes: '' },
+    photoFiles: [],
+    photoPreviews: [],
+    marketingConsent: false,
+    history: [],
+    historyLoading: false,
+    feedback: { type: '', message: '' },
+
+    async init() {
+      await this.loadClinicId();
+      await this.loadQueue();
+    },
+
+    async loadClinicId() {
+      const { data: { user } } = await supabaseClient.auth.getUser();
+      if (!user) return;
+      const { data, error } = await supabaseClient.from('users').select('clinic_id').eq('id', user.id).single();
+      if (error) {
+        this.showFeedback('error', 'Erro ao identificar sua clínica: ' + error.message);
+        return;
+      }
+      this.clinicId = data ? data.clinic_id : null;
+    },
+
+    async loadQueue() {
+      this.loading = true;
+      const start = new Date(); start.setHours(0, 0, 0, 0);
+      const end = new Date(); end.setHours(23, 59, 59, 999);
+      const { data, error } = await supabaseClient
+        .from('appointments')
+        .select('id, scheduled_at, duration_minutes, status, patient_id, service_id, patients ( full_name, anamnesis_answers, allergies ), services ( name )')
+        .gte('scheduled_at', start.toISOString())
+        .lte('scheduled_at', end.toISOString())
+        .in('status', ['agendado', 'confirmado', 'em_atendimento'])
+        .order('scheduled_at', { ascending: true });
+      if (error) {
+        this.showFeedback('error', 'Erro ao carregar a fila: ' + error.message);
+        this.queue = [];
+      } else {
+        this.queue = data || [];
+      }
+      this.loading = false;
+    },
+
+    get patientFlags() {
+      const answers = this.selectedAppt && this.selectedAppt.patients && this.selectedAppt.patients.anamnesis_answers;
+      if (!answers) return [];
+      return ATENDIMENTO_ANAMNESIS_QUESTIONS
+        .filter(q => answers[q.key] && answers[q.key].answer)
+        .map(q => q.hasDetail && answers[q.key].detail ? (q.label + ': ' + answers[q.key].detail) : q.label);
+    },
+
+    initials(name) {
+      if (!name) return '--';
+      const parts = name.trim().split(/\s+/);
+      return parts.length === 1 ? parts[0].slice(0, 2).toUpperCase() : (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    },
+
+    formatTime(value) {
+      const d = new Date(value);
+      return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    },
+
+    formatDate(value) {
+      if (!value) return '—';
+      const d = new Date(value);
+      return isNaN(d) ? '—' : d.toLocaleDateString('pt-BR');
+    },
+
+    formatToday() {
+      const label = new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' });
+      return label.charAt(0).toUpperCase() + label.slice(1);
+    },
+
+    statusLabel(status) {
+      const map = { agendado: 'Agendado', confirmado: 'Confirmado', em_atendimento: 'Em atendimento' };
+      return map[status] || status;
+    },
+
+    async selectAppointment(appt) {
+      this.selectedAppt = appt;
+      this.form = { protocol: appt.services ? appt.services.name : '', notes: '' };
+      this.photoFiles = [];
+      this.photoPreviews = [];
+      this.marketingConsent = false;
+      this.historyLoading = true;
+      this.history = [];
+      const { data, error } = await supabaseClient
+        .from('medical_records')
+        .select('protocol, notes, created_at')
+        .eq('patient_id', appt.patient_id)
+        .order('created_at', { ascending: false });
+      if (!error) this.history = data || [];
+      this.historyLoading = false;
+    },
+
+    onPhotosSelected(event) {
+      this.photoFiles = Array.from(event.target.files);
+      this.photoPreviews = this.photoFiles.map(f => URL.createObjectURL(f));
+    },
+
+    async markNoShow(appt) {
+      const { error } = await supabaseClient.from('appointments').update({ status: 'faltou' }).eq('id', appt.id);
+      if (error) {
+        this.showFeedback('error', 'Erro ao marcar falta: ' + error.message);
+        return;
+      }
+      this.showFeedback('success', 'Falta registrada.');
+      await this.loadQueue();
+    },
+
+    async concludeAttendance() {
+      if (!this.clinicId || !this.selectedAppt) return;
+      this.saving = true;
+      try {
+        const { data: { user } } = await supabaseClient.auth.getUser();
+
+        const { error: recError } = await supabaseClient.from('medical_records').insert({
+          clinic_id: this.clinicId,
+          appointment_id: this.selectedAppt.id,
+          patient_id: this.selectedAppt.patient_id,
+          professional_id: user ? user.id : null,
+          protocol: this.form.protocol || null,
+          notes: this.form.notes || null
+        });
+        if (recError) throw recError;
+
+        for (const file of this.photoFiles) {
+          const path = this.clinicId + '/' + this.selectedAppt.patient_id + '/' + Date.now() + '_' + file.name;
+          const { error: upError } = await supabaseClient.storage.from('patient-photos').upload(path, file);
+          if (upError) throw upError;
+          const { error: photoRowError } = await supabaseClient.from('patient_photos').insert({
+            clinic_id: this.clinicId,
+            patient_id: this.selectedAppt.patient_id,
+            storage_path: path,
+            marketing_consent: this.marketingConsent
+          });
+          if (photoRowError) throw photoRowError;
+        }
+
+        const { error: apptError } = await supabaseClient
+          .from('appointments')
+          .update({ status: 'concluido' })
+          .eq('id', this.selectedAppt.id);
+        if (apptError) throw apptError;
+
+        this.showFeedback('success', 'Atendimento registrado com sucesso.');
+        this.selectedAppt = null;
+        await this.loadQueue();
+      } catch (err) {
+        this.showFeedback('error', 'Erro ao registrar atendimento: ' + err.message);
+      }
+      this.saving = false;
+    },
+
+    showFeedback(type, message) {
+      this.feedback = { type, message };
+      setTimeout(() => { this.feedback = { type: '', message: '' }; }, 5000);
+    }
+  };
+}
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="js/supabase-client.js"></script>
+<script src="js/auth-guard.js"></script>
+<script src="js/include.js" defer></script>
+</body>
+</html>
