@@ -29,6 +29,8 @@ async function loadIncludes() {
 
   markActivePage();
   fillPageTitle();
+  setupLogout();
+  fillUserInfo();
   startAlpine();
 }
 
@@ -46,6 +48,49 @@ function fillPageTitle() {
   const subtitleEl = document.querySelector('[data-slot="page-subtitle"]');
   if (titleEl && title) titleEl.textContent = title;
   if (subtitleEl && subtitle) subtitleEl.textContent = subtitle;
+}
+
+function setupLogout() {
+  const btn = document.querySelector('[data-action="logout"]');
+  if (!btn || !window.supabaseClient) return;
+  btn.addEventListener('click', async () => {
+    await supabaseClient.auth.signOut();
+    window.location.href = 'index.html';
+  });
+}
+
+function getInitials(name) {
+  if (!name) return '--';
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+async function fillUserInfo() {
+  if (!window.supabaseClient) return;
+  const nameEl = document.querySelector('[data-slot="user-name"]');
+  const clinicEl = document.querySelector('[data-slot="clinic-name"]');
+  const initialsEl = document.querySelector('[data-slot="user-initials"]');
+  if (!nameEl && !clinicEl && !initialsEl) return;
+
+  try {
+    const { data: { user } } = await supabaseClient.auth.getUser();
+    if (!user) return;
+
+    const { data: profile, error } = await supabaseClient
+      .from('users')
+      .select('full_name, role, clinics ( name )')
+      .eq('id', user.id)
+      .single();
+
+    if (error || !profile) return;
+
+    if (nameEl) nameEl.textContent = profile.full_name || user.email;
+    if (clinicEl) clinicEl.textContent = profile.clinics ? profile.clinics.name : '';
+    if (initialsEl) initialsEl.textContent = getInitials(profile.full_name);
+  } catch (err) {
+    console.error('[include.js] fillUserInfo:', err);
+  }
 }
 
 function startAlpine() {

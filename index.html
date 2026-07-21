@@ -16,21 +16,23 @@
       <p>Acesse o painel da sua clínica</p>
     </div>
 
-    <form x-data="{ loading:false, showPass:false }" @submit.prevent="loading=true; setTimeout(() => window.location.href='dashboard.html', 500)">
+    <form x-data="loginForm()" @submit.prevent="submit()">
       <div class="form-group">
         <label class="label" for="email">E-mail</label>
-        <input class="input" type="email" id="email" placeholder="voce@clinica.com.br" required>
+        <input class="input" type="email" id="email" x-model="email" placeholder="voce@clinica.com.br" required>
       </div>
 
       <div class="form-group">
         <label class="label" for="senha">Senha</label>
         <div style="position:relative;">
-          <input class="input" :type="showPass ? 'text' : 'password'" id="senha" placeholder="••••••••" required style="padding-right:56px;">
+          <input class="input" :type="showPass ? 'text' : 'password'" id="senha" x-model="password" placeholder="••••••••" required style="padding-right:56px;">
           <button type="button" @click="showPass = !showPass" class="text-xs text-muted" style="position:absolute;right:14px;top:50%;transform:translateY(-50%);background:none;border:none;">
             <span x-text="showPass ? 'ocultar' : 'ver'"></span>
           </button>
         </div>
       </div>
+
+      <p x-show="errorMsg" x-cloak class="text-sm mb-3" style="color:var(--color-danger);" x-text="errorMsg"></p>
 
       <button class="btn btn-primary btn-block mt-2" type="submit" :disabled="loading">
         <span x-show="!loading">Entrar</span>
@@ -40,11 +42,39 @@
 
     <div class="auth-footer">
       Esqueceu a senha? Fale com a administração da clínica.<br>
-      Sistema interno · Prisma Creative — ambiente de demonstração
+      Sistema interno · Prisma Creative
     </div>
   </div>
 </div>
 
+<script>
+function loginForm() {
+  return {
+    email: '',
+    password: '',
+    loading: false,
+    showPass: false,
+    errorMsg: '',
+    async submit() {
+      this.errorMsg = '';
+      this.loading = true;
+      const { error } = await supabaseClient.auth.signInWithPassword({
+        email: this.email,
+        password: this.password
+      });
+      if (error) {
+        this.errorMsg = 'E-mail ou senha incorretos.';
+        this.loading = false;
+        return;
+      }
+      window.location.href = 'dashboard.html';
+    }
+  };
+}
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="js/supabase-client.js"></script>
 <script src="js/include.js" defer></script>
 </body>
 </html>

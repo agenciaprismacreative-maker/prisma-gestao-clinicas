@@ -84,16 +84,16 @@
     </nav>
 
     <div class="sidebar-footer">
-      <div class="avatar">RC</div>
+      <div class="avatar" data-slot="user-initials">--</div>
       <div class="sidebar-user">
-        <strong>Recepção</strong>
-        <span>Clínica modelo</span>
+        <strong data-slot="user-name">Carregando…</strong>
+        <span data-slot="clinic-name"></span>
       </div>
-      <a href="index.html" class="sidebar-logout" title="Sair">
+      <button type="button" class="sidebar-logout" title="Sair" data-action="logout">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/>
         </svg>
-      </a>
+      </button>
     </div>
 
   </div>
