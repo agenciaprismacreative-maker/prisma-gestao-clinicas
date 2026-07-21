@@ -137,6 +137,27 @@
 
       </div>
 
+      <div class="card card-shadow mb-5" x-show="!loading && dashboardLeaderboard.length > 0">
+        <div class="card-header">
+          <div>
+            <h3>🏆 Ranking do mês</h3>
+            <p>Quem está liderando em vendas — últimos 30 dias</p>
+          </div>
+          <a href="bi.html" class="btn btn-ghost btn-sm">Ver desempenho completo</a>
+        </div>
+        <div class="podium">
+          <template x-for="row in dashboardLeaderboard" :key="row.userId">
+            <div class="podium-place" :class="'rank-' + row.rank">
+              <span class="podium-crown" x-show="row.rank === 1">👑</span>
+              <div class="podium-medal" x-text="row.rank"></div>
+              <div class="podium-avatar" x-text="initials(row.name)"></div>
+              <div class="podium-name" x-text="row.name"></div>
+              <div class="podium-value" x-text="formatCurrency(row.revenue)"></div>
+            </div>
+          </template>
+        </div>
+      </div>
+
       <div class="grid grid-main-side">
 
         <div class="card card-shadow" x-show="!loading">
@@ -406,7 +427,7 @@ function dashboardApp() {
       since.setDate(since.getDate() - 30);
       const { data, error } = await supabaseClient
         .from('transactions')
-        .select('amount, type, transaction_date')
+        .select('amount, type, transaction_date, professional_id')
         .gte('transaction_date', since.toISOString().slice(0, 10));
       this.transactions30d = error ? [] : (data || []);
     },
@@ -490,6 +511,22 @@ function dashboardApp() {
       const concluidos = this.appointmentsToday.filter(a => a.status === 'concluido').length;
       const pct = previsto > 0 ? Math.round((realizado / previsto) * 100) : 0;
       return { previsto, realizado, pct, concluidos, total: relevantToday.length };
+    },
+
+    get dashboardLeaderboard() {
+      const sums = {};
+      this.transactions30d
+        .filter(t => t.type === 'pagamento_procedimento' || t.type === 'venda_pacote')
+        .forEach(t => {
+          if (!t.professional_id) return;
+          sums[t.professional_id] = (sums[t.professional_id] || 0) + Number(t.amount || 0);
+        });
+      return this.professionals
+        .map(u => ({ userId: u.id, name: u.full_name, revenue: sums[u.id] || 0 }))
+        .filter(row => row.revenue > 0)
+        .sort((a, b) => b.revenue - a.revenue)
+        .slice(0, 3)
+        .map((row, idx) => Object.assign(row, { rank: idx + 1 }));
     },
 
     get birthdaysWithDays() {

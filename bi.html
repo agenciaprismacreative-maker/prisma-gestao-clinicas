@@ -31,7 +31,7 @@
 
       <!-- ===================== VISÃO DA EQUIPE (ESTETICISTA/ATENDENTE) ===================== -->
       <div x-show="!loading && !isAdmin" x-cloak>
-        <div class="grid grid-3 mb-5">
+        <div class="grid grid-4 mb-5">
           <div class="stat-card">
             <div class="stat-label">Meta do mês</div>
             <div class="stat-value" x-text="myGoal ? formatCurrency(myGoal.target_amount) : '—'"></div>
@@ -47,6 +47,15 @@
             <div class="stat-value" x-text="formatCurrency(myMonthCommission)"></div>
             <div class="stat-trend text-muted">Lançamentos do tipo comissão</div>
           </div>
+          <div class="stat-card">
+            <div class="stat-label">Clientes atendidos</div>
+            <div class="stat-value" x-text="clientsAttendedFor(currentUserId)"></div>
+            <div class="stat-trend text-muted">Pacientes únicos concluídos por você</div>
+          </div>
+        </div>
+        <div class="card card-shadow mb-5" x-show="myRank">
+          <h3 class="mb-2" style="font-size:15px;">Sua posição no ranking do mês</h3>
+          <p class="text-sm text-muted"><span x-text="myRank"></span>º lugar de <span x-text="leaderboard.length"></span> na equipe, com <strong x-text="formatCurrency(myMonthRevenue)"></strong> em vendas realizadas.</p>
         </div>
         <div class="card card-shadow">
           <h3 class="mb-2" style="font-size:15px;">Indicações de novos pacientes (este mês)</h3>
@@ -57,13 +66,13 @@
       <!-- ===================== VISÃO ADMINISTRADOR ===================== -->
       <div x-show="!loading && isAdmin" x-cloak>
         <div class="flex gap-2 mb-5" style="flex-wrap:wrap;">
-          <button class="btn btn-sm" :class="tab==='comercial' ? 'btn-primary' : 'btn-secondary'" @click="tab='comercial'">Comercial</button>
-          <button class="btn btn-sm" :class="tab==='estoque' ? 'btn-primary' : 'btn-secondary'" @click="tab='estoque'">Estoque</button>
-          <button class="btn btn-sm" :class="tab==='fidelizacao' ? 'btn-primary' : 'btn-secondary'" @click="tab='fidelizacao'">Fidelização</button>
-          <button class="btn btn-sm" :class="tab==='financeiro' ? 'btn-primary' : 'btn-secondary'" @click="tab='financeiro'">Financeiro</button>
-          <button class="btn btn-sm" :class="tab==='marketing' ? 'btn-primary' : 'btn-secondary'" @click="tab='marketing'">Marketing</button>
-          <button class="btn btn-sm" :class="tab==='operacional' ? 'btn-primary' : 'btn-secondary'" @click="tab='operacional'">Operacional</button>
-          <button class="btn btn-sm" :class="tab==='metas' ? 'btn-primary' : 'btn-secondary'" @click="tab='metas'">Metas da equipe</button>
+          <button class="btn btn-sm" :class="tab==='comercial' ? 'btn-primary' : 'btn-secondary'" @click="setTab('comercial')">Comercial</button>
+          <button class="btn btn-sm" :class="tab==='estoque' ? 'btn-primary' : 'btn-secondary'" @click="setTab('estoque')">Estoque</button>
+          <button class="btn btn-sm" :class="tab==='fidelizacao' ? 'btn-primary' : 'btn-secondary'" @click="setTab('fidelizacao')">Fidelização</button>
+          <button class="btn btn-sm" :class="tab==='financeiro' ? 'btn-primary' : 'btn-secondary'" @click="setTab('financeiro')">Financeiro</button>
+          <button class="btn btn-sm" :class="tab==='marketing' ? 'btn-primary' : 'btn-secondary'" @click="setTab('marketing')">Marketing</button>
+          <button class="btn btn-sm" :class="tab==='operacional' ? 'btn-primary' : 'btn-secondary'" @click="setTab('operacional')">Operacional</button>
+          <button class="btn btn-sm" :class="tab==='metas' ? 'btn-primary' : 'btn-secondary'" @click="setTab('metas')">Metas da equipe</button>
         </div>
 
         <!-- ===================== COMERCIAL ===================== -->
@@ -74,7 +83,7 @@
             <div class="stat-card"><div class="stat-label">Ticket médio</div><div class="stat-value" x-text="formatCurrency(averageTicket)"></div></div>
             <div class="stat-card"><div class="stat-label">Conversão de agenda (30 dias)</div><div class="stat-value" x-text="conversionRate + '%'"></div></div>
           </div>
-          <div class="card card-shadow">
+          <div class="card card-shadow mb-5">
             <h3 class="mb-4" style="font-size:15px;">Origem dos pacientes</h3>
             <div x-show="leadSourceBreakdown.length === 0" class="text-sm text-muted">Nenhum dado de origem registrado ainda.</div>
             <template x-for="row in leadSourceBreakdown" :key="row.key">
@@ -86,6 +95,12 @@
                 <div class="bi-bar"><div class="bi-bar-fill" :style="'width:' + row.pct + '%'"></div></div>
               </div>
             </template>
+          </div>
+          <div class="card card-shadow">
+            <h3 class="mb-4" style="font-size:15px;">Novos pacientes mês a mês (últimos 6 meses)</h3>
+            <div style="position:relative;height:240px;">
+              <canvas id="chartPatientsMonths"></canvas>
+            </div>
           </div>
         </div>
 
@@ -132,7 +147,7 @@
             <div class="stat-card"><div class="stat-label">Comissões</div><div class="stat-value" x-text="formatCurrency(totalPorTipo.comissao_profissional)"></div></div>
             <div class="stat-card"><div class="stat-label">Pacotes ativos</div><div class="stat-value" x-text="activePackages"></div></div>
           </div>
-          <div class="card card-shadow">
+          <div class="card card-shadow mb-5">
             <h3 class="mb-4" style="font-size:15px;">Faturamento por forma de pagamento (30 dias)</h3>
             <div x-show="paymentMethodBreakdown.length === 0" class="text-sm text-muted">Nenhum lançamento no período.</div>
             <template x-for="row in paymentMethodBreakdown" :key="row.key">
@@ -145,6 +160,12 @@
               </div>
             </template>
           </div>
+          <div class="card card-shadow">
+            <h3 class="mb-4" style="font-size:15px;">Faturamento mês a mês (últimos 6 meses)</h3>
+            <div style="position:relative;height:240px;">
+              <canvas id="chartRevenueMonths"></canvas>
+            </div>
+          </div>
         </div>
 
         <!-- ===================== MARKETING ===================== -->
@@ -154,7 +175,7 @@
             <div class="stat-card"><div class="stat-label">Taxa de conversão de leads</div><div class="stat-value" x-text="leadConversionRate === null ? '—' : leadConversionRate + '%'"></div></div>
             <div class="stat-card"><div class="stat-label">Novos pacientes (30 dias)</div><div class="stat-value" x-text="newPatients30d"></div></div>
           </div>
-          <div class="card card-shadow">
+          <div class="card card-shadow mb-5">
             <h3 class="mb-4" style="font-size:15px;">Origem dos pacientes</h3>
             <div x-show="leadSourceBreakdown.length === 0" class="text-sm text-muted">Nenhum dado de origem registrado ainda.</div>
             <template x-for="row in leadSourceBreakdown" :key="'mkt-' + row.key">
@@ -166,6 +187,13 @@
                 <div class="bi-bar"><div class="bi-bar-fill" :style="'width:' + row.pct + '%'"></div></div>
               </div>
             </template>
+          </div>
+          <div class="card card-shadow">
+            <div class="flex items-center justify-between mb-2">
+              <h3 style="font-size:15px;">Integração com Meta Ads</h3>
+              <span class="badge badge-neutral">Funcionalidade futura</span>
+            </div>
+            <p class="text-sm text-muted">Em breve será possível conectar a conta de anúncios do Meta (Facebook e Instagram Ads) para acompanhar aqui investimento, alcance, cliques e custo por lead das campanhas, cruzando automaticamente esses dados com a origem dos pacientes cadastrados nesta clínica.</p>
           </div>
         </div>
 
@@ -200,28 +228,76 @@
         <!-- ===================== METAS DA EQUIPE ===================== -->
         <div x-show="tab==='metas'" x-cloak>
           <p class="text-sm text-muted mb-4">Defina a meta de faturamento de cada integrante para <strong x-text="currentMonthLabel"></strong>. O realizado considera pagamentos e vendas de pacote lançados em nome da pessoa.</p>
-          <div class="card card-shadow" style="padding:0;">
-            <div class="table-wrap">
-              <table class="table">
-                <thead><tr><th>Integrante</th><th>Meta do mês</th><th>Realizado</th><th>% atingido</th><th>Indicações (mês)</th><th></th></tr></thead>
-                <tbody>
-                  <template x-for="u in users" :key="u.id">
-                    <tr>
-                      <td x-text="u.full_name"></td>
-                      <td style="max-width:140px;">
-                        <input class="input" type="text" inputmode="decimal" x-model="goalInputs[u.id]" @input="goalInputs[u.id] = maskCurrencyInput($event.target.value)" placeholder="R$ 0,00">
-                      </td>
-                      <td x-text="formatCurrency(monthRevenueFor(u.id))"></td>
-                      <td>
-                        <span class="badge" :class="goalPctFor(u.id) === null ? 'badge-neutral' : (goalPctFor(u.id) >= 100 ? 'badge-success' : 'badge-warning')"
-                              x-text="goalPctFor(u.id) === null ? '—' : goalPctFor(u.id) + '%'"></span>
-                      </td>
-                      <td x-text="referralsFor(u.id)"></td>
-                      <td><button class="btn btn-secondary btn-sm" type="button" @click="saveGoal(u.id)" :disabled="savingGoal">Salvar</button></td>
-                    </tr>
-                  </template>
-                </tbody>
-              </table>
+
+          <div class="card card-shadow mb-5" x-show="leaderboard.length > 0">
+            <h3 class="mb-2" style="font-size:15px;">🏆 Ranking do mês · quem está liderando</h3>
+            <p class="text-xs text-soft mb-3">Ordenado pelo valor realizado em <span x-text="currentMonthLabel"></span>. Serve como referência de competitividade, não substitui a avaliação de qualidade do atendimento.</p>
+
+            <div class="podium">
+              <template x-for="row in leaderboard.slice(0, 3)" :key="row.userId">
+                <div class="podium-place" :class="'rank-' + row.rank">
+                  <span class="podium-crown" x-show="row.rank === 1">👑</span>
+                  <div class="podium-medal" x-text="row.rank"></div>
+                  <div class="podium-avatar" x-text="getInitials(row.name)"></div>
+                  <div class="podium-name" x-text="row.name"></div>
+                  <div class="podium-value" x-text="formatCurrency(row.revenue)"></div>
+                  <div class="podium-sub" x-text="row.salesCount + ' venda(s)' + (row.goalPct === null ? '' : ' · ' + row.goalPct + '% da meta')"></div>
+                </div>
+              </template>
+            </div>
+
+            <div style="margin-top:22px;" x-show="leaderboard.length > 3">
+              <template x-for="row in leaderboard.slice(3)" :key="row.userId">
+                <div class="leaderboard-row">
+                  <span class="leaderboard-rank" x-text="row.rank + 'º'"></span>
+                  <div class="avatar" style="width:30px;height:30px;font-size:11px;" x-text="getInitials(row.name)"></div>
+                  <div style="flex:1;">
+                    <strong class="text-sm" x-text="row.name"></strong>
+                    <div class="text-xs text-muted" x-text="row.salesCount + ' venda(s) · ' + row.clientsAttended + ' cliente(s) atendido(s)'"></div>
+                  </div>
+                  <strong class="text-sm" x-text="formatCurrency(row.revenue)"></strong>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <div class="grid grid-main-side mb-2">
+            <div class="card card-shadow" style="padding:0;">
+              <div style="padding:20px 20px 0;"><h3 style="font-size:15px;">Metas e realizado por integrante</h3></div>
+              <div class="table-wrap">
+                <table class="table">
+                  <thead><tr><th>Integrante</th><th>Meta do mês</th><th>Realizado</th><th>% atingido</th><th>Clientes atendidos</th><th>Indicações (mês)</th><th></th></tr></thead>
+                  <tbody>
+                    <template x-for="u in users" :key="u.id">
+                      <tr>
+                        <td x-text="u.full_name"></td>
+                        <td style="max-width:140px;">
+                          <input class="input" type="text" inputmode="decimal" x-model="goalInputs[u.id]" @input="goalInputs[u.id] = maskCurrencyInput($event.target.value)" placeholder="R$ 0,00">
+                        </td>
+                        <td x-text="formatCurrency(monthRevenueFor(u.id))"></td>
+                        <td>
+                          <span class="badge" :class="goalPctFor(u.id) === null ? 'badge-neutral' : (goalPctFor(u.id) >= 100 ? 'badge-success' : 'badge-warning')"
+                                x-text="goalPctFor(u.id) === null ? '—' : goalPctFor(u.id) + '%'"></span>
+                        </td>
+                        <td x-text="clientsAttendedFor(u.id)"></td>
+                        <td x-text="referralsFor(u.id)"></td>
+                        <td><button class="btn btn-secondary btn-sm" type="button" @click="saveGoal(u.id)" :disabled="savingGoal">Salvar</button></td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="card card-shadow">
+              <h3 class="mb-3" style="font-size:15px;">Procedimentos mais executados</h3>
+              <div x-show="topProcedures.length === 0" class="text-sm text-muted">Nenhum atendimento concluído ainda.</div>
+              <template x-for="(proc, idx) in topProcedures" :key="proc.name">
+                <div class="procedure-rank-row">
+                  <span x-text="(idx + 1) + 'º ' + proc.name"></span>
+                  <span class="badge badge-accent" x-text="proc.count"></span>
+                </div>
+              </template>
             </div>
           </div>
         </div>
@@ -233,6 +309,12 @@
 </div>
 
 <script>
+// Instâncias de gráfico (Chart.js) mantidas fora do objeto reativo do Alpine
+// de propósito: um objeto Chart.js tem referências internas circulares
+// (canvas <-> chart) que não devem ser transformadas em proxy reativo.
+let biRevenueChartInstance = null;
+let biPatientsChartInstance = null;
+
 function biApp() {
   return {
     loading: true,
@@ -263,6 +345,107 @@ function biApp() {
       ]);
       this.syncGoalInputs();
       this.loading = false;
+      this.$nextTick(() => this.renderPatientsChart());
+    },
+
+    setTab(name) {
+      this.tab = name;
+      this.$nextTick(() => {
+        if (name === 'comercial') this.renderPatientsChart();
+        if (name === 'financeiro') this.renderRevenueChart();
+      });
+    },
+
+    lastMonths(count) {
+      const months = [];
+      const now = new Date();
+      for (let i = count - 1; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const label = d.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
+        months.push({ key: d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'), label: label.charAt(0).toUpperCase() + label.slice(1) });
+      }
+      return months;
+    },
+
+    get monthlyRevenueSeries() {
+      const months = this.lastMonths(6);
+      const sums = {};
+      this.transactions
+        .filter(t => t.type === 'pagamento_procedimento' || t.type === 'venda_pacote')
+        .forEach(t => {
+          if (!t.transaction_date) return;
+          const key = t.transaction_date.slice(0, 7);
+          sums[key] = (sums[key] || 0) + Number(t.amount || 0);
+        });
+      return months.map(m => ({ label: m.label, total: sums[m.key] || 0 }));
+    },
+
+    get monthlyPatientsSeries() {
+      const months = this.lastMonths(6);
+      const counts = {};
+      this.patients.forEach(p => {
+        if (!p.created_at) return;
+        const key = p.created_at.slice(0, 7);
+        counts[key] = (counts[key] || 0) + 1;
+      });
+      return months.map(m => ({ label: m.label, total: counts[m.key] || 0 }));
+    },
+
+    renderRevenueChart() {
+      const canvas = document.getElementById('chartRevenueMonths');
+      if (!canvas || typeof Chart === 'undefined') return;
+      const series = this.monthlyRevenueSeries;
+      if (biRevenueChartInstance) biRevenueChartInstance.destroy();
+      biRevenueChartInstance = new Chart(canvas.getContext('2d'), {
+        type: 'bar',
+        data: {
+          labels: series.map(s => s.label),
+          datasets: [{
+            label: 'Faturamento',
+            data: series.map(s => s.total),
+            backgroundColor: '#2F4A45',
+            borderRadius: 4,
+            maxBarThickness: 46
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: { callbacks: { label: (ctx) => this.formatCurrency(ctx.parsed.y) } }
+          },
+          scales: { y: { ticks: { callback: (v) => this.formatCurrency(v) } } }
+        }
+      });
+    },
+
+    renderPatientsChart() {
+      const canvas = document.getElementById('chartPatientsMonths');
+      if (!canvas || typeof Chart === 'undefined') return;
+      const series = this.monthlyPatientsSeries;
+      if (biPatientsChartInstance) biPatientsChartInstance.destroy();
+      biPatientsChartInstance = new Chart(canvas.getContext('2d'), {
+        type: 'line',
+        data: {
+          labels: series.map(s => s.label),
+          datasets: [{
+            label: 'Novos pacientes',
+            data: series.map(s => s.total),
+            borderColor: '#B8912F',
+            backgroundColor: 'rgba(184,145,47,.15)',
+            fill: true,
+            tension: .3,
+            pointRadius: 3
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: { y: { ticks: { precision: 0 } } }
+        }
+      });
     },
 
     async loadClinicId() {
@@ -483,6 +666,54 @@ function biApp() {
       return this.blocks.length;
     },
 
+    clientsAttendedFor(userId) {
+      const ids = new Set(
+        this.appointments
+          .filter(a => a.professional_id === userId && a.status === 'concluido')
+          .map(a => a.patient_id)
+      );
+      return ids.size;
+    },
+
+    salesCountFor(userId) {
+      const monthPrefix = this.currentPeriodMonth.slice(0, 7);
+      return this.transactions.filter(t =>
+        t.professional_id === userId &&
+        (t.type === 'pagamento_procedimento' || t.type === 'venda_pacote') &&
+        t.transaction_date && t.transaction_date.slice(0, 7) === monthPrefix
+      ).length;
+    },
+
+    get leaderboard() {
+      return this.users
+        .map(u => ({
+          userId: u.id,
+          name: u.full_name,
+          revenue: this.monthRevenueFor(u.id),
+          salesCount: this.salesCountFor(u.id),
+          clientsAttended: this.clientsAttendedFor(u.id),
+          goalPct: this.goalPctFor(u.id)
+        }))
+        .sort((a, b) => b.revenue - a.revenue)
+        .map((row, idx) => Object.assign(row, { rank: idx + 1 }));
+    },
+
+    get myRank() {
+      const row = this.leaderboard.find(r => r.userId === this.currentUserId);
+      return row ? row.rank : null;
+    },
+
+    get topProcedures() {
+      const counts = {};
+      this.appointments
+        .filter(a => a.status === 'concluido' && a.services && a.services.name)
+        .forEach(a => { counts[a.services.name] = (counts[a.services.name] || 0) + 1; });
+      return Object.entries(counts)
+        .map(([name, count]) => ({ name, count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 8);
+    },
+
     get appointmentsByProfessional() {
       const map = {};
       this.appointments30d.forEach(a => {
@@ -596,6 +827,7 @@ function biApp() {
 </script>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <script src="js/supabase-client.js"></script>
 <script src="js/auth-guard.js"></script>
 <script src="js/topbar.js"></script>
