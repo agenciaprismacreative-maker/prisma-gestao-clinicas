@@ -312,16 +312,20 @@
             <button class="btn btn-ghost btn-sm" type="button" @click="showNewForm = false">Fechar</button>
           </div>
 
-          <div class="flex gap-2 mb-4" style="flex-wrap:wrap;">
-            <button type="button" class="btn btn-sm" :class="formTab==='gerais' ? 'btn-primary' : 'btn-secondary'" @click="formTab='gerais'">Gerais</button>
-            <button type="button" class="btn btn-sm" :class="formTab==='documentos' ? 'btn-primary' : 'btn-secondary'" @click="formTab='documentos'">Documentos</button>
-            <button type="button" class="btn btn-sm" :class="formTab==='endereco' ? 'btn-primary' : 'btn-secondary'" @click="formTab='endereco'">Endereço</button>
-            <button type="button" class="btn btn-sm" :class="formTab==='origem' ? 'btn-primary' : 'btn-secondary'" @click="formTab='origem'">Origem</button>
-            <button type="button" class="btn btn-sm" :class="formTab==='anamnese' ? 'btn-primary' : 'btn-secondary'" @click="formTab='anamnese'">Anamnese</button>
-            <button type="button" class="btn btn-sm" :class="formTab==='outros' ? 'btn-primary' : 'btn-secondary'" @click="formTab='outros'">Complementares</button>
+          <div class="wizard-progress">
+            <template x-for="(step, idx) in wizardSteps" :key="step.key">
+              <div class="wizard-step" :class="{ 'is-active': formTab === step.key, 'is-done': idx < currentStepIndex, 'is-clickable': idx <= maxStepReached }" @click="goToStep(step.key)">
+                <div class="wizard-step-circle">
+                  <span x-show="idx >= currentStepIndex" x-text="idx + 1"></span>
+                  <span x-show="idx < currentStepIndex">✓</span>
+                </div>
+                <span class="wizard-step-label" x-text="step.label"></span>
+              </div>
+            </template>
           </div>
+          <p class="text-xs text-soft mb-4">Etapa <span x-text="currentStepIndex + 1"></span> de <span x-text="wizardSteps.length"></span> · campos obrigatórios: nome, CPF, telefone e e-mail.</p>
 
-          <form @submit.prevent="createPatient()">
+          <form @submit.prevent="currentStepIndex === wizardSteps.length - 1 ? createPatient() : nextStep()">
 
             <!-- GERAIS -->
             <div x-show="formTab==='gerais'">
@@ -332,7 +336,7 @@
 
               <div class="grid grid-2 gap-3">
                 <div class="form-group">
-                  <label class="label">CPF</label>
+                  <label class="label">CPF *</label>
                   <input class="input" x-model="newPatient.cpf" @input="newPatient.cpf = maskCpf($event.target.value)" placeholder="000.000.000-00" maxlength="14">
                   <p class="input-hint" x-show="newPatient.cpf && !isValidCpf(newPatient.cpf)" style="color:var(--color-danger);">CPF incompleto ou inválido.</p>
                 </div>
@@ -344,11 +348,11 @@
 
               <div class="grid grid-2 gap-3">
                 <div class="form-group">
-                  <label class="label">WhatsApp</label>
+                  <label class="label">WhatsApp *</label>
                   <input class="input" x-model="newPatient.phone" @input="newPatient.phone = maskPhone($event.target.value)" placeholder="(11) 90000-0000" maxlength="15">
                 </div>
                 <div class="form-group">
-                  <label class="label">E-mail</label>
+                  <label class="label">E-mail *</label>
                   <input class="input" type="email" x-model="newPatient.email" placeholder="paciente@email.com">
                   <p class="input-hint" x-show="newPatient.email && !isValidEmail(newPatient.email)" style="color:var(--color-danger);">E-mail em formato inválido.</p>
                 </div>
@@ -606,10 +610,15 @@
               </div>
             </div>
 
-            <button class="btn btn-primary btn-block mt-2" type="submit" :disabled="saving">
-              <span x-show="!saving">Salvar paciente</span>
-              <span x-show="saving" x-cloak>Salvando…</span>
-            </button>
+            <div class="flex items-center justify-between mt-4" style="gap:10px;">
+              <button type="button" class="btn btn-secondary" @click="prevStep()" x-show="currentStepIndex > 0">Voltar</button>
+              <span x-show="currentStepIndex === 0"></span>
+              <button type="button" class="btn btn-primary" @click="nextStep()" x-show="currentStepIndex < wizardSteps.length - 1">Avançar</button>
+              <button class="btn btn-primary" type="submit" :disabled="saving" x-show="currentStepIndex === wizardSteps.length - 1">
+                <span x-show="!saving">Salvar paciente</span>
+                <span x-show="saving" x-cloak>Salvando…</span>
+              </button>
+            </div>
           </form>
         </div>
       </div>
@@ -712,6 +721,15 @@ function pacientesApp() {
     clinicId: null,
     showNewForm: false,
     formTab: 'gerais',
+    maxStepReached: 0,
+    wizardSteps: [
+      { key: 'gerais', label: 'Dados gerais' },
+      { key: 'documentos', label: 'Documentos' },
+      { key: 'endereco', label: 'Endereço' },
+      { key: 'origem', label: 'Origem' },
+      { key: 'anamnese', label: 'Anamnese' },
+      { key: 'outros', label: 'Complementares' }
+    ],
     questions: ANAMNESIS_QUESTIONS,
     newPatient: emptyNewPatient(),
     history: [],
@@ -848,7 +866,51 @@ function pacientesApp() {
     openNewForm() {
       this.newPatient = emptyNewPatient();
       this.formTab = 'gerais';
+      this.maxStepReached = 0;
       this.showNewForm = true;
+    },
+
+    get currentStepIndex() {
+      return this.wizardSteps.findIndex(s => s.key === this.formTab);
+    },
+
+    goToStep(key) {
+      const idx = this.wizardSteps.findIndex(s => s.key === key);
+      if (idx <= this.maxStepReached) this.formTab = key;
+    },
+
+    nextStep() {
+      if (this.formTab === 'gerais' && !this.validateGeraisStep()) return;
+      const idx = this.currentStepIndex;
+      if (idx < this.wizardSteps.length - 1) {
+        this.formTab = this.wizardSteps[idx + 1].key;
+        this.maxStepReached = Math.max(this.maxStepReached, idx + 1);
+      }
+    },
+
+    prevStep() {
+      const idx = this.currentStepIndex;
+      if (idx > 0) this.formTab = this.wizardSteps[idx - 1].key;
+    },
+
+    validateGeraisStep() {
+      if (!this.newPatient.full_name || !this.newPatient.full_name.trim()) {
+        this.showFeedback('error', 'Informe o nome completo do paciente.');
+        return false;
+      }
+      if (!this.newPatient.cpf || !isValidCpf(this.newPatient.cpf)) {
+        this.showFeedback('error', 'Informe um CPF válido para continuar.');
+        return false;
+      }
+      if (!this.newPatient.phone || this.newPatient.phone.trim().length < 14) {
+        this.showFeedback('error', 'Informe um telefone válido para continuar.');
+        return false;
+      }
+      if (!this.newPatient.email || !isValidEmail(this.newPatient.email)) {
+        this.showFeedback('error', 'Informe um e-mail válido para continuar.');
+        return false;
+      }
+      return true;
     },
 
     async selectPatient(p) {
@@ -968,12 +1030,8 @@ function pacientesApp() {
         this.showFeedback('error', 'Não foi possível identificar sua clínica. Recarregue a página e tente de novo.');
         return;
       }
-      if (this.newPatient.email && !isValidEmail(this.newPatient.email)) {
-        this.showFeedback('error', 'Corrija o e-mail antes de salvar.');
-        return;
-      }
-      if (this.newPatient.cpf && !isValidCpf(this.newPatient.cpf)) {
-        this.showFeedback('error', 'Corrija o CPF antes de salvar.');
+      if (!this.validateGeraisStep()) {
+        this.formTab = 'gerais';
         return;
       }
       this.saving = true;

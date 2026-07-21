@@ -474,6 +474,18 @@ textarea.input { resize: vertical; min-height: 80px; }
 /* ---------- combobox de busca (paciente no agendamento) ---------- */
 .patient-option:hover { background: var(--color-surface-alt); }
 
+/* ---------- assistente (wizard) de cadastro sequencial ---------- */
+.wizard-progress { display: flex; align-items: flex-start; justify-content: space-between; gap: 4px; }
+.wizard-step { position: relative; display: flex; flex: 1; flex-direction: column; align-items: center; gap: 6px; cursor: default; }
+.wizard-step.is-clickable { cursor: pointer; }
+.wizard-step:not(:last-child)::after { content: ''; position: absolute; top: 13px; left: 50%; width: 100%; height: 2px; background: var(--color-border); z-index: 0; }
+.wizard-step.is-done:not(:last-child)::after { background: var(--color-primary); }
+.wizard-step-circle { position: relative; z-index: 1; width: 26px; height: 26px; border-radius: 50%; background: var(--color-surface); border: 2px solid var(--color-border); display: flex; align-items: center; justify-content: center; font-size: 11.5px; font-weight: 700; color: var(--color-text-muted); }
+.wizard-step.is-active .wizard-step-circle { border-color: var(--color-primary); color: var(--color-primary); background: var(--color-primary-light); }
+.wizard-step.is-done .wizard-step-circle { border-color: var(--color-primary); background: var(--color-primary); color: #fff; }
+.wizard-step-label { font-size: 10.5px; color: var(--color-text-muted); text-align: center; max-width: 84px; line-height: 1.25; }
+.wizard-step.is-active .wizard-step-label { color: var(--color-text); font-weight: 600; }
+
 /* ---------- BI: barra de proporção ---------- */
 .bi-bar { height: 7px; border-radius: var(--radius-full); background: var(--color-surface-alt); overflow: hidden; }
 .bi-bar-fill { height: 100%; background: var(--color-primary); border-radius: var(--radius-full); }
