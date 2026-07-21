@@ -1,10 +1,10 @@
 # Prisma · Sistema de Gestão para Clínicas de Estética
 
-Esboço visual do sistema descrito em `docs/especificacao-sistema.pdf`. Interface em HTML, CSS e JavaScript puro, com Alpine.js para reatividade, conforme a stack definida na seção 3 do documento. Ainda sem conexão com banco de dados: os dados exibidos são fictícios, de uma clínica de demonstração chamada "Clínica Alma Estética".
+Sistema descrito em `docs/especificacao-sistema.pdf`, com as evoluções registradas em `docs/adendo-especificacao-2026-07.md`. Interface em HTML, CSS e JavaScript puro, com Alpine.js para reatividade, conforme a stack definida na seção 3 do documento original. Já conectado a um projeto real no Supabase (banco de dados, autenticação e Storage), publicado no Vercel.
 
-## Como visualizar
+## Como visualizar localmente
 
-O menu lateral e o cabeçalho são carregados por fetch() a partir de `partials/`, então o projeto precisa rodar por um servidor local, não pode ser aberto direto com duplo clique no arquivo. Dentro da pasta do projeto, rode um dos comandos abaixo e acesse o endereço indicado no terminal.
+O menu lateral e o cabeçalho são carregados por fetch() a partir de `partials/`, então o projeto precisa rodar por um servidor local, não pode ser aberto direto com duplo clique no arquivo.
 
 ```
 npx serve
@@ -16,28 +16,38 @@ ou
 python3 -m http.server 8000
 ```
 
-Depois acesse `http://localhost:8000` (ou a porta indicada) e entre por `index.html`.
+Depois acesse `http://localhost:8000` e entre com um usuário já cadastrado em Authentication → Users no painel do Supabase.
 
 ## Estrutura de pastas
 
 ```
-index.html          tela de login
-dashboard.html       painel com indicadores da clínica
-pacientes.html        lista de pacientes e ficha individual
-agenda.html          agenda diária por profissional
-partials/             cabeçalho e menu lateral, incluídos via JavaScript
-css/styles.css        folha de estilos única do sistema
-js/include.js          script que injeta os fragmentos HTML e inicia o Alpine.js
-docs/                   especificação original e guia de criação de contas
+index.html            tela de login (autenticação real via Supabase Auth)
+dashboard.html         painel com indicadores da clínica
+pacientes.html          cadastro completo de pacientes, importação CSV, anamnese estruturada
+agenda.html            agenda diária por profissional
+atendimento.html        fila de atendimento, prontuário e fotos de evolução
+equipe.html            equipe da clínica e quadro de tarefas
+financeiro.html         transações, comissões e pacotes de sessão
+reativacao.html         pacientes elegíveis à reativação e histórico de contatos
+partials/               cabeçalho e menu lateral, incluídos via JavaScript
+css/styles.css          folha de estilos única do sistema
+js/supabase-client.js    conexão com o projeto Supabase (URL e chave pública)
+js/auth-guard.js        protege as páginas internas, exige sessão ativa
+js/include.js            injeta os fragmentos HTML, popula usuário/clínica no menu e inicia o Alpine.js
+database/schema.sql      schema completo (12 tabelas) com RLS por clínica
+database/grants.sql      permissões de acesso do role authenticated
+database/seed.sql        clínica e usuário de teste
+database/migrations/     alterações incrementais ao schema já aplicado
+docs/                     especificação original, adendo de melhorias e guias de infraestrutura
 ```
 
 ## O que já está pronto
 
-Login, dashboard com indicadores e confirmações via WhatsApp, lista e ficha de pacientes (com comparador de evolução e histórico) e a visão diária da agenda por profissional, com os status de confirmado, aguardando, sem resposta, faltou e cancelado. O menu lateral já mostra os demais módulos do sistema (equipe e tarefas, atendimento, financeiro, pós-venda, configurações), marcados como "em breve", para dar a visão do produto completo.
+Login e sessão real via Supabase Auth. Cadastro de pacientes com CPF e telefone com máscara, e-mail validado, anamnese estruturada de dezesseis perguntas com pontos de atenção clínica destacados na ficha, e importação em lote por CSV. Agenda com colunas por profissional real da clínica, criação de agendamento e navegação entre dias. Atendimento e prontuário, com fila do dia, registro de evolução por sessão, upload de fotos para o Supabase Storage e conclusão automática do agendamento. Equipe com vínculo de novos integrantes (a partir de um usuário já criado no Supabase Auth) e edição de papel, além de um quadro de tarefas em três colunas. Financeiro com lançamentos de pagamento, venda de pacote e comissão, e controle de pacotes de sessão por paciente. Pós-venda e reativação, calculando quem já passou do intervalo de retorno esperado por procedimento e permitindo registrar contato manual enquanto a integração automática não existe.
 
 ## O que ainda falta
 
-Todas as telas acima são estáticas: os dados estão escritos diretamente no HTML ou em um pequeno array dentro de cada página, sem conexão real com banco de dados. As próximas etapas, seguindo a ordem da seção 8 da especificação, são: criar o schema no Supabase, conectar login e dados reais, depois construir atendimento e prontuário, equipe e tarefas, financeiro e estoque.
+Três pendências técnicas separadas do restante: a integração real com WhatsApp via Z-API (que vai automatizar a confirmação de agendamento, os lembretes e a régua de reativação hoje registrada manualmente), a análise evolutiva por IA na ficha do paciente (mencionada no adendo, usando o histórico de atendimentos que já está sendo gravado), e a atualização do dashboard para consumir dados reais de faturamento e comparecimento em vez dos números de exemplo que ainda restam ali. A tela de Configurações também segue como próximo módulo de menu a construir.
 
 ## Identidade visual
 

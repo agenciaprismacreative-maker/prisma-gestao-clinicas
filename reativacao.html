@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Pós-venda e Reativação · Prisma Gestão de Clínicas</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body data-page="reativacao" data-title="Pós-venda e reativação" data-subtitle="" x-data="{ sidebarOpen:false }">
+
+<div class="app-shell">
+  <div data-include="partials/sidebar.html"></div>
+
+  <div class="main">
+    <header class="topbar" data-include="partials/topbar.html"></header>
+
+    <main class="content" x-data="reativacaoApp()" x-init="init()">
+
+      <div class="page-header">
+        <div>
+          <h2>Pós-venda e reativação</h2>
+          <p>Pacientes no intervalo de retorno do procedimento</p>
+        </div>
+      </div>
+
+      <div x-show="feedback.message" x-cloak class="card mb-4" :style="'padding:12px 16px;border-color:' + (feedback.type==='error' ? 'var(--color-danger)' : 'var(--color-success)')">
+        <span class="text-sm" x-text="feedback.message" :style="'color:' + (feedback.type==='error' ? 'var(--color-danger)' : 'var(--color-success)')"></span>
+      </div>
+
+      <div class="empty-note mb-4">
+        O disparo automático pelo WhatsApp ainda não está ativo, depende da integração com a Z-API. Por enquanto, esta tela calcula quem já passou do intervalo de retorno esperado e permite registrar o contato feito manualmente.
+      </div>
+
+      <div class="flex gap-2 mb-5">
+        <button class="btn btn-sm" :class="tab==='candidatos' ? 'btn-primary' : 'btn-secondary'" @click="tab='candidatos'">Elegíveis à reativação</button>
+        <button class="btn btn-sm" :class="tab==='historico' ? 'btn-primary' : 'btn-secondary'" @click="tab='historico'">Histórico de contatos</button>
+      </div>
+
+      <!-- CANDIDATOS -->
+      <div x-show="tab==='candidatos'">
+        <div x-show="loading" class="text-sm text-muted">Calculando…</div>
+        <div class="card card-shadow" style="padding:0;" x-show="!loading">
+          <div x-show="candidates.length === 0" class="empty-note" style="margin:20px;">
+            Nenhum paciente no intervalo de retorno ainda. Isso é esperado enquanto poucos atendimentos foram concluídos.
+          </div>
+          <div class="table-wrap" x-show="candidates.length > 0">
+            <table class="table">
+              <thead><tr><th>Paciente</th><th>WhatsApp</th><th>Último procedimento</th><th>Dias sem retorno</th><th>Intervalo esperado</th><th></th></tr></thead>
+              <tbody>
+                <template x-for="c in candidates" :key="c.patient_id">
+                  <tr>
+                    <td><strong x-text="c.patients ? c.patients.full_name : ''"></strong></td>
+                    <td x-text="(c.patients && c.patients.phone) || '—'"></td>
+                    <td x-text="c.services ? c.services.name : ''"></td>
+                    <td><span class="badge badge-warning" x-text="c.daysSince + ' dias'"></span></td>
+                    <td x-text="c.interval + ' dias'"></td>
+                    <td><button class="btn btn-secondary btn-sm" type="button" @click="markContacted(c)">Marcar contato feito</button></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- HISTÓRICO -->
+      <div x-show="tab==='historico'" x-cloak>
+        <div class="card card-shadow" style="padding:0;">
+          <div x-show="logs.length === 0" class="empty-note" style="margin:20px;">Nenhum contato registrado ainda.</div>
+          <div class="table-wrap" x-show="logs.length > 0">
+            <table class="table">
+              <thead><tr><th>Data</th><th>Paciente</th><th>Tipo</th><th>Direção</th><th>Conteúdo</th></tr></thead>
+              <tbody>
+                <template x-for="l in logs" :key="l.id">
+                  <tr>
+                    <td x-text="formatDateTime(l.created_at)"></td>
+                    <td x-text="(l.patients && l.patients.full_name) || '—'"></td>
+                    <td x-text="typeLabel(l.message_type)"></td>
+                    <td x-text="l.direction === 'enviada' ? 'Enviada' : 'Recebida'"></td>
+                    <td x-text="l.content || '—'"></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<script>
+function reativacaoApp() {
+  return {
+    loading: true,
+    clinicId: null,
+    tab: 'candidatos',
+    candidates: [],
+    logs: [],
+    feedback: { type: '', message: '' },
+
+    async init() {
+      await this.loadClinicId();
+      await Promise.all([this.loadCandidates(), this.loadLogs()]);
+      this.loading = false;
+    },
+
+    async loadClinicId() {
+      const { data: { user } } = await supabaseClient.auth.getUser();
+      if (!user) return;
+      const { data, error } = await supabaseClient.from('users').select('clinic_id').eq('id', user.id).single();
+      if (error) {
+        this.showFeedback('error', 'Erro ao identificar sua clínica: ' + error.message);
+        return;
+      }
+      this.clinicId = data ? data.clinic_id : null;
+    },
+
+    async loadCandidates() {
+      const { data, error } = await supabaseClient
+        .from('appointments')
+        .select('patient_id, scheduled_at, patients ( full_name, phone ), services ( name, return_interval_days )')
+        .eq('status', 'concluido')
+        .order('scheduled_at', { ascending: false });
+
+      if (error) {
+        this.showFeedback('error', 'Erro ao calcular reativações: ' + error.message);
+        this.candidates = [];
+        return;
+      }
+
+      const latestByPatient = {};
+      (data || []).forEach(appt => {
+        if (!appt.services || !appt.services.return_interval_days) return;
+        const current = latestByPatient[appt.patient_id];
+        if (!current || new Date(appt.scheduled_at) > new Date(current.scheduled_at)) {
+          latestByPatient[appt.patient_id] = appt;
+        }
+      });
+
+      const now = new Date();
+      this.candidates = Object.values(latestByPatient)
+        .map(appt => {
+          const last = new Date(appt.scheduled_at);
+          const daysSince = Math.floor((now - last) / 86400000);
+          return Object.assign({}, appt, { daysSince, interval: appt.services.return_interval_days });
+        })
+        .filter(c => c.daysSince >= c.interval)
+        .sort((a, b) => b.daysSince - a.daysSince);
+    },
+
+    async loadLogs() {
+      const { data, error } = await supabaseClient
+        .from('communications_log')
+        .select('id, message_type, direction, content, created_at, patients ( full_name )')
+        .order('created_at', { ascending: false })
+        .limit(50);
+      this.logs = error ? [] : (data || []);
+    },
+
+    typeLabel(type) {
+      const map = { confirmacao: 'Confirmação', lembrete: 'Lembrete', reativacao: 'Reativação', pesquisa_satisfacao: 'Pesquisa de satisfação' };
+      return map[type] || type || '—';
+    },
+
+    formatDateTime(value) {
+      if (!value) return '—';
+      const d = new Date(value);
+      return isNaN(d) ? '—' : d.toLocaleString('pt-BR');
+    },
+
+    async markContacted(candidate) {
+      if (!this.clinicId) return;
+      const { error } = await supabaseClient.from('communications_log').insert({
+        clinic_id: this.clinicId,
+        patient_id: candidate.patient_id,
+        channel: 'whatsapp',
+        message_type: 'reativacao',
+        direction: 'enviada',
+        content: 'Contato manual de reativação registrado pela equipe (integração automática ainda não ativa).'
+      });
+      if (error) {
+        this.showFeedback('error', 'Erro ao registrar contato: ' + error.message);
+        return;
+      }
+      this.showFeedback('success', 'Contato registrado no histórico.');
+      await this.loadLogs();
+    },
+
+    showFeedback(type, message) {
+      this.feedback = { type, message };
+      setTimeout(() => { this.feedback = { type: '', message: '' }; }, 5000);
+    }
+  };
+}
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="js/supabase-client.js"></script>
+<script src="js/auth-guard.js"></script>
+<script src="js/include.js" defer></script>
+</body>
+</html>
