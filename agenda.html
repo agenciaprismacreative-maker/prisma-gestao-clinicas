@@ -180,7 +180,7 @@
 
       <!-- ficha breve ao clicar num agendamento existente -->
       <div x-show="apptDetail.show" x-cloak class="modal-overlay" style="z-index:55;" @click.self="closeApptDetail()">
-        <div class="card card-shadow" style="margin:auto;width:100%;max-width:360px;" x-show="apptDetail.appt">
+        <div class="card card-shadow" style="margin:auto;width:100%;max-width:400px;" x-show="apptDetail.appt">
           <div class="card-header">
             <h3 x-text="apptDetail.appt ? (apptDetail.appt.patients ? apptDetail.appt.patients.full_name : 'Paciente') : ''"></h3>
             <button class="btn btn-ghost btn-sm" type="button" @click="closeApptDetail()">Fechar</button>
@@ -213,6 +213,21 @@
                       <input class="input" type="time" x-model="apptDetail.rescheduleTime">
                     </div>
                   </div>
+                  <div class="form-group">
+                    <label class="label">Profissional</label>
+                    <select class="input" x-model="apptDetail.rescheduleProfessionalId">
+                      <option value="">Sem profissional definido</option>
+                      <template x-for="pr in professionals" :key="pr.id">
+                        <option :value="pr.id" x-text="pr.full_name"></option>
+                      </template>
+                    </select>
+                  </div>
+                  <div class="form-group" x-show="isReassigningProfessional" x-cloak>
+                    <label class="label">Motivo da troca de profissional *</label>
+                    <textarea class="input" rows="2" x-model="apptDetail.reassignReason" placeholder="Por que esse atendimento está sendo passado para outro profissional" required></textarea>
+                    <p class="input-hint">Obrigatório: o profissional que vai receber o paciente será avisado com esse motivo.</p>
+                  </div>
+                  <p class="text-sm mb-2" x-show="feedback.message" x-cloak x-text="feedback.message" :style="'color:' + (feedback.type==='error' ? 'var(--color-danger)' : 'var(--color-success)')"></p>
                   <div class="flex gap-2">
                     <button type="button" class="btn btn-primary btn-sm" @click="submitDetailReschedule()" :disabled="savingDetail">Confirmar reagendamento</button>
                     <button type="button" class="btn btn-ghost btn-sm" @click="apptDetail.mode = 'view'">Cancelar</button>
@@ -408,7 +423,7 @@ function agendaApp() {
     newBlock: { professional_id: '', date: '', start_time: '09:00', end_time: '10:00', reason: '' },
     contextMenu: { show: false, x: 0, y: 0, professionalId: null, time: '09:00', date: null, showViewDay: false },
     apptContextMenu: { show: false, x: 0, y: 0, appt: null },
-    apptDetail: { show: false, appt: null, mode: 'view', rescheduleDate: '', rescheduleTime: '', cancelReason: '' },
+    apptDetail: { show: false, appt: null, mode: 'view', rescheduleDate: '', rescheduleTime: '', rescheduleProfessionalId: '', reassignReason: '', cancelReason: '' },
     savingDetail: false,
     feedback: { type: '', message: '' },
 
@@ -826,17 +841,32 @@ function agendaApp() {
       const d = new Date(this.apptDetail.appt.scheduled_at);
       this.apptDetail.rescheduleDate = this.toDateInputValue(d);
       this.apptDetail.rescheduleTime = d.toTimeString().slice(0, 5);
+      this.apptDetail.rescheduleProfessionalId = this.apptDetail.appt.professional_id || '';
+      this.apptDetail.reassignReason = '';
       this.apptDetail.mode = 'reagendar';
+    },
+
+    get isReassigningProfessional() {
+      if (!this.apptDetail.appt) return false;
+      return (this.apptDetail.rescheduleProfessionalId || '') !== (this.apptDetail.appt.professional_id || '');
     },
 
     async submitDetailReschedule() {
       const appt = this.apptDetail.appt;
       if (!appt || !this.apptDetail.rescheduleDate || !this.apptDetail.rescheduleTime) return;
+      if (this.isReassigningProfessional && !this.apptDetail.reassignReason.trim()) {
+        this.showFeedback('error', 'Descreva o motivo da troca de profissional. Esse aviso é obrigatório porque o novo profissional será notificado com esse motivo.');
+        return;
+      }
       const newDateTime = new Date(this.apptDetail.rescheduleDate + 'T' + this.apptDetail.rescheduleTime + ':00');
+      const wasReassigning = this.isReassigningProfessional;
+      const newProfessionalId = this.apptDetail.rescheduleProfessionalId || null;
+      const reason = this.apptDetail.reassignReason.trim();
+      const patientName = appt.patients ? appt.patients.full_name : 'um paciente';
 
       const preventDouble = !window.__prismaClinicSettings || window.__prismaClinicSettings.prevent_double_booking !== false;
-      if (preventDouble && appt.professional_id) {
-        const hasConflict = await this.hasSchedulingConflict(appt.professional_id, newDateTime, appt.duration_minutes || 60, appt.id);
+      if (preventDouble && newProfessionalId) {
+        const hasConflict = await this.hasSchedulingConflict(newProfessionalId, newDateTime, appt.duration_minutes || 60, appt.id);
         if (hasConflict) {
           this.showFeedback('error', 'Esse profissional já tem um agendamento nesse novo horário. Escolha outro.');
           return;
@@ -844,16 +874,38 @@ function agendaApp() {
       }
 
       this.savingDetail = true;
+      const payload = {
+        scheduled_at: newDateTime.toISOString(),
+        professional_id: newProfessionalId,
+        rescheduled_count: (appt.rescheduled_count || 0) + 1
+      };
+      if (wasReassigning) payload.reassign_reason = reason;
       const { error } = await supabaseClient
         .from('appointments')
-        .update({ scheduled_at: newDateTime.toISOString(), rescheduled_count: (appt.rescheduled_count || 0) + 1 })
+        .update(payload)
         .eq('id', appt.id);
       this.savingDetail = false;
       if (error) {
         this.showFeedback('error', 'Erro ao reagendar: ' + error.message);
         return;
       }
-      this.showFeedback('success', 'Agendamento remarcado com sucesso.');
+
+      // avisa quem recebeu o paciente, mesmo mecanismo usado em
+      // atendimento.html: melhor esforço, não desfaz o reagendamento (que já
+      // foi salvo) se essa notificação falhar.
+      let noticeSent = false;
+      if (wasReassigning && newProfessionalId) {
+        const dateLabel = newDateTime.toLocaleDateString('pt-BR') + ' às ' + newDateTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+        const { error: noticeError } = await supabaseClient.from('dashboard_notes').insert({
+          clinic_id: this.clinicId,
+          author_id: this.currentUserId,
+          target_user_id: newProfessionalId,
+          content: 'Atendimento remanejado para você: ' + patientName + ', ' + dateLabel + '. Motivo: ' + reason
+        });
+        noticeSent = !noticeError;
+      }
+
+      this.showFeedback('success', 'Agendamento remarcado com sucesso.' + (noticeSent ? ' Lembrete enviado para o profissional que recebeu o paciente.' : ''));
       this.closeApptDetail();
       await this.loadAppointments();
     },
