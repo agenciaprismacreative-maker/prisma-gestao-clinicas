@@ -53,7 +53,7 @@
       <div x-show="tab==='transacoes'">
         <div class="page-header" style="margin-bottom:20px;">
           <div><p class="text-sm text-muted" x-text="transactions.length + ' lançamento(s)'"></p></div>
-          <button class="btn btn-primary btn-sm" type="button" @click="showNewTransactionForm = true">Nova comissão manual</button>
+          <p class="text-xs text-soft" x-show="transactions.length > 0">Lançamentos são gerados automaticamente: venda e comissão de indicação ao aprovar uma venda em Vendas, comissão de meta ao clicar em "Lançar comissão" na aba Metas de Desempenho.</p>
         </div>
 
         <div x-show="loading" class="text-sm text-muted">Carregando…</div>
@@ -338,82 +338,6 @@
         </div>
       </div>
 
-      <!-- modal novo lançamento -->
-      <div x-show="showNewTransactionForm" x-cloak class="modal-overlay" @click.self="showNewTransactionForm=false">
-        <div class="card card-shadow" style="margin:auto;width:100%;max-width:480px;max-height:88vh;overflow-y:auto;">
-          <div class="card-header"><h3>Nova comissão manual</h3><button class="btn btn-ghost btn-sm" @click="showNewTransactionForm=false">Fechar</button></div>
-          <p class="input-hint mb-3">Pagamentos de procedimento e vendas de pacote são lançados automaticamente ao aprovar a venda em Vendas — não precisam ser lançados aqui de novo. Use este formulário só para uma comissão avulsa (ajuste, bônus ou indicação registrada fora do fluxo de vendas).</p>
-          <form @submit.prevent="createTransaction()">
-            <div class="form-group" style="position:relative;">
-              <label class="label">Paciente (opcional)</label>
-              <input class="input" type="text" x-model="transactionPatientSearch" @focus="transactionPatientDropdownOpen = true" @input="transactionPatientDropdownOpen = true; newTransaction.patient_id = ''" placeholder="Digite o nome do paciente" autocomplete="off">
-              <div x-show="transactionPatientDropdownOpen" x-cloak @click.away="transactionPatientDropdownOpen = false"
-                   style="position:absolute;z-index:10;top:100%;left:0;right:0;background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-md);box-shadow:var(--shadow-md);max-height:200px;overflow-y:auto;margin-top:4px;">
-                <div @click="newTransaction.patient_id = ''; transactionPatientSearch = ''; transactionPatientDropdownOpen = false" class="patient-option" style="padding:9px 14px;cursor:pointer;font-size:13.5px;">Nenhum</div>
-                <template x-for="p in filteredPatientsFor(transactionPatientSearch)" :key="p.id">
-                  <div @click="newTransaction.patient_id = p.id; transactionPatientSearch = p.full_name; transactionPatientDropdownOpen = false" class="patient-option" style="padding:9px 14px;cursor:pointer;font-size:13.5px;" x-text="p.full_name"></div>
-                </template>
-              </div>
-            </div>
-            <div class="form-group" x-show="newTransaction.type === 'comissao_profissional'" x-cloak>
-              <label class="label">Profissional</label>
-              <select class="input" x-model="newTransaction.professional_id">
-                <option value="">Selecione</option>
-                <template x-for="u in users" :key="u.id">
-                  <option :value="u.id" x-text="u.full_name"></option>
-                </template>
-              </select>
-            </div>
-
-            <template x-if="newTransaction.type === 'comissao_profissional'">
-              <div class="grid grid-2 gap-3">
-                <div class="form-group">
-                  <label class="label">Valor base (procedimento/pacote)</label>
-                  <input class="input" type="text" inputmode="decimal" x-model="newTransaction.base_amount" @input="newTransaction.base_amount = maskCurrencyInput($event.target.value); recalcCommission()" placeholder="R$ 0,00">
-                </div>
-                <div class="form-group">
-                  <label class="label">Percentual (%)</label>
-                  <input class="input" type="number" step="0.1" min="0" max="100" x-model="newTransaction.commission_percentage" @input="recalcCommission()">
-                </div>
-              </div>
-            </template>
-
-            <!-- comissão: valor único, sem divisão de pagamento -->
-            <template x-if="newTransaction.type === 'comissao_profissional'">
-              <div class="grid grid-2 gap-3">
-                <div class="form-group">
-                  <label class="label">Valor da comissão (R$)</label>
-                  <input class="input" type="text" inputmode="decimal" x-model="newTransaction.amount" @input="newTransaction.amount = maskCurrencyInput($event.target.value)" placeholder="R$ 0,00" required>
-                  <p class="input-hint">Calculado automaticamente, mas pode ajustar.</p>
-                </div>
-                <div class="form-group">
-                  <label class="label">Data</label>
-                  <input class="input" type="date" x-model="newTransaction.transaction_date" required>
-                </div>
-              </div>
-            </template>
-            <template x-if="newTransaction.type === 'comissao_profissional'">
-              <div class="form-group">
-                <label class="label">Forma de pagamento</label>
-                <select class="input" x-model="newTransaction.payment_method">
-                  <option value="">Não informado</option>
-                  <option value="Dinheiro">Dinheiro</option>
-                  <option value="Pix">Pix</option>
-                  <option value="Cartão de débito">Cartão de débito</option>
-                  <option value="Cartão de crédito">Cartão de crédito</option>
-                  <option value="Transferência">Transferência</option>
-                </select>
-              </div>
-            </template>
-
-            <button class="btn btn-primary btn-block mt-2" type="submit" :disabled="saving">
-              <span x-show="!saving">Salvar lançamento</span>
-              <span x-show="saving" x-cloak>Salvando…</span>
-            </button>
-          </form>
-        </div>
-      </div>
-
       <!-- modal cadastrar/editar modelo de pacote -->
       <div x-show="showNewTemplateForm" x-cloak class="modal-overlay" @click.self="showNewTemplateForm=false">
         <div class="card card-shadow" style="margin:auto;width:100%;max-width:520px;max-height:88vh;overflow-y:auto;">
@@ -478,16 +402,12 @@ function financeiroApp() {
     patients: [],
     services: [],
     users: [],
-    showNewTransactionForm: false,
-    transactionPatientSearch: '',
-    transactionPatientDropdownOpen: false,
     products: [],
     serviceProductsMap: {},
     paymentMachines: [],
     showMachineForm: false,
     editingMachineId: null,
     machineForm: { name: '', rates: {} },
-    newTransaction: { type: 'comissao_profissional', patient_id: '', professional_id: '', amount: '', base_amount: '', commission_percentage: '', payment_method: '', transaction_date: new Date().toISOString().slice(0,10) },
     planTemplates: [],
     planTemplateItems: {},
     showNewTemplateForm: false,
@@ -852,14 +772,6 @@ function financeiroApp() {
       return Math.round(margin);
     },
 
-    recalcCommission() {
-      const base = parseCurrencyToNumber(this.newTransaction.base_amount) || 0;
-      const pct = Number(this.newTransaction.commission_percentage) || 0;
-      if (base > 0 && pct > 0) {
-        this.newTransaction.amount = numberToCurrencyInput(Math.round(base * pct / 100 * 100) / 100);
-      }
-    },
-
     feeRateFor(machineId, installments) {
       const machine = this.paymentMachines.find(m => m.id === machineId);
       if (!machine || !machine.fee_rates) return 0;
@@ -958,34 +870,6 @@ function financeiroApp() {
     // manter esse caminho manual em paralelo arriscava lançar o mesmo
     // recebimento duas vezes (ou lançar um "venda_pacote" sem o pacote real
     // por trás, sem sessões geradas pro paciente).
-    async createTransaction() {
-      if (!this.clinicId) return;
-      this.saving = true;
-      const payload = {
-        clinic_id: this.clinicId,
-        type: 'comissao_profissional',
-        patient_id: this.newTransaction.patient_id || null,
-        professional_id: this.newTransaction.professional_id || null,
-        amount: parseCurrencyToNumber(this.newTransaction.amount),
-        commission_percentage: this.newTransaction.commission_percentage || null,
-        base_amount: parseCurrencyToNumber(this.newTransaction.base_amount),
-        payment_method: this.newTransaction.payment_method || null,
-        transaction_date: this.newTransaction.transaction_date
-      };
-      const { error } = await supabaseClient.from('transactions').insert(payload);
-      this.saving = false;
-      if (error) {
-        this.showFeedback('error', 'Erro ao salvar lançamento: ' + error.message);
-        return;
-      }
-
-      this.showNewTransactionForm = false;
-      this.newTransaction = { type: 'comissao_profissional', patient_id: '', professional_id: '', amount: '', base_amount: '', commission_percentage: '', payment_method: '', transaction_date: new Date().toISOString().slice(0,10) };
-      this.transactionPatientSearch = '';
-      this.showFeedback('success', 'Lançamento registrado.');
-      await this.loadTransactions();
-    },
-
     showFeedback(type, message) {
       this.feedback = { type, message };
       setTimeout(() => { this.feedback = { type: '', message: '' }; }, 5000);

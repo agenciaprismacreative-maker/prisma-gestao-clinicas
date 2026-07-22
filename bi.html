@@ -525,6 +525,7 @@
               <span x-show="collectiveGoalPct !== null"> · <strong x-text="collectiveGoalPct + '%'"></strong> da meta coletiva</span>
               <span x-show="suggestedCollectiveCommission !== null"> · comissão sugerida: <strong x-text="formatCurrency(suggestedCollectiveCommission)"></strong></span>
             </p>
+            <button class="btn btn-primary btn-sm mt-2" type="button" x-show="suggestedCollectiveCommission > 0" @click="launchCollectiveCommission()" :disabled="savingCollectiveGoal">Lançar comissão coletiva</button>
           </div>
           </template>
 
@@ -552,7 +553,10 @@
                         </td>
                         <td x-text="clientsAttendedFor(u.id)"></td>
                         <td x-text="referralsFor(u.id)"></td>
-                        <td><button class="btn btn-secondary btn-sm" type="button" @click="saveGoal(u.id)" :disabled="savingGoal">Salvar</button></td>
+                        <td class="flex gap-2">
+                          <button class="btn btn-secondary btn-sm" type="button" @click="saveGoal(u.id)" :disabled="savingGoal">Salvar</button>
+                          <button class="btn btn-primary btn-sm" type="button" x-show="suggestedCommissionFor(u.id) > 0" @click="launchIndividualCommission(u.id)" :disabled="savingGoal">Lançar comissão</button>
+                        </td>
                       </tr>
                     </template>
                   </tbody>
@@ -1128,6 +1132,40 @@ function biApp() {
       return this.monthRevenueFor(userId) * tierPct / 100;
     },
 
+    // Gera direto no financeiro a comissão de meta individual já calculada
+    // acima (mesmo valor mostrado na coluna "Comissão sugerida"), sem
+    // reabrir nenhum formulário manual. Um clique, zero redigitação.
+    async launchIndividualCommission(userId) {
+      const pct = this.commissionTierFor(this.goalPctFor(userId));
+      const revenue = this.monthRevenueFor(userId);
+      const amount = this.suggestedCommissionFor(userId);
+      if (!amount || amount <= 0) return;
+      const user = this.users.find(u => u.id === userId);
+      const userName = user ? user.full_name : 'este integrante';
+      const alreadyPaid = this.monthCommissionFor(userId);
+      const warning = alreadyPaid > 0
+        ? ('Atenção: já existe ' + this.formatCurrency(alreadyPaid) + ' em comissão lançada para ' + userName + ' neste mês (pode incluir comissão de indicação). ')
+        : '';
+      if (!(await confirmDialog(warning + 'Lançar comissão de meta individual de ' + this.formatCurrency(amount) + ' (' + pct + '% sobre ' + this.formatCurrency(revenue) + ') para ' + userName + '?', { danger: false, confirmLabel: 'Lançar comissão' }))) return;
+      this.savingGoal = true;
+      const { error } = await supabaseClient.from('transactions').insert({
+        clinic_id: this.clinicId,
+        type: 'comissao_profissional',
+        professional_id: userId,
+        amount: amount,
+        commission_percentage: pct,
+        base_amount: revenue,
+        transaction_date: new Date().toISOString().slice(0, 10)
+      });
+      this.savingGoal = false;
+      if (error) {
+        this.showFeedback('error', 'Erro ao lançar comissão: ' + error.message);
+        return;
+      }
+      this.showFeedback('success', 'Comissão de meta lançada para ' + userName + '.');
+      await this.loadTransactions();
+    },
+
     // ---------- trilha de meta coletiva (por unidade/clínica) ----------
     // Independente da trilha individual acima: tabela própria
     // (collective_goals), faixas de comissão próprias (goal_scope =
@@ -1292,6 +1330,33 @@ function biApp() {
       const tierPct = this.collectiveCommissionTierFor(this.collectiveGoalPct);
       if (tierPct === null) return null;
       return this.collectiveMonthRevenue * tierPct / 100;
+    },
+
+    // Mesma lógica da comissão individual, mas sem professional_id (é um
+    // valor da unidade como um todo, não de uma pessoa específica).
+    async launchCollectiveCommission() {
+      const pct = this.collectiveCommissionTierFor(this.collectiveGoalPct);
+      const revenue = this.collectiveMonthRevenue;
+      const amount = this.suggestedCollectiveCommission;
+      if (!amount || amount <= 0) return;
+      if (!(await confirmDialog('Lançar comissão coletiva de ' + this.formatCurrency(amount) + ' (' + pct + '% sobre ' + this.formatCurrency(revenue) + ') da unidade?', { danger: false, confirmLabel: 'Lançar comissão' }))) return;
+      this.savingCollectiveGoal = true;
+      const { error } = await supabaseClient.from('transactions').insert({
+        clinic_id: this.clinicId,
+        type: 'comissao_profissional',
+        professional_id: null,
+        amount: amount,
+        commission_percentage: pct,
+        base_amount: revenue,
+        transaction_date: new Date().toISOString().slice(0, 10)
+      });
+      this.savingCollectiveGoal = false;
+      if (error) {
+        this.showFeedback('error', 'Erro ao lançar comissão coletiva: ' + error.message);
+        return;
+      }
+      this.showFeedback('success', 'Comissão coletiva lançada.');
+      await this.loadTransactions();
     },
 
     async loadBlocks() {
