@@ -31,9 +31,9 @@
 
       <!-- ===================== VISÃO DA EQUIPE (ESTETICISTA/ATENDENTE) ===================== -->
       <div x-show="!loading && !isAdmin" x-cloak>
-        <div class="grid grid-3 mb-3">
+        <div class="grid grid-3 mb-3" x-show="goalScopeSettings.enable_individual_goal">
           <div class="stat-card">
-            <div class="stat-label">Meta do mês</div>
+            <div class="stat-label">Meta individual do mês</div>
             <div class="stat-value" x-text="myGoal ? formatCurrency(myGoal.target_amount) : '—'"></div>
             <div class="stat-trend text-muted" x-show="!myGoal">Nenhuma meta definida para este mês</div>
           </div>
@@ -47,6 +47,24 @@
             <div class="stat-label">Comissões do mês</div>
             <div class="stat-value" x-text="formatCurrency(myMonthCommission)"></div>
             <div class="stat-trend text-muted">Lançamentos do tipo comissão</div>
+          </div>
+        </div>
+
+        <div class="grid grid-3 mb-3" x-show="goalScopeSettings.enable_collective_goal">
+          <div class="stat-card">
+            <div class="stat-label">Meta coletiva da unidade</div>
+            <div class="stat-value" x-text="collectiveGoal ? formatCurrency(collectiveGoal.target_amount) : '—'"></div>
+            <div class="stat-trend text-muted" x-show="!collectiveGoal">Nenhuma meta coletiva definida para este mês</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Realizado pela unidade no mês</div>
+            <div class="stat-value" x-text="formatCurrency(collectiveMonthRevenue)"></div>
+            <div class="stat-trend" :style="'color:' + (collectiveGoalPct !== null && collectiveGoalPct >= 100 ? 'var(--color-success)' : 'var(--color-text-muted)')" x-text="collectiveGoalPct !== null ? (collectiveGoalPct + '% da meta coletiva atingida') : 'Faturamento de toda a equipe'"></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Comissão coletiva sugerida</div>
+            <div class="stat-value" x-text="suggestedCollectiveCommission !== null ? formatCurrency(suggestedCollectiveCommission) : '—'"></div>
+            <div class="stat-trend text-muted">Meta separada da meta individual</div>
           </div>
         </div>
 
@@ -370,7 +388,22 @@
         <div x-show="tab==='metas'" x-cloak>
           <p class="text-sm text-muted mb-4">Defina a meta de faturamento de cada integrante para <strong x-text="currentMonthLabel"></strong>. O realizado considera pagamentos e vendas de pacote lançados em nome da pessoa.</p>
 
-          <div class="card card-shadow mb-5" x-show="leaderboard.length > 0">
+          <div class="card card-shadow mb-5">
+            <h3 class="mb-2" style="font-size:15px;">Trilhas de meta</h3>
+            <p class="text-xs text-soft mb-3">As duas trilhas são totalmente independentes: nunca são somadas nem misturadas, cada uma tem seu próprio valor e sua própria faixa de comissão. Ligue uma, outra, ou as duas.</p>
+            <div class="flex" style="flex-direction:column;gap:10px;">
+              <label class="text-sm flex items-center gap-2">
+                <input type="checkbox" x-model="goalScopeSettings.enable_individual_goal" style="width:auto;" @change="saveGoalScopeSettings()">
+                Meta individual (por profissional, com valor e comissão próprios)
+              </label>
+              <label class="text-sm flex items-center gap-2">
+                <input type="checkbox" x-model="goalScopeSettings.enable_collective_goal" style="width:auto;" @change="saveGoalScopeSettings()">
+                Meta coletiva (por unidade/clínica, com valor e comissão próprios)
+              </label>
+            </div>
+          </div>
+
+          <div class="card card-shadow mb-5" x-show="goalScopeSettings.enable_individual_goal && leaderboard.length > 0">
             <h3 class="mb-2" style="font-size:15px;">🏆 Ranking do mês · quem está liderando</h3>
             <p class="text-xs text-soft mb-3">Ordenado pelo valor realizado em <span x-text="currentMonthLabel"></span>. Serve como referência de competitividade, não substitui a avaliação de qualidade do atendimento.</p>
 
@@ -402,9 +435,10 @@
             </div>
           </div>
 
+          <template x-if="goalScopeSettings.enable_individual_goal">
           <div class="card card-shadow mb-5">
-            <h3 class="mb-2" style="font-size:15px;">Faixas de comissão por atingimento de meta</h3>
-            <p class="text-xs text-soft mb-3">Regra única para toda a equipe: a partir de tal % da meta batida, tal % de comissão sobre o realizado. A faixa com o maior "a partir de" que a pessoa já alcançou é a que vale.</p>
+            <h3 class="mb-2" style="font-size:15px;">Faixas de comissão · Meta individual</h3>
+            <p class="text-xs text-soft mb-3">Regra única para toda a equipe: a partir de tal % da meta individual batida, tal % de comissão sobre o realizado da pessoa. A faixa com o maior "a partir de" que a pessoa já alcançou é a que vale.</p>
 
             <div x-show="commissionTiers.length === 0" class="text-sm text-muted mb-3">Nenhuma faixa cadastrada ainda — sem faixas, a coluna "Comissão sugerida" fica vazia.</div>
             <div class="flex" style="flex-direction:column;gap:8px;margin-bottom:14px;" x-show="commissionTiers.length > 0">
@@ -428,9 +462,40 @@
               <button class="btn btn-secondary btn-sm" type="button" @click="addCommissionTier()" :disabled="savingTier">Adicionar faixa</button>
             </div>
           </div>
+          </template>
 
+          <template x-if="goalScopeSettings.enable_collective_goal">
           <div class="card card-shadow mb-5">
-            <h3 class="mb-2" style="font-size:15px;">Meta geral da equipe</h3>
+            <h3 class="mb-2" style="font-size:15px;">Faixas de comissão · Meta coletiva</h3>
+            <p class="text-xs text-soft mb-3">Faixa independente da individual: a partir de tal % da meta coletiva (da unidade) batida, tal % de comissão sobre o faturamento total da equipe no mês.</p>
+
+            <div x-show="collectiveCommissionTiers.length === 0" class="text-sm text-muted mb-3">Nenhuma faixa cadastrada ainda para a meta coletiva.</div>
+            <div class="flex" style="flex-direction:column;gap:8px;margin-bottom:14px;" x-show="collectiveCommissionTiers.length > 0">
+              <template x-for="tier in collectiveCommissionTiers" :key="tier.id">
+                <div class="flex items-center justify-between" style="padding:8px 12px;background:var(--color-surface-alt);border-radius:var(--radius-md);">
+                  <span class="text-sm">A partir de <strong x-text="tier.min_achievement_pct + '%'"></strong> da meta coletiva → <strong x-text="tier.commission_percentage + '%'"></strong> de comissão</span>
+                  <a href="#" class="text-xs" @click.prevent="removeCollectiveCommissionTier(tier)">remover</a>
+                </div>
+              </template>
+            </div>
+
+            <div class="flex items-end gap-2" style="flex-wrap:wrap;">
+              <div class="form-group" style="margin:0;">
+                <label class="label">A partir de (% da meta)</label>
+                <input class="input" type="number" min="0" step="1" x-model="newCollectiveTierMinPct" placeholder="Ex.: 100" style="max-width:160px;">
+              </div>
+              <div class="form-group" style="margin:0;">
+                <label class="label">Comissão (%)</label>
+                <input class="input" type="number" min="0" step="0.1" x-model="newCollectiveTierCommissionPct" placeholder="Ex.: 5" style="max-width:160px;">
+              </div>
+              <button class="btn btn-secondary btn-sm" type="button" @click="addCollectiveCommissionTier()" :disabled="savingCollectiveTier">Adicionar faixa</button>
+            </div>
+          </div>
+          </template>
+
+          <template x-if="goalScopeSettings.enable_individual_goal">
+          <div class="card card-shadow mb-5">
+            <h3 class="mb-2" style="font-size:15px;">Meta geral da equipe · individual</h3>
             <p class="text-xs text-soft mb-3">Defina o faturamento total esperado da equipe no mês (ex.: R$ 120.000) e divida igualmente entre os integrantes abaixo. Depois de dividir, ajuste manualmente quem precisar de uma meta diferente — por exemplo, um vendedor com desempenho historicamente maior — e salve.</p>
             <div class="flex items-end gap-2" style="flex-wrap:wrap;">
               <div class="form-group" style="margin:0;">
@@ -442,9 +507,29 @@
             </div>
             <p class="text-xs text-muted mt-2" x-show="users.length > 0">Soma das metas individuais preenchidas agora: <strong x-text="formatCurrency(sumOfIndividualGoals)"></strong> (<span x-text="users.length"></span> integrante(s))</p>
           </div>
+          </template>
+
+          <template x-if="goalScopeSettings.enable_collective_goal">
+          <div class="card card-shadow mb-5">
+            <h3 class="mb-2" style="font-size:15px;">Meta coletiva da unidade</h3>
+            <p class="text-xs text-soft mb-3">Um único valor para a clínica inteira neste mês, separado da soma das metas individuais. O realizado considera o faturamento de toda a equipe.</p>
+            <div class="flex items-end gap-2" style="flex-wrap:wrap;">
+              <div class="form-group" style="margin:0;">
+                <label class="label">Meta coletiva do mês (R$)</label>
+                <input class="input" type="text" inputmode="decimal" x-model="collectiveGoalInput" @input="collectiveGoalInput = maskCurrencyInput($event.target.value)" placeholder="Ex.: 150.000,00" style="max-width:220px;">
+              </div>
+              <button class="btn btn-primary btn-sm" type="button" @click="saveCollectiveGoal()" :disabled="savingCollectiveGoal">Salvar meta coletiva</button>
+            </div>
+            <p class="text-xs text-muted mt-2">
+              Realizado da unidade: <strong x-text="formatCurrency(collectiveMonthRevenue)"></strong>
+              <span x-show="collectiveGoalPct !== null"> · <strong x-text="collectiveGoalPct + '%'"></strong> da meta coletiva</span>
+              <span x-show="suggestedCollectiveCommission !== null"> · comissão sugerida: <strong x-text="formatCurrency(suggestedCollectiveCommission)"></strong></span>
+            </p>
+          </div>
+          </template>
 
           <div class="grid grid-main-side mb-2">
-            <div class="card card-shadow" style="padding:0;">
+            <div class="card card-shadow" style="padding:0;" x-show="goalScopeSettings.enable_individual_goal">
               <div style="padding:20px 20px 0;"><h3 style="font-size:15px;">Metas e realizado por integrante</h3></div>
               <div class="table-wrap">
                 <table class="table">
@@ -536,6 +621,20 @@ function biApp() {
     newTierCommissionPct: '',
     savingTier: false,
 
+    // trilhas de meta independentes: individual (já existia) e coletiva/por
+    // unidade (nova). Nunca somadas — cada uma com seu valor e sua faixa de
+    // comissão própria. goalScopeSettings liga/desliga cada uma.
+    goalScopeSettings: { enable_individual_goal: true, enable_collective_goal: false },
+    goalScopeSettingsId: null,
+    savingGoalScopeSettings: false,
+    collectiveGoal: null,
+    collectiveGoalInput: '',
+    savingCollectiveGoal: false,
+    collectiveCommissionTiers: [],
+    newCollectiveTierMinPct: '',
+    newCollectiveTierCommissionPct: '',
+    savingCollectiveTier: false,
+
     async init() {
       await this.loadClinicId();
       await Promise.all([
@@ -543,9 +642,11 @@ function biApp() {
         this.loadPackages(), this.loadLeads(), this.loadCommunications(),
         this.loadTasks(), this.loadUsers(), this.loadBlocks(), this.loadGoals(),
         this.loadProducts(), this.loadServices(), this.loadServiceProductsMap(),
-        this.loadExpenses(), this.loadSaleItemsForCosts(), this.loadCommissionTiers()
+        this.loadExpenses(), this.loadSaleItemsForCosts(), this.loadCommissionTiers(),
+        this.loadGoalScopeSettings(), this.loadCollectiveGoal(), this.loadCollectiveCommissionTiers()
       ]);
       this.syncGoalInputs();
+      this.syncCollectiveGoalInput();
       this.loading = false;
       this.$nextTick(() => this.renderPatientsChart());
     },
@@ -975,6 +1076,7 @@ function biApp() {
       const { data, error } = await supabaseClient
         .from('commission_tiers')
         .select('id, min_achievement_pct, commission_percentage')
+        .eq('goal_scope', 'individual')
         .order('min_achievement_pct', { ascending: true });
       this.commissionTiers = error ? [] : (data || []);
     },
@@ -1024,6 +1126,172 @@ function biApp() {
       const tierPct = this.commissionTierFor(this.goalPctFor(userId));
       if (tierPct === null) return null;
       return this.monthRevenueFor(userId) * tierPct / 100;
+    },
+
+    // ---------- trilha de meta coletiva (por unidade/clínica) ----------
+    // Independente da trilha individual acima: tabela própria
+    // (collective_goals), faixas de comissão próprias (goal_scope =
+    // 'coletiva' em commission_tiers) e nunca somada com a meta individual.
+
+    async loadGoalScopeSettings() {
+      if (!this.clinicId) return;
+      const { data, error } = await supabaseClient
+        .from('clinic_settings')
+        .select('id, enable_individual_goal, enable_collective_goal')
+        .eq('clinic_id', this.clinicId)
+        .maybeSingle();
+      if (error || !data) return;
+      this.goalScopeSettingsId = data.id;
+      this.goalScopeSettings = {
+        enable_individual_goal: data.enable_individual_goal !== false,
+        enable_collective_goal: data.enable_collective_goal === true
+      };
+    },
+
+    // clinic_settings pode não ter nenhuma linha ainda para esta clínica
+    // (é o caso hoje) — por isso insere se ainda não existir uma linha, em
+    // vez de só fazer update, que atualizaria 0 linhas silenciosamente.
+    async saveGoalScopeSettings() {
+      if (!this.clinicId) return;
+      this.savingGoalScopeSettings = true;
+      let error;
+      if (this.goalScopeSettingsId) {
+        ({ error } = await supabaseClient
+          .from('clinic_settings')
+          .update({
+            enable_individual_goal: this.goalScopeSettings.enable_individual_goal,
+            enable_collective_goal: this.goalScopeSettings.enable_collective_goal
+          })
+          .eq('id', this.goalScopeSettingsId));
+      } else {
+        const { data, error: insertError } = await supabaseClient
+          .from('clinic_settings')
+          .insert({
+            clinic_id: this.clinicId,
+            enable_individual_goal: this.goalScopeSettings.enable_individual_goal,
+            enable_collective_goal: this.goalScopeSettings.enable_collective_goal
+          })
+          .select()
+          .single();
+        error = insertError;
+        if (!error && data) this.goalScopeSettingsId = data.id;
+      }
+      this.savingGoalScopeSettings = false;
+      if (error) {
+        this.showFeedback('error', 'Erro ao salvar configuração das metas: ' + error.message);
+        return;
+      }
+      this.showFeedback('success', 'Configuração de metas salva.');
+    },
+
+    async loadCollectiveGoal() {
+      if (!this.clinicId) return;
+      const { data, error } = await supabaseClient
+        .from('collective_goals')
+        .select('id, target_amount, period_month')
+        .eq('clinic_id', this.clinicId)
+        .eq('period_month', this.currentPeriodMonth)
+        .maybeSingle();
+      this.collectiveGoal = error ? null : (data || null);
+    },
+
+    syncCollectiveGoalInput() {
+      this.collectiveGoalInput = this.collectiveGoal ? numberToCurrencyInput(this.collectiveGoal.target_amount) : '';
+    },
+
+    async saveCollectiveGoal() {
+      const amount = parseCurrencyToNumber(this.collectiveGoalInput);
+      if (!amount || amount <= 0) {
+        this.showFeedback('error', 'Informe um valor de meta coletiva válido.');
+        return;
+      }
+      this.savingCollectiveGoal = true;
+      let error;
+      if (this.collectiveGoal) {
+        ({ error } = await supabaseClient.from('collective_goals').update({ target_amount: amount }).eq('id', this.collectiveGoal.id));
+      } else {
+        ({ error } = await supabaseClient.from('collective_goals').insert({
+          clinic_id: this.clinicId, period_month: this.currentPeriodMonth, target_amount: amount
+        }));
+      }
+      this.savingCollectiveGoal = false;
+      if (error) {
+        this.showFeedback('error', 'Erro ao salvar meta coletiva: ' + error.message);
+        return;
+      }
+      this.showFeedback('success', 'Meta coletiva salva.');
+      await this.loadCollectiveGoal();
+      this.syncCollectiveGoalInput();
+    },
+
+    async loadCollectiveCommissionTiers() {
+      const { data, error } = await supabaseClient
+        .from('commission_tiers')
+        .select('id, min_achievement_pct, commission_percentage')
+        .eq('goal_scope', 'coletiva')
+        .order('min_achievement_pct', { ascending: true });
+      this.collectiveCommissionTiers = error ? [] : (data || []);
+    },
+
+    async addCollectiveCommissionTier() {
+      const minPct = Number(this.newCollectiveTierMinPct);
+      const commPct = Number(this.newCollectiveTierCommissionPct);
+      if (!(minPct >= 0) || !(commPct >= 0) || this.newCollectiveTierMinPct === '' || this.newCollectiveTierCommissionPct === '') {
+        this.showFeedback('error', 'Informe o atingimento mínimo e o percentual de comissão da faixa coletiva.');
+        return;
+      }
+      this.savingCollectiveTier = true;
+      const { error } = await supabaseClient.from('commission_tiers').insert({
+        clinic_id: this.clinicId, min_achievement_pct: minPct, commission_percentage: commPct, goal_scope: 'coletiva'
+      });
+      this.savingCollectiveTier = false;
+      if (error) {
+        this.showFeedback('error', 'Erro ao adicionar faixa coletiva: ' + error.message);
+        return;
+      }
+      this.newCollectiveTierMinPct = '';
+      this.newCollectiveTierCommissionPct = '';
+      this.showFeedback('success', 'Faixa de comissão coletiva adicionada.');
+      await this.loadCollectiveCommissionTiers();
+    },
+
+    async removeCollectiveCommissionTier(tier) {
+      if (!(await confirmDialog('Remover a faixa coletiva "a partir de ' + tier.min_achievement_pct + '% da meta"?'))) return;
+      const { error } = await supabaseClient.from('commission_tiers').delete().eq('id', tier.id);
+      if (error) {
+        this.showFeedback('error', 'Erro ao remover faixa: ' + error.message);
+        return;
+      }
+      this.showFeedback('success', 'Faixa removida.');
+      await this.loadCollectiveCommissionTiers();
+    },
+
+    collectiveCommissionTierFor(pct) {
+      if (pct === null || pct === undefined) return null;
+      const applicable = this.collectiveCommissionTiers
+        .filter(t => pct >= Number(t.min_achievement_pct))
+        .sort((a, b) => Number(b.min_achievement_pct) - Number(a.min_achievement_pct));
+      return applicable.length > 0 ? Number(applicable[0].commission_percentage) : null;
+    },
+
+    // faturamento de toda a equipe no mês (não filtrado por profissional) —
+    // é o "realizado" da meta coletiva/por unidade.
+    get collectiveMonthRevenue() {
+      return this.transactions
+        .filter(t => (t.type === 'pagamento_procedimento' || t.type === 'venda_pacote'))
+        .filter(t => t.transaction_date && t.transaction_date.slice(0, 7) === this.currentPeriodMonth.slice(0, 7))
+        .reduce((sum, t) => sum + Number(t.amount || 0), 0);
+    },
+
+    get collectiveGoalPct() {
+      if (!this.collectiveGoal || !this.collectiveGoal.target_amount) return null;
+      return Math.round((this.collectiveMonthRevenue / Number(this.collectiveGoal.target_amount)) * 100);
+    },
+
+    get suggestedCollectiveCommission() {
+      const tierPct = this.collectiveCommissionTierFor(this.collectiveGoalPct);
+      if (tierPct === null) return null;
+      return this.collectiveMonthRevenue * tierPct / 100;
     },
 
     async loadBlocks() {

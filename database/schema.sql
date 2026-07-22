@@ -341,6 +341,17 @@ create table public.goals (
   created_at timestamptz not null default now()
 );
 
+-- meta coletiva/por unidade: totalmente independente de goals (individual)
+-- acima, nunca somada nem misturada com ela. Uma linha por clínica por mês.
+create table public.collective_goals (
+  id uuid primary key default gen_random_uuid(),
+  clinic_id uuid not null references public.clinics (id) on delete cascade,
+  period_month date not null,
+  target_amount numeric(10, 2) not null,
+  created_at timestamptz not null default now(),
+  unique (clinic_id, period_month)
+);
+
 -- ============================================================================
 -- 17. PAYMENT_MACHINES (maquininhas de cartão, com taxa por parcela)
 -- ============================================================================
@@ -464,6 +475,8 @@ create table public.clinic_settings (
   cnpj text,
   company_address text,
   address_cep text,
+  enable_individual_goal boolean not null default true,
+  enable_collective_goal boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -498,6 +511,7 @@ create table public.commission_tiers (
   clinic_id uuid not null references public.clinics (id) on delete cascade,
   min_achievement_pct numeric(6, 2) not null,
   commission_percentage numeric(5, 2) not null,
+  goal_scope text not null default 'individual' check (goal_scope in ('individual', 'coletiva')),
   created_at timestamptz not null default now()
 );
 
@@ -617,6 +631,7 @@ alter table public.products enable row level security;
 alter table public.service_products enable row level security;
 alter table public.stock_movements enable row level security;
 alter table public.goals enable row level security;
+alter table public.collective_goals enable row level security;
 alter table public.payment_machines enable row level security;
 alter table public.sales enable row level security;
 alter table public.sale_items enable row level security;
@@ -725,6 +740,13 @@ create policy "goals_select" on public.goals for select
   );
 
 create policy "goals_write" on public.goals for all
+  using (public.auth_is_prisma_team() or (clinic_id = public.auth_clinic_id() and public.auth_is_admin()))
+  with check (public.auth_is_prisma_team() or (clinic_id = public.auth_clinic_id() and public.auth_is_admin()));
+
+create policy "collective_goals_select" on public.collective_goals for select
+  using (clinic_id = public.auth_clinic_id() or public.auth_is_prisma_team());
+
+create policy "collective_goals_write" on public.collective_goals for all
   using (public.auth_is_prisma_team() or (clinic_id = public.auth_clinic_id() and public.auth_is_admin()))
   with check (public.auth_is_prisma_team() or (clinic_id = public.auth_clinic_id() and public.auth_is_admin()));
 
