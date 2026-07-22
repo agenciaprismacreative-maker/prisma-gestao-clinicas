@@ -386,151 +386,130 @@
 
         <!-- ===================== METAS DA EQUIPE ===================== -->
         <div x-show="tab==='metas'" x-cloak>
-          <p class="text-sm text-muted mb-4">Defina a meta de faturamento de cada integrante para <strong x-text="currentMonthLabel"></strong>. O realizado considera pagamentos e vendas de pacote lançados em nome da pessoa.</p>
+          <p class="text-sm text-muted mb-4">Duas trilhas de meta totalmente independentes — <strong>individual</strong> (uma meta por profissional) e <strong>coletiva</strong> (uma meta só para a unidade) —, nunca somadas nem misturadas entre si. Cada uma tem seu próprio valor-alvo e sua própria régua de comissão por atingimento.</p>
 
           <div class="card card-shadow mb-5">
             <h3 class="mb-2" style="font-size:15px;">Trilhas de meta</h3>
-            <p class="text-xs text-soft mb-3">As duas trilhas são totalmente independentes: nunca são somadas nem misturadas, cada uma tem seu próprio valor e sua própria faixa de comissão. Ligue uma, outra, ou as duas.</p>
+            <p class="text-xs text-soft mb-3">Ligue uma, a outra, ou as duas ao mesmo tempo. Desligar uma trilha só esconde os cards dela (aqui e na visão da equipe) — nenhum valor é apagado, e tudo volta a aparecer se você ligar de novo.</p>
             <div class="flex" style="flex-direction:column;gap:10px;">
               <label class="text-sm flex items-center gap-2">
                 <input type="checkbox" x-model="goalScopeSettings.enable_individual_goal" style="width:auto;" @change="saveGoalScopeSettings()">
-                Meta individual (por profissional, com valor e comissão próprios)
+                Meta individual — cada profissional com meta e comissão próprias
               </label>
               <label class="text-sm flex items-center gap-2">
                 <input type="checkbox" x-model="goalScopeSettings.enable_collective_goal" style="width:auto;" @change="saveGoalScopeSettings()">
-                Meta coletiva (por unidade/clínica, com valor e comissão próprios)
+                Meta coletiva — um único alvo de faturamento para a unidade inteira
               </label>
             </div>
           </div>
 
-          <div class="card card-shadow mb-5" x-show="goalScopeSettings.enable_individual_goal && leaderboard.length > 0">
-            <h3 class="mb-2" style="font-size:15px;">🏆 Ranking do mês · quem está liderando</h3>
-            <p class="text-xs text-soft mb-3">Ordenado pelo valor realizado em <span x-text="currentMonthLabel"></span>. Serve como referência de competitividade, não substitui a avaliação de qualidade do atendimento.</p>
+          <template x-if="goalScopeSettings.enable_individual_goal">
+          <div>
+            <div class="section-eyebrow mt-2"><span class="bar"></span><h3>Meta individual</h3></div>
 
-            <div class="podium">
-              <template x-for="row in leaderboard.slice(0, 3)" :key="row.userId">
-                <div class="podium-place" :class="'rank-' + row.rank">
-                  <span class="podium-crown" x-show="row.rank === 1">👑</span>
-                  <div class="podium-medal" x-text="row.rank"></div>
-                  <div class="podium-avatar" x-text="getInitials(row.name)"></div>
-                  <div class="podium-name" x-text="row.name"></div>
-                  <div class="podium-value" x-text="formatCurrency(row.revenue)"></div>
-                  <div class="podium-sub" x-text="row.salesCount + ' venda(s)' + (row.goalPct === null ? '' : ' · ' + row.goalPct + '% da meta')"></div>
+            <div class="card card-shadow mb-5">
+              <h3 class="mb-1" style="font-size:15px;">Progresso da equipe em <span x-text="currentMonthLabel"></span></h3>
+              <p class="text-xs text-soft mb-3">Soma da meta de cada integrante contra o que a equipe já faturou no mês (pagamentos e vendas de pacote lançados no nome de cada pessoa, ao aprovar uma venda em Vendas ou concluir um atendimento).</p>
+              <div class="goal-meter-stats">
+                <div class="goal-meter-stat">
+                  <div class="label">Meta do mês (soma da equipe)</div>
+                  <div class="value" x-text="individualGoalMeter.target > 0 ? formatCurrency(individualGoalMeter.target) : '—'"></div>
                 </div>
-              </template>
+                <div class="goal-meter-stat">
+                  <div class="label">Realizado</div>
+                  <div class="value" x-text="formatCurrency(individualGoalMeter.realized)"></div>
+                </div>
+                <div class="goal-meter-stat">
+                  <div class="label">Atingido</div>
+                  <div class="value" :style="'color:' + (individualGoalMeter.pct !== null && individualGoalMeter.pct >= 100 ? 'var(--color-success)' : 'var(--color-text)')" x-text="individualGoalMeter.pct !== null ? individualGoalMeter.pct + '%' : '—'"></div>
+                </div>
+              </div>
+              <div class="goal-track-wrap" x-show="individualGoalMeter.target > 0">
+                <span class="goal-track-goal-label" :style="'left:' + individualGoalMeter.goalLinePct + '%'">Meta</span>
+                <div class="goal-track">
+                  <div class="goal-fill" :class="individualGoalMeter.pct !== null && individualGoalMeter.pct >= 100 ? 'is-complete' : ''" :style="'width:' + individualGoalMeter.fillPct + '%'"></div>
+                  <div class="goal-track-goal-line" :style="'left:' + individualGoalMeter.goalLinePct + '%'"></div>
+                </div>
+              </div>
+              <p class="text-xs text-muted" x-show="individualGoalMeter.target <= 0">Ainda sem meta definida para nenhum integrante — defina abaixo para começar a acompanhar o progresso aqui.</p>
             </div>
 
-            <div style="margin-top:22px;" x-show="leaderboard.length > 3">
-              <template x-for="row in leaderboard.slice(3)" :key="row.userId">
-                <div class="leaderboard-row">
-                  <span class="leaderboard-rank" x-text="row.rank + 'º'"></span>
-                  <div class="avatar" style="width:30px;height:30px;font-size:11px;" x-text="getInitials(row.name)"></div>
-                  <div style="flex:1;">
-                    <strong class="text-sm" x-text="row.name"></strong>
-                    <div class="text-xs text-muted" x-text="row.salesCount + ' venda(s) · ' + row.clientsAttended + ' cliente(s) atendido(s)'"></div>
+            <div class="card card-shadow mb-5">
+              <h3 class="mb-2" style="font-size:15px;">Definir a meta de cada integrante</h3>
+              <p class="text-xs text-soft mb-3">Informe o faturamento total esperado da equipe (ex.: R$ 120.000) para dividir igualmente entre todos, ou preencha direto o valor de cada pessoa na tabela mais abaixo. Depois de dividir, ajuste manualmente quem precisar de uma meta diferente — por exemplo, alguém com desempenho historicamente maior — e clique em salvar.</p>
+              <div class="flex items-end gap-2" style="flex-wrap:wrap;">
+                <div class="form-group" style="margin:0;">
+                  <label class="label">Meta geral do mês (R$)</label>
+                  <input class="input" type="text" inputmode="decimal" x-model="teamGoalTotal" @input="teamGoalTotal = maskCurrencyInput($event.target.value)" placeholder="Ex.: 120.000,00" style="max-width:220px;">
+                </div>
+                <button class="btn btn-secondary btn-sm" type="button" @click="distributeTeamGoal()">Dividir igualmente entre a equipe</button>
+                <button class="btn btn-primary btn-sm" type="button" @click="saveAllGoals()" :disabled="savingGoal">Salvar todas as metas</button>
+              </div>
+              <p class="text-xs text-muted mt-2" x-show="users.length > 0">Soma das metas preenchidas nos campos agora (antes de salvar): <strong x-text="formatCurrency(sumOfIndividualGoals)"></strong> (<span x-text="users.length"></span> integrante(s))</p>
+            </div>
+
+            <div class="card card-shadow mb-5">
+              <h3 class="mb-1" style="font-size:15px;">Régua de comissão</h3>
+              <p class="text-xs text-soft mb-3">A partir de tal % da própria meta batida, a pessoa passa a receber tal % de comissão sobre o que ela mesma faturou no mês — vale sempre a faixa mais alta que ela já alcançou. A faixa destacada abaixo é a que estaria valendo agora para o total da equipe.</p>
+
+              <div x-show="commissionTiers.length === 0" class="text-sm text-muted mb-3">Nenhuma faixa cadastrada ainda — sem faixas, a comissão sugerida fica vazia para todo mundo.</div>
+              <div class="flex" style="flex-direction:column;gap:8px;margin-bottom:14px;" x-show="commissionTiers.length > 0">
+                <template x-for="(tier, idx) in commissionTiers" :key="tier.id">
+                  <div class="tier-row" :class="tier.id === activeTierId(commissionTiers, individualGoalMeter.pct) ? 'is-active' : ''">
+                    <span class="tier-step" x-text="idx + 1"></span>
+                    <span class="tier-row-text">A partir de <strong x-text="tier.min_achievement_pct + '%'"></strong> da meta → <strong x-text="tier.commission_percentage + '%'"></strong> de comissão</span>
+                    <span class="tier-row-active-tag" x-show="tier.id === activeTierId(commissionTiers, individualGoalMeter.pct)">valendo agora</span>
+                    <a href="#" class="text-xs" @click.prevent="removeCommissionTier(tier)">remover</a>
                   </div>
-                  <strong class="text-sm" x-text="formatCurrency(row.revenue)"></strong>
+                </template>
+              </div>
+
+              <div class="flex items-end gap-2" style="flex-wrap:wrap;">
+                <div class="form-group" style="margin:0;">
+                  <label class="label">A partir de (% da meta)</label>
+                  <input class="input" type="number" min="0" step="1" x-model="newTierMinPct" placeholder="Ex.: 100" style="max-width:160px;">
                 </div>
-              </template>
-            </div>
-          </div>
-
-          <template x-if="goalScopeSettings.enable_individual_goal">
-          <div class="card card-shadow mb-5">
-            <h3 class="mb-2" style="font-size:15px;">Faixas de comissão · Meta individual</h3>
-            <p class="text-xs text-soft mb-3">Regra única para toda a equipe: a partir de tal % da meta individual batida, tal % de comissão sobre o realizado da pessoa. A faixa com o maior "a partir de" que a pessoa já alcançou é a que vale.</p>
-
-            <div x-show="commissionTiers.length === 0" class="text-sm text-muted mb-3">Nenhuma faixa cadastrada ainda — sem faixas, a coluna "Comissão sugerida" fica vazia.</div>
-            <div class="flex" style="flex-direction:column;gap:8px;margin-bottom:14px;" x-show="commissionTiers.length > 0">
-              <template x-for="tier in commissionTiers" :key="tier.id">
-                <div class="flex items-center justify-between" style="padding:8px 12px;background:var(--color-surface-alt);border-radius:var(--radius-md);">
-                  <span class="text-sm">A partir de <strong x-text="tier.min_achievement_pct + '%'"></strong> da meta → <strong x-text="tier.commission_percentage + '%'"></strong> de comissão</span>
-                  <a href="#" class="text-xs" @click.prevent="removeCommissionTier(tier)">remover</a>
+                <div class="form-group" style="margin:0;">
+                  <label class="label">Comissão (%)</label>
+                  <input class="input" type="number" min="0" step="0.1" x-model="newTierCommissionPct" placeholder="Ex.: 5" style="max-width:160px;">
                 </div>
-              </template>
+                <button class="btn btn-secondary btn-sm" type="button" @click="addCommissionTier()" :disabled="savingTier">Adicionar faixa</button>
+              </div>
             </div>
 
-            <div class="flex items-end gap-2" style="flex-wrap:wrap;">
-              <div class="form-group" style="margin:0;">
-                <label class="label">A partir de (% da meta)</label>
-                <input class="input" type="number" min="0" step="1" x-model="newTierMinPct" placeholder="Ex.: 100" style="max-width:160px;">
+            <div class="card card-shadow mb-5" x-show="leaderboard.length > 0">
+              <h3 class="mb-2" style="font-size:15px;">🏆 Ranking do mês · quem está liderando</h3>
+              <p class="text-xs text-soft mb-3">Ordenado pelo valor realizado em <span x-text="currentMonthLabel"></span>. Serve como referência de competitividade, não substitui a avaliação de qualidade do atendimento.</p>
+
+              <div class="podium">
+                <template x-for="row in leaderboard.slice(0, 3)" :key="row.userId">
+                  <div class="podium-place" :class="'rank-' + row.rank">
+                    <span class="podium-crown" x-show="row.rank === 1">👑</span>
+                    <div class="podium-medal" x-text="row.rank"></div>
+                    <div class="podium-avatar" x-text="getInitials(row.name)"></div>
+                    <div class="podium-name" x-text="row.name"></div>
+                    <div class="podium-value" x-text="formatCurrency(row.revenue)"></div>
+                    <div class="podium-sub" x-text="row.salesCount + ' venda(s)' + (row.goalPct === null ? '' : ' · ' + row.goalPct + '% da meta')"></div>
+                  </div>
+                </template>
               </div>
-              <div class="form-group" style="margin:0;">
-                <label class="label">Comissão (%)</label>
-                <input class="input" type="number" min="0" step="0.1" x-model="newTierCommissionPct" placeholder="Ex.: 5" style="max-width:160px;">
+
+              <div style="margin-top:22px;" x-show="leaderboard.length > 3">
+                <template x-for="row in leaderboard.slice(3)" :key="row.userId">
+                  <div class="leaderboard-row">
+                    <span class="leaderboard-rank" x-text="row.rank + 'º'"></span>
+                    <div class="avatar" style="width:30px;height:30px;font-size:11px;" x-text="getInitials(row.name)"></div>
+                    <div style="flex:1;">
+                      <strong class="text-sm" x-text="row.name"></strong>
+                      <div class="text-xs text-muted" x-text="row.salesCount + ' venda(s) · ' + row.clientsAttended + ' cliente(s) atendido(s)'"></div>
+                    </div>
+                    <strong class="text-sm" x-text="formatCurrency(row.revenue)"></strong>
+                  </div>
+                </template>
               </div>
-              <button class="btn btn-secondary btn-sm" type="button" @click="addCommissionTier()" :disabled="savingTier">Adicionar faixa</button>
             </div>
-          </div>
-          </template>
 
-          <template x-if="goalScopeSettings.enable_collective_goal">
-          <div class="card card-shadow mb-5">
-            <h3 class="mb-2" style="font-size:15px;">Faixas de comissão · Meta coletiva</h3>
-            <p class="text-xs text-soft mb-3">Faixa independente da individual: a partir de tal % da meta coletiva (da unidade) batida, tal % de comissão sobre o faturamento total da equipe no mês.</p>
-
-            <div x-show="collectiveCommissionTiers.length === 0" class="text-sm text-muted mb-3">Nenhuma faixa cadastrada ainda para a meta coletiva.</div>
-            <div class="flex" style="flex-direction:column;gap:8px;margin-bottom:14px;" x-show="collectiveCommissionTiers.length > 0">
-              <template x-for="tier in collectiveCommissionTiers" :key="tier.id">
-                <div class="flex items-center justify-between" style="padding:8px 12px;background:var(--color-surface-alt);border-radius:var(--radius-md);">
-                  <span class="text-sm">A partir de <strong x-text="tier.min_achievement_pct + '%'"></strong> da meta coletiva → <strong x-text="tier.commission_percentage + '%'"></strong> de comissão</span>
-                  <a href="#" class="text-xs" @click.prevent="removeCollectiveCommissionTier(tier)">remover</a>
-                </div>
-              </template>
-            </div>
-
-            <div class="flex items-end gap-2" style="flex-wrap:wrap;">
-              <div class="form-group" style="margin:0;">
-                <label class="label">A partir de (% da meta)</label>
-                <input class="input" type="number" min="0" step="1" x-model="newCollectiveTierMinPct" placeholder="Ex.: 100" style="max-width:160px;">
-              </div>
-              <div class="form-group" style="margin:0;">
-                <label class="label">Comissão (%)</label>
-                <input class="input" type="number" min="0" step="0.1" x-model="newCollectiveTierCommissionPct" placeholder="Ex.: 5" style="max-width:160px;">
-              </div>
-              <button class="btn btn-secondary btn-sm" type="button" @click="addCollectiveCommissionTier()" :disabled="savingCollectiveTier">Adicionar faixa</button>
-            </div>
-          </div>
-          </template>
-
-          <template x-if="goalScopeSettings.enable_individual_goal">
-          <div class="card card-shadow mb-5">
-            <h3 class="mb-2" style="font-size:15px;">Meta geral da equipe · individual</h3>
-            <p class="text-xs text-soft mb-3">Defina o faturamento total esperado da equipe no mês (ex.: R$ 120.000) e divida igualmente entre os integrantes abaixo. Depois de dividir, ajuste manualmente quem precisar de uma meta diferente — por exemplo, um vendedor com desempenho historicamente maior — e salve.</p>
-            <div class="flex items-end gap-2" style="flex-wrap:wrap;">
-              <div class="form-group" style="margin:0;">
-                <label class="label">Meta geral do mês (R$)</label>
-                <input class="input" type="text" inputmode="decimal" x-model="teamGoalTotal" @input="teamGoalTotal = maskCurrencyInput($event.target.value)" placeholder="Ex.: 120.000,00" style="max-width:220px;">
-              </div>
-              <button class="btn btn-secondary btn-sm" type="button" @click="distributeTeamGoal()">Dividir igualmente entre a equipe</button>
-              <button class="btn btn-primary btn-sm" type="button" @click="saveAllGoals()" :disabled="savingGoal">Salvar todas as metas</button>
-            </div>
-            <p class="text-xs text-muted mt-2" x-show="users.length > 0">Soma das metas individuais preenchidas agora: <strong x-text="formatCurrency(sumOfIndividualGoals)"></strong> (<span x-text="users.length"></span> integrante(s))</p>
-          </div>
-          </template>
-
-          <template x-if="goalScopeSettings.enable_collective_goal">
-          <div class="card card-shadow mb-5">
-            <h3 class="mb-2" style="font-size:15px;">Meta coletiva da unidade</h3>
-            <p class="text-xs text-soft mb-3">Um único valor para a clínica inteira neste mês, separado da soma das metas individuais. O realizado considera o faturamento de toda a equipe.</p>
-            <div class="flex items-end gap-2" style="flex-wrap:wrap;">
-              <div class="form-group" style="margin:0;">
-                <label class="label">Meta coletiva do mês (R$)</label>
-                <input class="input" type="text" inputmode="decimal" x-model="collectiveGoalInput" @input="collectiveGoalInput = maskCurrencyInput($event.target.value)" placeholder="Ex.: 150.000,00" style="max-width:220px;">
-              </div>
-              <button class="btn btn-primary btn-sm" type="button" @click="saveCollectiveGoal()" :disabled="savingCollectiveGoal">Salvar meta coletiva</button>
-            </div>
-            <p class="text-xs text-muted mt-2">
-              Realizado da unidade: <strong x-text="formatCurrency(collectiveMonthRevenue)"></strong>
-              <span x-show="collectiveGoalPct !== null"> · <strong x-text="collectiveGoalPct + '%'"></strong> da meta coletiva</span>
-              <span x-show="suggestedCollectiveCommission !== null"> · comissão sugerida: <strong x-text="formatCurrency(suggestedCollectiveCommission)"></strong></span>
-            </p>
-            <button class="btn btn-primary btn-sm mt-2" type="button" x-show="suggestedCollectiveCommission > 0" @click="launchCollectiveCommission()" :disabled="savingCollectiveGoal">Lançar comissão coletiva</button>
-          </div>
-          </template>
-
-          <div class="grid grid-main-side mb-2">
-            <div class="card card-shadow" style="padding:0;" x-show="goalScopeSettings.enable_individual_goal">
+            <div class="card card-shadow mb-5" style="padding:0;">
               <div style="padding:20px 20px 0;"><h3 style="font-size:15px;">Metas e realizado por integrante</h3></div>
               <div class="table-wrap">
                 <table class="table">
@@ -563,17 +542,94 @@
                 </table>
               </div>
             </div>
+          </div>
+          </template>
 
-            <div class="card card-shadow">
-              <h3 class="mb-3" style="font-size:15px;">Procedimentos mais executados</h3>
-              <div x-show="topProcedures.length === 0" class="text-sm text-muted">Nenhum atendimento concluído ainda.</div>
-              <template x-for="(proc, idx) in topProcedures" :key="proc.name">
-                <div class="procedure-rank-row">
-                  <span x-text="(idx + 1) + 'º ' + proc.name"></span>
-                  <span class="badge badge-accent" x-text="proc.count"></span>
+          <template x-if="goalScopeSettings.enable_collective_goal">
+          <div>
+            <div class="section-eyebrow mt-2"><span class="bar"></span><h3>Meta coletiva</h3></div>
+
+            <div class="card card-shadow mb-5">
+              <h3 class="mb-1" style="font-size:15px;">Progresso da unidade em <span x-text="currentMonthLabel"></span></h3>
+              <p class="text-xs text-soft mb-3">Um único alvo para a clínica inteira, contra o faturamento de toda a equipe somado — não importa quem atendeu ou vendeu.</p>
+              <div class="goal-meter-stats">
+                <div class="goal-meter-stat">
+                  <div class="label">Meta coletiva do mês</div>
+                  <div class="value" x-text="collectiveGoalMeter.target > 0 ? formatCurrency(collectiveGoalMeter.target) : '—'"></div>
                 </div>
-              </template>
+                <div class="goal-meter-stat">
+                  <div class="label">Realizado pela unidade</div>
+                  <div class="value" x-text="formatCurrency(collectiveGoalMeter.realized)"></div>
+                </div>
+                <div class="goal-meter-stat">
+                  <div class="label">Atingido</div>
+                  <div class="value" :style="'color:' + (collectiveGoalMeter.pct !== null && collectiveGoalMeter.pct >= 100 ? 'var(--color-success)' : 'var(--color-text)')" x-text="collectiveGoalMeter.pct !== null ? collectiveGoalMeter.pct + '%' : '—'"></div>
+                </div>
+              </div>
+              <div class="goal-track-wrap" x-show="collectiveGoalMeter.target > 0">
+                <span class="goal-track-goal-label" :style="'left:' + collectiveGoalMeter.goalLinePct + '%'">Meta</span>
+                <div class="goal-track">
+                  <div class="goal-fill" :class="collectiveGoalMeter.pct !== null && collectiveGoalMeter.pct >= 100 ? 'is-complete' : ''" :style="'width:' + collectiveGoalMeter.fillPct + '%'"></div>
+                  <div class="goal-track-goal-line" :style="'left:' + collectiveGoalMeter.goalLinePct + '%'"></div>
+                </div>
+              </div>
+              <p class="text-xs text-muted mb-2" x-show="collectiveGoalMeter.target > 0" x-text="suggestedCollectiveCommission !== null ? ('Comissão coletiva sugerida agora: ' + formatCurrency(suggestedCollectiveCommission)) : 'Ainda fora de qualquer faixa de comissão coletiva.'"></p>
+              <button class="btn btn-primary btn-sm" type="button" x-show="suggestedCollectiveCommission > 0" @click="launchCollectiveCommission()" :disabled="savingCollectiveGoal">Lançar comissão coletiva</button>
+              <p class="text-xs text-muted" x-show="collectiveGoalMeter.target <= 0">Ainda sem meta coletiva definida — defina abaixo para começar a acompanhar o progresso aqui.</p>
             </div>
+
+            <div class="card card-shadow mb-5">
+              <h3 class="mb-2" style="font-size:15px;">Definir a meta coletiva</h3>
+              <p class="text-xs text-soft mb-3">Diferente da individual, aqui é um valor só para a clínica inteira no mês — não é dividido entre ninguém.</p>
+              <div class="flex items-end gap-2" style="flex-wrap:wrap;">
+                <div class="form-group" style="margin:0;">
+                  <label class="label">Meta coletiva do mês (R$)</label>
+                  <input class="input" type="text" inputmode="decimal" x-model="collectiveGoalInput" @input="collectiveGoalInput = maskCurrencyInput($event.target.value)" placeholder="Ex.: 150.000,00" style="max-width:220px;">
+                </div>
+                <button class="btn btn-primary btn-sm" type="button" @click="saveCollectiveGoal()" :disabled="savingCollectiveGoal">Salvar meta coletiva</button>
+              </div>
+            </div>
+
+            <div class="card card-shadow mb-5">
+              <h3 class="mb-1" style="font-size:15px;">Régua de comissão coletiva</h3>
+              <p class="text-xs text-soft mb-3">A partir de tal % da meta coletiva batida, a unidade passa a gerar tal % de comissão sobre o faturamento total da equipe no mês. Independente da régua individual — nunca somadas.</p>
+
+              <div x-show="collectiveCommissionTiers.length === 0" class="text-sm text-muted mb-3">Nenhuma faixa cadastrada ainda para a meta coletiva.</div>
+              <div class="flex" style="flex-direction:column;gap:8px;margin-bottom:14px;" x-show="collectiveCommissionTiers.length > 0">
+                <template x-for="(tier, idx) in collectiveCommissionTiers" :key="tier.id">
+                  <div class="tier-row" :class="tier.id === activeTierId(collectiveCommissionTiers, collectiveGoalMeter.pct) ? 'is-active' : ''">
+                    <span class="tier-step" x-text="idx + 1"></span>
+                    <span class="tier-row-text">A partir de <strong x-text="tier.min_achievement_pct + '%'"></strong> da meta coletiva → <strong x-text="tier.commission_percentage + '%'"></strong> de comissão</span>
+                    <span class="tier-row-active-tag" x-show="tier.id === activeTierId(collectiveCommissionTiers, collectiveGoalMeter.pct)">valendo agora</span>
+                    <a href="#" class="text-xs" @click.prevent="removeCollectiveCommissionTier(tier)">remover</a>
+                  </div>
+                </template>
+              </div>
+
+              <div class="flex items-end gap-2" style="flex-wrap:wrap;">
+                <div class="form-group" style="margin:0;">
+                  <label class="label">A partir de (% da meta)</label>
+                  <input class="input" type="number" min="0" step="1" x-model="newCollectiveTierMinPct" placeholder="Ex.: 100" style="max-width:160px;">
+                </div>
+                <div class="form-group" style="margin:0;">
+                  <label class="label">Comissão (%)</label>
+                  <input class="input" type="number" min="0" step="0.1" x-model="newCollectiveTierCommissionPct" placeholder="Ex.: 5" style="max-width:160px;">
+                </div>
+                <button class="btn btn-secondary btn-sm" type="button" @click="addCollectiveCommissionTier()" :disabled="savingCollectiveTier">Adicionar faixa</button>
+              </div>
+            </div>
+          </div>
+          </template>
+
+          <div class="card card-shadow mb-5">
+            <h3 class="mb-3" style="font-size:15px;">Procedimentos mais executados</h3>
+            <div x-show="topProcedures.length === 0" class="text-sm text-muted">Nenhum atendimento concluído ainda.</div>
+            <template x-for="(proc, idx) in topProcedures" :key="proc.name">
+              <div class="procedure-rank-row">
+                <span x-text="(idx + 1) + 'º ' + proc.name"></span>
+                <span class="badge badge-accent" x-text="proc.count"></span>
+              </div>
+            </template>
           </div>
         </div>
 
@@ -1126,6 +1182,17 @@ function biApp() {
       return applicable.length > 0 ? Number(applicable[0].commission_percentage) : null;
     },
 
+    // qual faixa (de uma lista qualquer, individual ou coletiva) está
+    // valendo agora para um certo % de atingimento — usado só para destacar
+    // visualmente a faixa ativa na lista de faixas de comissão.
+    activeTierId(tiers, pct) {
+      if (pct === null || pct === undefined) return null;
+      const applicable = (tiers || [])
+        .filter(t => pct >= Number(t.min_achievement_pct))
+        .sort((a, b) => Number(b.min_achievement_pct) - Number(a.min_achievement_pct));
+      return applicable.length > 0 ? applicable[0].id : null;
+    },
+
     suggestedCommissionFor(userId) {
       const tierPct = this.commissionTierFor(this.goalPctFor(userId));
       if (tierPct === null) return null;
@@ -1608,6 +1675,46 @@ function biApp() {
       const goal = this.goalFor(userId);
       if (!goal || !goal.target_amount) return null;
       return Math.round((this.monthRevenueFor(userId) / Number(goal.target_amount)) * 100);
+    },
+
+    // soma das metas individuais JÁ SALVAS neste mês (diferente de
+    // sumOfIndividualGoals, que soma o que está digitado nos campos agora,
+    // mesmo sem salvar ainda) e soma do realizado de todo mundo — usados só
+    // no card de progresso geral da trilha individual.
+    get teamSavedGoalTotal() {
+      return this.goals
+        .filter(g => g.period_month === this.currentPeriodMonth)
+        .reduce((sum, g) => sum + Number(g.target_amount || 0), 0);
+    },
+
+    get teamRealizedTotal() {
+      return this.users.reduce((sum, u) => sum + this.monthRevenueFor(u.id), 0);
+    },
+
+    // monta os números prontos para o card de progresso (meta, realizado, %
+    // atingido, largura da barra e posição da linha da meta em 0-100%,
+    // com espaço extra na escala quando o realizado já passou da meta).
+    buildGoalMeter(target, realized) {
+      const t = Number(target) || 0;
+      const r = Number(realized) || 0;
+      const pct = t > 0 ? Math.round((r / t) * 100) : null;
+      const scaleMax = Math.max(100, pct || 0) * 1.15;
+      const clamp = (v) => Math.max(0, Math.min(100, v));
+      return {
+        target: t,
+        realized: r,
+        pct,
+        fillPct: clamp(((pct || 0) / scaleMax) * 100),
+        goalLinePct: clamp((100 / scaleMax) * 100)
+      };
+    },
+
+    get individualGoalMeter() {
+      return this.buildGoalMeter(this.teamSavedGoalTotal, this.teamRealizedTotal);
+    },
+
+    get collectiveGoalMeter() {
+      return this.buildGoalMeter(this.collectiveGoal ? this.collectiveGoal.target_amount : 0, this.collectiveMonthRevenue);
     },
 
     referralsFor(userId) {
