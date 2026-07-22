@@ -520,7 +520,7 @@ function vendasApp() {
     async loadSales() {
       const { data, error } = await supabaseClient
         .from('sales')
-        .select('id, patient_id, status, origin, validity_months, discount_percentage, total_amount, payment_method, installments, payment_machine_id, payment_lines, referred_by_patient_id, referred_by_user_id, referral_commission_percentage, created_at, approved_at, patients ( full_name )')
+        .select('id, patient_id, status, origin, validity_months, discount_percentage, total_amount, payment_method, installments, payment_machine_id, payment_lines, referred_by_patient_id, referred_by_user_id, referral_commission_percentage, created_by, created_at, approved_at, patients!sales_patient_id_fkey ( full_name ), users!sales_created_by_fkey ( full_name )')
         .order('created_at', { ascending: false });
       this.sales = error ? [] : (data || []);
       if (error) this.showFeedback('error', 'Erro ao carregar vendas: ' + error.message);
@@ -878,8 +878,19 @@ function vendasApp() {
 
     downloadReceipt(sale) {
       const items = this.saleItemsBySale[sale.id] || [];
+      const settings = window.__prismaClinicSettings || {};
+      const clinicName = settings.legal_name || window.__prismaClinicName || 'Clínica';
       const doc = new window.jspdf.jsPDF();
       let y = 20;
+
+      doc.setFontSize(14);
+      doc.text(clinicName, 14, y);
+      y += 6;
+      doc.setFontSize(9);
+      if (settings.cnpj) { doc.text('CNPJ: ' + settings.cnpj, 14, y); y += 5; }
+      if (settings.company_address) { doc.text(settings.company_address, 14, y); y += 5; }
+      y += 5;
+
       doc.setFontSize(16);
       doc.text('Comprovante de venda', 14, y);
       y += 10;
@@ -887,6 +898,8 @@ function vendasApp() {
       doc.text('Data da aprovação: ' + this.formatDate(sale.approved_at || sale.created_at), 14, y);
       y += 6;
       doc.text('Paciente: ' + ((sale.patients && sale.patients.full_name) || '—'), 14, y);
+      y += 6;
+      doc.text('Vendedor(a): ' + ((sale.users && sale.users.full_name) || '—'), 14, y);
       y += 10;
 
       doc.setFontSize(11);

@@ -21,10 +21,16 @@
           <h2>Estoque</h2>
           <p>Insumos clínicos, produtos de revenda, movimentações e custo por procedimento</p>
         </div>
-        <button class="btn btn-primary" type="button" @click="openNewProductForm()">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
-          <span x-text="tab === 'produtos' ? 'Novo produto' : 'Novo insumo'"></span>
-        </button>
+        <div class="flex gap-2">
+          <button class="btn btn-secondary" type="button" @click="openNewProductForm('insumo')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+            <span>Novo insumo</span>
+          </button>
+          <button class="btn btn-primary" type="button" @click="openNewProductForm('revenda')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+            <span>Novo produto</span>
+          </button>
+        </div>
       </div>
 
       <div x-show="feedback.message" x-cloak class="card mb-4" :style="'padding:12px 16px;border-color:' + (feedback.type==='error' ? 'var(--color-danger)' : 'var(--color-success)')">
@@ -78,29 +84,40 @@
         </div>
 
         <div class="flex gap-2 mb-5" style="flex-wrap:wrap;">
-          <button class="btn btn-sm" :class="tab==='insumos' ? 'btn-primary' : 'btn-secondary'" @click="tab='insumos'">Insumos</button>
-          <button class="btn btn-sm" :class="tab==='produtos' ? 'btn-primary' : 'btn-secondary'" @click="tab='produtos'">Produtos (revenda)</button>
-          <button class="btn btn-sm" :class="tab==='movimentacoes' ? 'btn-primary' : 'btn-secondary'" @click="tab='movimentacoes'">Movimentações</button>
-          <button class="btn btn-sm" :class="tab==='custo' ? 'btn-primary' : 'btn-secondary'" @click="tab='custo'">Custo por procedimento</button>
+          <button class="btn btn-sm" :class="tab==='insumos' ? 'btn-primary' : 'btn-secondary'" @click="setTab('insumos')">Insumos</button>
+          <button class="btn btn-sm" :class="tab==='produtos' ? 'btn-primary' : 'btn-secondary'" @click="setTab('produtos')">Produtos (revenda)</button>
+          <button class="btn btn-sm" :class="tab==='movimentacoes' ? 'btn-primary' : 'btn-secondary'" @click="setTab('movimentacoes')">Movimentações</button>
+          <button class="btn btn-sm" :class="tab==='custo' ? 'btn-primary' : 'btn-secondary'" @click="setTab('custo')">Custo por procedimento</button>
         </div>
 
         <!-- ===================== INSUMOS ===================== -->
         <div x-show="tab==='insumos'">
           <p class="text-xs text-soft mb-3">Insumos são de uso clínico interno (consumidos em procedimentos) e não aparecem para venda direta ao paciente.</p>
+          <div class="flex items-center gap-2 mb-3" x-show="insumoBrands.length > 0">
+            <label class="text-xs text-muted">Marca:</label>
+            <select class="input" style="max-width:220px;" x-model="brandFilter">
+              <option value="">Todas as marcas</option>
+              <template x-for="b in insumoBrands" :key="b">
+                <option :value="b" x-text="b"></option>
+              </template>
+            </select>
+          </div>
           <div class="card card-shadow" style="padding:0;">
             <div x-show="insumos.length === 0" class="empty-note" style="margin:20px;">
               Nenhum insumo cadastrado ainda. Use "Novo insumo" para começar a controlar o estoque.
             </div>
             <div class="table-wrap" x-show="insumos.length > 0">
               <table class="table">
-                <thead><tr><th>Insumo</th><th>Estoque atual</th><th>Mínimo</th><th>Máximo</th><th>Status</th><th>Custo unitário</th><th>Validade</th><th></th></tr></thead>
+                <thead><tr><th>Insumo</th><th>Marca</th><th>Estoque atual</th><th>Mínimo</th><th>Máximo</th><th>Status</th><th>Custo unitário</th><th>Validade</th><th></th></tr></thead>
                 <tbody>
                   <template x-for="p in insumos" :key="p.id">
                     <tr>
                       <td>
                         <strong x-text="p.name"></strong>
+                        <div class="text-xs text-muted" x-show="p.description" x-text="p.description"></div>
                         <div class="text-xs text-muted" x-show="p.barcode" x-text="p.barcode"></div>
                       </td>
+                      <td x-text="p.brand || '—'"></td>
                       <td x-text="(p.stock_quantity !== null ? p.stock_quantity : 0) + (p.unit_of_measure ? (' ' + p.unit_of_measure) : '')"></td>
                       <td x-text="p.min_stock_quantity !== null ? p.min_stock_quantity : '—'"></td>
                       <td x-text="p.max_stock_quantity !== null ? p.max_stock_quantity : '—'"></td>
@@ -129,20 +146,31 @@
         <!-- ===================== PRODUTOS (REVENDA) ===================== -->
         <div x-show="tab==='produtos'" x-cloak>
           <p class="text-xs text-soft mb-3">Produtos de revenda podem ser vendidos diretamente ao paciente (ex.: sérum, protetor solar, cinta modeladora). Aparecem como item avulso na tela de Vendas.</p>
+          <div class="flex items-center gap-2 mb-3" x-show="produtoBrands.length > 0">
+            <label class="text-xs text-muted">Marca:</label>
+            <select class="input" style="max-width:220px;" x-model="brandFilter">
+              <option value="">Todas as marcas</option>
+              <template x-for="b in produtoBrands" :key="b">
+                <option :value="b" x-text="b"></option>
+              </template>
+            </select>
+          </div>
           <div class="card card-shadow" style="padding:0;">
             <div x-show="produtosRevenda.length === 0" class="empty-note" style="margin:20px;">
               Nenhum produto de revenda cadastrado ainda. Use "Novo produto" para cadastrar itens vendáveis ao paciente.
             </div>
             <div class="table-wrap" x-show="produtosRevenda.length > 0">
               <table class="table">
-                <thead><tr><th>Produto</th><th>Estoque atual</th><th>Mínimo</th><th>Status</th><th>Custo</th><th>Preço de venda</th><th>Margem</th><th>Validade</th><th></th></tr></thead>
+                <thead><tr><th>Produto</th><th>Marca</th><th>Estoque atual</th><th>Mínimo</th><th>Status</th><th>Custo</th><th>Preço de venda</th><th>Margem</th><th>Validade</th><th></th></tr></thead>
                 <tbody>
                   <template x-for="p in produtosRevenda" :key="p.id">
                     <tr>
                       <td>
                         <strong x-text="p.name"></strong>
+                        <div class="text-xs text-muted" x-show="p.description" x-text="p.description"></div>
                         <div class="text-xs text-muted" x-show="p.barcode" x-text="p.barcode"></div>
                       </td>
+                      <td x-text="p.brand || '—'"></td>
                       <td x-text="(p.stock_quantity !== null ? p.stock_quantity : 0) + (p.unit_of_measure ? (' ' + p.unit_of_measure) : '')"></td>
                       <td x-text="p.min_stock_quantity !== null ? p.min_stock_quantity : '—'"></td>
                       <td><span class="badge" :class="stockStatus(p).cls" x-text="stockStatus(p).label"></span></td>
@@ -252,6 +280,20 @@
               <label class="label">Nome</label>
               <input class="input" x-model="productForm.name" required placeholder="Ex.: Toxina botulínica 100U ou Protetor solar FPS 50">
             </div>
+            <div class="form-group">
+              <label class="label">Descrição (opcional)</label>
+              <input class="input" x-model="productForm.description" placeholder="Ex.: FPS 50, 100g · Vermelho cereja, 4g · use para diferenciar variações do mesmo nome">
+            </div>
+            <div class="grid grid-2 gap-3">
+              <div class="form-group">
+                <label class="label">Marca/fabricante (opcional)</label>
+                <input class="input" x-model="productForm.brand" placeholder="Ex.: Allergan, La Roche-Posay">
+              </div>
+              <div class="form-group">
+                <label class="label">Código de barras (opcional)</label>
+                <input class="input" x-model="productForm.barcode">
+              </div>
+            </div>
             <div class="grid grid-2 gap-3">
               <div class="form-group">
                 <label class="label">Custo unitário (R$)</label>
@@ -271,15 +313,9 @@
               </p>
             </div>
 
-            <div class="grid grid-2 gap-3">
-              <div class="form-group">
-                <label class="label">Código de barras (opcional)</label>
-                <input class="input" x-model="productForm.barcode">
-              </div>
-              <div class="form-group">
-                <label class="label">Validade (opcional)</label>
-                <input class="input" type="date" x-model="productForm.expiry_date">
-              </div>
+            <div class="form-group">
+              <label class="label">Validade (opcional)</label>
+              <input class="input" type="date" x-model="productForm.expiry_date" style="max-width:200px;">
             </div>
 
             <hr class="divider">
@@ -365,6 +401,7 @@ function estoqueApp() {
     clinicId: null,
     currentUserId: null,
     tab: 'insumos',
+    brandFilter: '',
     products: [],
     movements: [],
     services: [],
@@ -400,9 +437,14 @@ function estoqueApp() {
     async loadProducts() {
       const { data, error } = await supabaseClient
         .from('products')
-        .select('id, name, unit_cost, sale_price, product_type, expiry_date, unit_of_measure, barcode, stock_quantity, min_stock_quantity, max_stock_quantity')
+        .select('id, name, brand, description, unit_cost, sale_price, product_type, expiry_date, unit_of_measure, barcode, stock_quantity, min_stock_quantity, max_stock_quantity')
         .order('name');
       this.products = error ? [] : (data || []);
+    },
+
+    setTab(name) {
+      this.tab = name;
+      this.brandFilter = '';
     },
 
     async loadMovements() {
@@ -438,11 +480,21 @@ function estoqueApp() {
     },
 
     get insumos() {
-      return this.products.filter(p => p.product_type !== 'revenda');
+      return this.products.filter(p => p.product_type !== 'revenda' && (!this.brandFilter || p.brand === this.brandFilter));
     },
 
     get produtosRevenda() {
-      return this.products.filter(p => p.product_type === 'revenda');
+      return this.products.filter(p => p.product_type === 'revenda' && (!this.brandFilter || p.brand === this.brandFilter));
+    },
+
+    get insumoBrands() {
+      const set = new Set(this.products.filter(p => p.product_type !== 'revenda' && p.brand).map(p => p.brand));
+      return Array.from(set).sort();
+    },
+
+    get produtoBrands() {
+      const set = new Set(this.products.filter(p => p.product_type === 'revenda' && p.brand).map(p => p.brand));
+      return Array.from(set).sort();
     },
 
     get lowStockProducts() {
@@ -536,11 +588,11 @@ function estoqueApp() {
       return parts[2] + '/' + parts[1] + '/' + parts[0];
     },
 
-    openNewProductForm() {
+    openNewProductForm(type) {
       this.editingProductId = null;
       this.productForm = {
-        name: '', product_type: this.tab === 'produtos' ? 'revenda' : 'insumo',
-        unit_cost: '', sale_price: '', unit_of_measure: '', barcode: '',
+        name: '', product_type: type || (this.tab === 'produtos' ? 'revenda' : 'insumo'),
+        brand: '', description: '', unit_cost: '', sale_price: '', unit_of_measure: '', barcode: '',
         stock_quantity: '0', min_stock_quantity: '', max_stock_quantity: '', expiry_date: ''
       };
       this.showProductForm = true;
@@ -550,6 +602,8 @@ function estoqueApp() {
       this.editingProductId = p.id;
       this.productForm = {
         name: p.name,
+        brand: p.brand || '',
+        description: p.description || '',
         product_type: p.product_type === 'revenda' ? 'revenda' : 'insumo',
         unit_cost: p.unit_cost !== null ? numberToCurrencyInput(p.unit_cost) : '',
         sale_price: (p.sale_price !== null && p.sale_price !== undefined) ? numberToCurrencyInput(p.sale_price) : '',
@@ -570,6 +624,8 @@ function estoqueApp() {
         const isRevenda = this.productForm.product_type === 'revenda';
         const payload = {
           name: this.productForm.name,
+          brand: this.productForm.brand || null,
+          description: this.productForm.description || null,
           product_type: isRevenda ? 'revenda' : 'insumo',
           unit_cost: parseCurrencyToNumber(this.productForm.unit_cost),
           sale_price: isRevenda ? parseCurrencyToNumber(this.productForm.sale_price) : null,

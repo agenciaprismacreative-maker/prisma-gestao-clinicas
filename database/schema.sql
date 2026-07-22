@@ -32,6 +32,7 @@ create table public.users (
   professional_register text,
   specialties text,
   bio text,
+  salary numeric(10, 2),
   created_at timestamptz not null default now()
 );
 
@@ -287,6 +288,8 @@ create table public.products (
   product_type text not null default 'insumo' check (product_type in ('insumo', 'revenda')),
   sale_price numeric(10, 2),
   expiry_date date,
+  brand text,
+  description text,
   created_at timestamptz not null default now()
 );
 
@@ -451,8 +454,31 @@ create table public.clinic_settings (
   primary_color text,
   accent_color text,
   max_discount_percentage numeric(5, 2),
+  legal_name text,
+  cnpj text,
+  company_address text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
+);
+
+-- ============================================================================
+-- CLINIC_EXPENSES (custos e folha): despesas fixas/pontuais da clínica
+-- (aluguel, contas, etc.). O salário de cada funcionário fica em users.salary
+-- e é somado à parte, sem duplicar aqui.
+-- ============================================================================
+create table public.clinic_expenses (
+  id uuid primary key default gen_random_uuid(),
+  clinic_id uuid not null references public.clinics (id) on delete cascade,
+  description text not null,
+  category text not null default 'outros' check (
+    category in ('aluguel', 'contas', 'marketing', 'manutencao', 'fornecedores', 'impostos', 'outros')
+  ),
+  amount numeric(10, 2) not null default 0,
+  is_recurring boolean not null default false,
+  expense_date date not null default current_date,
+  notes text,
+  created_by uuid references public.users (id) on delete set null,
+  created_at timestamptz not null default now()
 );
 
 -- ============================================================================
@@ -468,6 +494,9 @@ create index idx_communications_patient on public.communications_log (patient_id
 create index idx_schedule_blocks_clinic_date on public.schedule_blocks (clinic_id, start_at);
 create index idx_service_products_service on public.service_products (service_id);
 create index idx_products_clinic on public.products (clinic_id);
+create index idx_products_brand on public.products (brand);
+create index idx_clinic_expenses_clinic on public.clinic_expenses (clinic_id);
+create index idx_clinic_expenses_date on public.clinic_expenses (expense_date);
 create index idx_stock_movements_product on public.stock_movements (product_id);
 create index idx_stock_movements_clinic on public.stock_movements (clinic_id);
 create index idx_stock_movements_created_at on public.stock_movements (created_at);
@@ -724,6 +753,14 @@ create policy "clinic_settings_select" on public.clinic_settings for select
   using (clinic_id = public.auth_clinic_id() or public.auth_is_prisma_team());
 
 create policy "clinic_settings_write" on public.clinic_settings for all
+  using (public.auth_is_prisma_team() or (clinic_id = public.auth_clinic_id() and public.auth_is_admin()))
+  with check (public.auth_is_prisma_team() or (clinic_id = public.auth_clinic_id() and public.auth_is_admin()));
+
+-- clinic_expenses: só administrador (ou equipe Prisma) lê e escreve —
+-- despesas e folha são informação financeira sensível.
+alter table public.clinic_expenses enable row level security;
+
+create policy "clinic_expenses_all" on public.clinic_expenses for all
   using (public.auth_is_prisma_team() or (clinic_id = public.auth_clinic_id() and public.auth_is_admin()))
   with check (public.auth_is_prisma_team() or (clinic_id = public.auth_clinic_id() and public.auth_is_admin()));
 

@@ -97,6 +97,7 @@ async function fillUserInfo() {
     if (nameEl) nameEl.textContent = profile.full_name || user.email;
     if (clinicEl) clinicEl.textContent = profile.clinics ? profile.clinics.name : '';
     if (initialsEl) initialsEl.textContent = getInitials(profile.full_name);
+    window.__prismaClinicName = profile.clinics ? profile.clinics.name : '';
 
     window.__prismaUserRole = profile.role;
     applyRoleVisibility(profile.role);
@@ -121,19 +122,65 @@ function shadeColor(hex, percent) {
   return '#' + (0x1000000 + r * 0x10000 + g * 0x100 + b).toString(16).slice(1);
 }
 
+function hexToRgb(hex) {
+  const clean = (hex || '').replace('#', '');
+  if (clean.length !== 6) return null;
+  const num = parseInt(clean, 16);
+  if (Number.isNaN(num)) return null;
+  return { r: (num >> 16) & 0xFF, g: (num >> 8) & 0xFF, b: num & 0xFF };
+}
+
+// Luminância relativa (fórmula do WCAG), usada para decidir automaticamente
+// se o texto sobre uma cor deve ser branco ou escuro, e para garantir que
+// a variante "-dark" de uma cor fique escura o bastante para texto branco
+// em cima, não importa quão clara seja a cor original escolhida.
+function relativeLuminance(hex) {
+  const rgb = hexToRgb(hex);
+  if (!rgb) return 1;
+  const channels = [rgb.r, rgb.g, rgb.b].map((c) => {
+    const s = c / 255;
+    return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+  });
+  return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+}
+
+function contrastTextColor(hex) {
+  if (!hex) return '#FFFFFF';
+  return relativeLuminance(hex) > 0.42 ? '#1F2624' : '#FFFFFF';
+}
+
+// Escurece progressivamente até a luminância cair abaixo do alvo, em vez de
+// aplicar sempre a mesma porcentagem fixa — assim uma cor de marca muito
+// clara (ex.: um rosa pastel) ainda vira um fundo escuro o suficiente para
+// o texto branco da barra lateral continuar legível.
+function ensureDarkEnough(hex, maxLuminance) {
+  let current = shadeColor(hex, -0.22);
+  let extra = 0;
+  while (relativeLuminance(current) > maxLuminance && extra < 0.85) {
+    extra += 0.12;
+    current = shadeColor(hex, -0.22 - extra);
+  }
+  return current;
+}
+
 function applyBrandColors(primary, accent) {
   const root = document.documentElement.style;
   if (primary) {
     root.setProperty('--color-primary', primary);
-    root.setProperty('--color-primary-dark', shadeColor(primary, -0.22));
+    root.setProperty('--color-primary-dark', ensureDarkEnough(primary, 0.35));
     root.setProperty('--color-primary-light', shadeColor(primary, 0.86));
+    root.setProperty('--color-primary-contrast', contrastTextColor(primary));
   }
   if (accent) {
     root.setProperty('--color-accent', accent);
     root.setProperty('--color-accent-light', shadeColor(accent, 0.86));
+    root.setProperty('--color-accent-contrast', contrastTextColor(accent));
   }
 }
 window.shadeColor = shadeColor;
+window.relativeLuminance = relativeLuminance;
+window.contrastTextColor = contrastTextColor;
+window.ensureDarkEnough = ensureDarkEnough;
 window.applyBrandColors = applyBrandColors;
 
 async function applyClinicSettings(clinicId, role) {
@@ -141,7 +188,7 @@ async function applyClinicSettings(clinicId, role) {
   try {
     const { data: settings } = await supabaseClient
       .from('clinic_settings')
-      .select('logo_url, theme, prevent_double_booking, agenda_name_format, manager_password, manager_password_for_discount, manager_password_for_courtesy, show_performance_to_staff, manager_password_for_performance, primary_color, accent_color, max_discount_percentage')
+      .select('logo_url, theme, prevent_double_booking, agenda_name_format, manager_password, manager_password_for_discount, manager_password_for_courtesy, show_performance_to_staff, manager_password_for_performance, primary_color, accent_color, max_discount_percentage, legal_name, cnpj, company_address')
       .eq('clinic_id', clinicId)
       .maybeSingle();
 

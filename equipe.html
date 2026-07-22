@@ -118,7 +118,7 @@
         <div class="card card-shadow" style="padding:0;">
           <div class="table-wrap">
             <table class="table">
-              <thead><tr><th>Nome</th><th>E-mail</th><th>Papel</th><th>Especialidades</th><th></th></tr></thead>
+              <thead><tr><th>Nome</th><th>E-mail</th><th>Papel</th><th>Especialidades</th><th>Salário</th><th></th></tr></thead>
               <tbody>
                 <template x-for="u in users" :key="u.id">
                   <tr>
@@ -126,6 +126,7 @@
                     <td x-text="u.email || '—'"></td>
                     <td><span class="badge badge-neutral" x-text="roleLabel(u.role)"></span></td>
                     <td x-text="u.specialties || '—'"></td>
+                    <td x-text="u.salary !== null && u.salary !== undefined ? formatCurrency(u.salary) : '—'"></td>
                     <td><button class="btn btn-ghost btn-sm" type="button" @click="openEditUser(u)">Editar</button></td>
                   </tr>
                 </template>
@@ -220,6 +221,14 @@
             </div>
 
             <hr class="divider">
+            <h4 class="text-xs text-muted mb-2" style="text-transform:uppercase;letter-spacing:.04em;">Dados internos (financeiro)</h4>
+            <div class="form-group">
+              <label class="label">Salário (opcional)</label>
+              <input class="input" type="text" inputmode="decimal" x-model="newMember.salary" @input="newMember.salary = maskCurrencyInput($event.target.value)" placeholder="R$ 0,00">
+              <p class="input-hint">Usado para compor a folha de pagamento no dashboard de custos. Visível só para administradores.</p>
+            </div>
+
+            <hr class="divider">
             <h4 class="text-xs text-muted mb-2" style="text-transform:uppercase;letter-spacing:.04em;">Qualificação profissional (opcional)</h4>
             <div class="form-group">
               <label class="label">Registro profissional</label>
@@ -258,6 +267,14 @@
                 <option value="atendente">Atendente</option>
                 <option value="administrador">Administrador</option>
               </select>
+            </div>
+
+            <hr class="divider">
+            <h4 class="text-xs text-muted mb-2" style="text-transform:uppercase;letter-spacing:.04em;">Dados internos (financeiro)</h4>
+            <div class="form-group">
+              <label class="label">Salário (opcional)</label>
+              <input class="input" type="text" inputmode="decimal" x-model="editingUser.salary" @input="editingUser.salary = maskCurrencyInput($event.target.value)" placeholder="R$ 0,00">
+              <p class="input-hint">Usado para compor a folha de pagamento no dashboard de custos. Visível só para administradores.</p>
             </div>
 
             <hr class="divider">
@@ -315,7 +332,7 @@ function equipeApp() {
     newTask: { title: '', description: '', assigned_to: '', due_date: '', patient_id: '' },
     taskPatientSearch: '',
     taskPatientDropdownOpen: false,
-    newMember: { full_name: '', email: '', password: '', role: 'esteticista', professional_register: '', specialties: '', bio: '' },
+    newMember: { full_name: '', email: '', password: '', role: 'esteticista', professional_register: '', specialties: '', bio: '', salary: '' },
     feedback: { type: '', message: '' },
 
     async init() {
@@ -336,7 +353,7 @@ function equipeApp() {
     },
 
     async loadUsers() {
-      const { data, error } = await supabaseClient.from('users').select('id, full_name, email, role, professional_register, specialties, bio').order('full_name');
+      const { data, error } = await supabaseClient.from('users').select('id, full_name, email, role, professional_register, specialties, bio, salary').order('full_name');
       this.users = error ? [] : (data || []);
     },
 
@@ -392,6 +409,10 @@ function equipeApp() {
     roleLabel(role) {
       const map = { esteticista: 'Esteticista', atendente: 'Atendente', administrador: 'Administrador', equipe_prisma: 'Equipe Prisma' };
       return map[role] || role;
+    },
+
+    formatCurrency(value) {
+      return (Number(value) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
     },
 
     async createTask() {
@@ -468,7 +489,8 @@ function equipeApp() {
         role: this.newMember.role,
         professional_register: this.newMember.professional_register || null,
         specialties: this.newMember.specialties || null,
-        bio: this.newMember.bio || null
+        bio: this.newMember.bio || null,
+        salary: this.newMember.salary ? parseCurrencyToNumber(this.newMember.salary) : null
       });
       this.saving = false;
       if (error) {
@@ -476,7 +498,7 @@ function equipeApp() {
         return;
       }
       this.showNewMemberForm = false;
-      this.newMember = { full_name: '', email: '', password: '', role: 'esteticista', professional_register: '', specialties: '', bio: '' };
+      this.newMember = { full_name: '', email: '', password: '', role: 'esteticista', professional_register: '', specialties: '', bio: '', salary: '' };
       this.showFeedback('success', 'Integrante cadastrado com sucesso. Se a confirmação de e-mail estiver ativa no Supabase, ele(a) precisa confirmar o e-mail antes do primeiro login.');
       await this.loadUsers();
     },
@@ -486,7 +508,8 @@ function equipeApp() {
         id: u.id, full_name: u.full_name, role: u.role,
         professional_register: u.professional_register || '',
         specialties: u.specialties || '',
-        bio: u.bio || ''
+        bio: u.bio || '',
+        salary: (u.salary !== null && u.salary !== undefined) ? numberToCurrencyInput(u.salary) : ''
       };
       this.showEditUserForm = true;
     },
@@ -500,7 +523,8 @@ function equipeApp() {
           role: this.editingUser.role,
           professional_register: this.editingUser.professional_register || null,
           specialties: this.editingUser.specialties || null,
-          bio: this.editingUser.bio || null
+          bio: this.editingUser.bio || null,
+          salary: this.editingUser.salary ? parseCurrencyToNumber(this.editingUser.salary) : null
         })
         .eq('id', this.editingUser.id);
       this.saving = false;
@@ -525,6 +549,7 @@ function equipeApp() {
 <script src="js/supabase-client.js"></script>
 <script src="js/auth-guard.js"></script>
 <script src="js/topbar.js"></script>
+<script src="js/currency-mask.js"></script>
 <script src="js/include.js" defer></script>
 </body>
 </html>

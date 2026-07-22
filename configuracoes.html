@@ -61,6 +61,25 @@
         </div>
 
         <div class="card card-shadow">
+          <h3 class="mb-3" style="font-size:15px;">Dados fiscais</h3>
+          <p class="text-xs text-muted mb-3">Usados no comprovante de venda em PDF gerado para o paciente.</p>
+          <div class="form-group">
+            <label class="label">Razão social</label>
+            <input class="input" x-model="settings.legal_name" placeholder="Ex.: Clínica Estética XYZ Ltda.">
+          </div>
+          <div class="grid grid-2 gap-3">
+            <div class="form-group">
+              <label class="label">CNPJ</label>
+              <input class="input" x-model="settings.cnpj" placeholder="00.000.000/0001-00">
+            </div>
+            <div class="form-group">
+              <label class="label">Endereço</label>
+              <input class="input" x-model="settings.company_address" placeholder="Rua, número, bairro, cidade">
+            </div>
+          </div>
+        </div>
+
+        <div class="card card-shadow">
           <h3 class="mb-3" style="font-size:15px;">Aparência</h3>
           <div class="form-group">
             <label class="label">Tema</label>
@@ -87,7 +106,19 @@
             </div>
           </div>
           <button type="button" class="btn btn-ghost btn-sm mt-2" @click="resetBrandColors()">Restaurar cores padrão</button>
-          <p class="input-hint">Usadas em botões, destaques, gráficos e no ranking de metas. Tons mais claros e mais escuros são calculados automaticamente a partir dessas duas cores.</p>
+          <p class="input-hint">Usadas em botões, destaques, gráficos e no ranking de metas. Tons mais claros e mais escuros, além da cor do texto sobre cada uma, são calculados automaticamente para manter o contraste legível mesmo com uma cor muito clara.</p>
+
+          <div class="card mt-3" style="padding:16px 18px;background:var(--color-surface-alt);border-style:dashed;">
+            <p class="text-xs text-muted mb-3" style="text-transform:uppercase;letter-spacing:.04em;">Pré-visualização ao vivo</p>
+            <div class="flex items-center gap-2 mb-3" style="flex-wrap:wrap;">
+              <button type="button" class="btn btn-primary btn-sm">Botão primário</button>
+              <button type="button" class="btn btn-secondary btn-sm">Botão secundário</button>
+              <span class="badge" style="background:var(--color-accent);color:var(--color-accent-contrast);padding:5px 10px;border-radius:var(--radius-full);font-size:12px;font-weight:600;">Destaque</span>
+            </div>
+            <div style="background:var(--color-primary-dark);color:#fff;padding:12px 14px;border-radius:var(--radius-md);font-size:13px;">
+              Assim fica o menu lateral — o fundo escurece automaticamente o quanto for preciso para o texto continuar legível.
+            </div>
+          </div>
         </div>
       </div>
 
@@ -183,7 +214,8 @@ function configuracoesApp() {
       logo_url: '', theme: 'claro', prevent_double_booking: true, agenda_name_format: 'completo',
       manager_password: '', manager_password_for_discount: false, manager_password_for_courtesy: false,
       show_performance_to_staff: true, manager_password_for_performance: false,
-      primary_color: '#2F4A45', accent_color: '#B8912F', max_discount_percentage: ''
+      primary_color: '#2F4A45', accent_color: '#B8912F', max_discount_percentage: '',
+      legal_name: '', cnpj: '', company_address: ''
     },
     settingsId: null,
     feedback: { type: '', message: '' },
@@ -219,7 +251,10 @@ function configuracoesApp() {
           primary_color: settingsRes.data.primary_color || this.defaultPrimaryColor,
           accent_color: settingsRes.data.accent_color || this.defaultAccentColor,
           max_discount_percentage: settingsRes.data.max_discount_percentage !== null && settingsRes.data.max_discount_percentage !== undefined
-            ? String(settingsRes.data.max_discount_percentage) : ''
+            ? String(settingsRes.data.max_discount_percentage) : '',
+          legal_name: settingsRes.data.legal_name || '',
+          cnpj: settingsRes.data.cnpj || '',
+          company_address: settingsRes.data.company_address || ''
         };
       }
       this.loading = false;

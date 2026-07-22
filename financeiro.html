@@ -46,6 +46,7 @@
         <button class="btn btn-sm" :class="tab==='transacoes' ? 'btn-primary' : 'btn-secondary'" @click="tab='transacoes'">Transações</button>
         <button class="btn btn-sm" :class="tab==='pacotes' ? 'btn-primary' : 'btn-secondary'" @click="tab='pacotes'">Pacotes</button>
         <button class="btn btn-sm" :class="tab==='maquininhas' ? 'btn-primary' : 'btn-secondary'" @click="tab='maquininhas'">Maquininhas</button>
+        <button class="btn btn-sm" :class="tab==='despesas' ? 'btn-primary' : 'btn-secondary'" @click="tab='despesas'">Despesas fixas</button>
       </div>
 
       <!-- TRANSAÇÕES -->
@@ -173,6 +174,100 @@
               </tbody>
             </table>
           </div>
+        </div>
+      </div>
+
+      <!-- DESPESAS FIXAS -->
+      <div x-show="tab==='despesas'" x-cloak>
+        <div class="grid grid-2 mb-5">
+          <div class="stat-card">
+            <div class="stat-label">Despesas lançadas este mês</div>
+            <div class="stat-value" x-text="formatCurrency(expensesThisMonthTotal)"></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Folha de pagamento (salários cadastrados)</div>
+            <div class="stat-value" x-text="formatCurrency(totalPayroll)"></div>
+            <div class="stat-trend text-muted">Definido em Equipe, por integrante</div>
+          </div>
+        </div>
+
+        <div class="page-header" style="margin-bottom:20px;">
+          <div><p class="text-sm text-muted">Aluguel, contas, marketing e outros custos fixos ou pontuais da clínica — usados no dashboard de custos e lucro em Desempenho.</p></div>
+          <button class="btn btn-primary btn-sm" type="button" @click="openNewExpenseForm()">Nova despesa</button>
+        </div>
+
+        <div class="card card-shadow" style="padding:0;">
+          <div x-show="expenses.length === 0" class="empty-note" style="margin:20px;">Nenhuma despesa cadastrada ainda.</div>
+          <div class="table-wrap" x-show="expenses.length > 0">
+            <table class="table">
+              <thead><tr><th>Descrição</th><th>Categoria</th><th>Valor</th><th>Data</th><th>Recorrente</th><th></th></tr></thead>
+              <tbody>
+                <template x-for="e in expenses" :key="e.id">
+                  <tr>
+                    <td>
+                      <strong x-text="e.description"></strong>
+                      <div class="text-xs text-muted" x-show="e.notes" x-text="e.notes"></div>
+                    </td>
+                    <td><span class="badge badge-neutral" x-text="categoryLabel(e.category)"></span></td>
+                    <td x-text="formatCurrency(e.amount)"></td>
+                    <td x-text="formatDate(e.expense_date)"></td>
+                    <td x-text="e.is_recurring ? 'Sim, mensal' : 'Não'"></td>
+                    <td class="flex gap-2">
+                      <button class="btn btn-ghost btn-sm" type="button" @click="openEditExpenseForm(e)">Editar</button>
+                      <button class="btn btn-ghost btn-sm" type="button" @click="removeExpense(e)">Remover</button>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- modal nova/editar despesa -->
+      <div x-show="showExpenseForm" x-cloak class="modal-overlay" @click.self="showExpenseForm=false">
+        <div class="card card-shadow" style="margin:auto;width:100%;max-width:460px;">
+          <div class="card-header"><h3 x-text="editingExpenseId ? 'Editar despesa' : 'Nova despesa'"></h3><button class="btn btn-ghost btn-sm" @click="showExpenseForm=false">Fechar</button></div>
+          <form @submit.prevent="saveExpense()">
+            <div class="form-group">
+              <label class="label">Descrição</label>
+              <input class="input" x-model="expenseForm.description" required placeholder="Ex.: Aluguel da sala, Conta de luz, Anúncios Instagram">
+            </div>
+            <div class="grid grid-2 gap-3">
+              <div class="form-group">
+                <label class="label">Categoria</label>
+                <select class="input" x-model="expenseForm.category">
+                  <option value="aluguel">Aluguel</option>
+                  <option value="contas">Contas (água/luz/internet)</option>
+                  <option value="marketing">Marketing</option>
+                  <option value="manutencao">Manutenção</option>
+                  <option value="fornecedores">Fornecedores</option>
+                  <option value="impostos">Impostos</option>
+                  <option value="outros">Outros</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="label">Valor (R$)</label>
+                <input class="input" type="text" inputmode="decimal" x-model="expenseForm.amount" @input="expenseForm.amount = maskCurrencyInput($event.target.value)" placeholder="R$ 0,00" required>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="label">Data</label>
+              <input class="input" type="date" x-model="expenseForm.expense_date" required style="max-width:200px;">
+            </div>
+            <div class="form-group flex items-center gap-2">
+              <input type="checkbox" x-model="expenseForm.is_recurring" id="isrecurring" style="width:auto;">
+              <label for="isrecurring" class="text-sm" style="margin:0;">Despesa recorrente (se repete todo mês)</label>
+            </div>
+            <div class="form-group">
+              <label class="label">Observações (opcional)</label>
+              <textarea class="input" x-model="expenseForm.notes" rows="2"></textarea>
+            </div>
+            <button class="btn btn-primary btn-block mt-2" type="submit" :disabled="saving">
+              <span x-show="!saving">Salvar despesa</span>
+              <span x-show="saving" x-cloak>Salvando…</span>
+            </button>
+          </form>
         </div>
       </div>
 
@@ -425,13 +520,96 @@ function financeiroApp() {
     showNewTemplateForm: false,
     editingTemplateId: null,
     templateForm: { name: '', description: '', items: [{ service_id: '', quantity: 1 }] },
+    expenses: [],
+    showExpenseForm: false,
+    editingExpenseId: null,
+    expenseForm: { description: '', category: 'outros', amount: '', is_recurring: false, expense_date: new Date().toISOString().slice(0, 10), notes: '' },
     feedback: { type: '', message: '' },
 
     async init() {
       await this.loadClinicId();
-      await Promise.all([this.loadTransactions(), this.loadPackages(), this.loadPatients(), this.loadServices(), this.loadUsers(), this.loadProducts(), this.loadServiceProductsMap(), this.loadPaymentMachines(), this.loadPlanTemplates()]);
+      await Promise.all([this.loadTransactions(), this.loadPackages(), this.loadPatients(), this.loadServices(), this.loadUsers(), this.loadProducts(), this.loadServiceProductsMap(), this.loadPaymentMachines(), this.loadPlanTemplates(), this.loadExpenses()]);
       this.newTransaction.paymentLines = [this.emptyPaymentLine()];
       this.loading = false;
+    },
+
+    get expensesThisMonthTotal() {
+      const now = new Date();
+      return this.expenses
+        .filter(e => {
+          const d = new Date(e.expense_date);
+          return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+        })
+        .reduce((sum, e) => sum + Number(e.amount || 0), 0);
+    },
+
+    get totalPayroll() {
+      return this.users.reduce((sum, u) => sum + Number(u.salary || 0), 0);
+    },
+
+    categoryLabel(cat) {
+      const map = {
+        aluguel: 'Aluguel', contas: 'Contas (água/luz/internet)', marketing: 'Marketing',
+        manutencao: 'Manutenção', fornecedores: 'Fornecedores', impostos: 'Impostos', outros: 'Outros'
+      };
+      return map[cat] || cat;
+    },
+
+    openNewExpenseForm() {
+      this.editingExpenseId = null;
+      this.expenseForm = { description: '', category: 'outros', amount: '', is_recurring: false, expense_date: new Date().toISOString().slice(0, 10), notes: '' };
+      this.showExpenseForm = true;
+    },
+
+    openEditExpenseForm(e) {
+      this.editingExpenseId = e.id;
+      this.expenseForm = {
+        description: e.description,
+        category: e.category || 'outros',
+        amount: numberToCurrencyInput(e.amount),
+        is_recurring: !!e.is_recurring,
+        expense_date: e.expense_date ? String(e.expense_date).slice(0, 10) : new Date().toISOString().slice(0, 10),
+        notes: e.notes || ''
+      };
+      this.showExpenseForm = true;
+    },
+
+    async saveExpense() {
+      if (!this.clinicId || !this.expenseForm.description) return;
+      this.saving = true;
+      const payload = {
+        description: this.expenseForm.description,
+        category: this.expenseForm.category,
+        amount: parseCurrencyToNumber(this.expenseForm.amount),
+        is_recurring: this.expenseForm.is_recurring,
+        expense_date: this.expenseForm.expense_date,
+        notes: this.expenseForm.notes || null
+      };
+      let error;
+      if (this.editingExpenseId) {
+        ({ error } = await supabaseClient.from('clinic_expenses').update(payload).eq('id', this.editingExpenseId));
+      } else {
+        ({ error } = await supabaseClient.from('clinic_expenses').insert({ ...payload, clinic_id: this.clinicId }));
+      }
+      this.saving = false;
+      if (error) {
+        this.showFeedback('error', 'Erro ao salvar despesa: ' + error.message);
+        return;
+      }
+      this.showExpenseForm = false;
+      this.showFeedback('success', 'Despesa salva.');
+      await this.loadExpenses();
+    },
+
+    async removeExpense(e) {
+      if (!(await confirmDialog('Tem certeza que deseja remover a despesa "' + e.description + '"?'))) return;
+      const { error } = await supabaseClient.from('clinic_expenses').delete().eq('id', e.id);
+      if (error) {
+        this.showFeedback('error', 'Erro ao remover despesa: ' + error.message);
+        return;
+      }
+      this.showFeedback('success', 'Despesa removida.');
+      await this.loadExpenses();
     },
 
     filteredPatientsFor(query) {
@@ -479,8 +657,16 @@ function financeiroApp() {
     },
 
     async loadUsers() {
-      const { data } = await supabaseClient.from('users').select('id, full_name').order('full_name');
+      const { data } = await supabaseClient.from('users').select('id, full_name, salary').order('full_name');
       this.users = data || [];
+    },
+
+    async loadExpenses() {
+      const { data, error } = await supabaseClient
+        .from('clinic_expenses')
+        .select('id, description, category, amount, is_recurring, expense_date, notes')
+        .order('expense_date', { ascending: false });
+      this.expenses = error ? [] : (data || []);
     },
 
     async loadProducts() {

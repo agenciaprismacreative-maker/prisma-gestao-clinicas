@@ -1115,7 +1115,7 @@ function pacientesApp() {
     async loadReferredFriends(patientId) {
       const { data, error } = await supabaseClient
         .from('sales')
-        .select('id, status, created_at, patients ( id, full_name )')
+        .select('id, status, created_at, patients!sales_patient_id_fkey ( id, full_name )')
         .eq('referred_by_patient_id', patientId)
         .neq('status', 'cancelada')
         .order('created_at', { ascending: false });
