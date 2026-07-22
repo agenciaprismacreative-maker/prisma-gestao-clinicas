@@ -99,12 +99,14 @@ function topbarApp() {
           .lte('scheduled_at', in48h.toISOString()),
         // anotações do dashboard direcionadas a mim: além de aparecerem lá,
         // também viram lembrete no sino, pra não depender de a pessoa abrir
-        // o dashboard pra saber que recebeu um recado.
+        // o dashboard pra saber que recebeu um recado. Só as ainda não
+        // dispensadas (dismissed_at nulo) aparecem aqui.
         this.currentUserId
           ? supabaseClient
               .from('dashboard_notes')
               .select('id, content, created_at')
               .eq('target_user_id', this.currentUserId)
+              .is('dismissed_at', null)
           : Promise.resolve({ data: [] })
       ];
 
@@ -136,7 +138,10 @@ function topbarApp() {
           label: 'Anotação para você: ' + preview,
           sublabel: 'Recebida em ' + new Date(n.created_at).toLocaleDateString('pt-BR'),
           severity: 'warning',
-          href: 'dashboard.html'
+          href: 'dashboard.html',
+          completable: true,
+          type: 'note',
+          id: n.id
         });
       });
 
@@ -152,7 +157,10 @@ function topbarApp() {
           label: t.title,
           sublabel: overdue ? 'Tarefa atrasada' : 'Vence nos próximos dias',
           severity: overdue ? 'urgent' : 'warning',
-          href: 'equipe.html'
+          href: 'equipe.html',
+          completable: true,
+          type: 'task',
+          id: t.id
         });
       });
 
@@ -212,6 +220,25 @@ function topbarApp() {
 
     get urgentCount() {
       return this.reminders.filter((r) => r.severity === 'urgent').length;
+    },
+
+    // Só tarefas e anotações direcionadas têm um botão de concluir de
+    // verdade: são as únicas com um estado real pra marcar como resolvido
+    // (status da tarefa, dismissed_at da anotação). Os outros lembretes
+    // (confirmar agendamento, estoque baixo, venda pendente) nascem de uma
+    // condição real de outra tela e somem sozinhos quando ela é resolvida lá
+    // — um botão de concluir neles só esconderia o problema sem resolvê-lo.
+    async completeReminder(r) {
+      if (r.type === 'task') {
+        const { error } = await supabaseClient.from('tasks').update({ status: 'concluida' }).eq('id', r.id);
+        if (error) return;
+      } else if (r.type === 'note') {
+        const { error } = await supabaseClient.from('dashboard_notes').update({ dismissed_at: new Date().toISOString() }).eq('id', r.id);
+        if (error) return;
+      } else {
+        return;
+      }
+      this.reminders = this.reminders.filter((x) => x !== r);
     },
 
     severityColor(severity) {

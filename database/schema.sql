@@ -415,6 +415,7 @@ create table public.dashboard_notes (
   author_id uuid references public.users (id) on delete set null,
   target_user_id uuid references public.users (id) on delete cascade,
   content text not null,
+  dismissed_at timestamptz,
   created_at timestamptz not null default now()
 );
 

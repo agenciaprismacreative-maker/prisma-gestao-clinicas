@@ -44,10 +44,13 @@
         <div x-show="remindersLoading" class="text-xs text-muted" style="padding:8px;">Carregando…</div>
         <div x-show="!remindersLoading && reminders.length === 0" class="text-xs text-muted" style="padding:8px;">Nada pendente por aqui.</div>
         <template x-for="(r, i) in reminders" :key="i">
-          <a :href="r.href" class="topbar-search-result" style="display:block;padding:8px;border-radius:var(--radius-md);text-decoration:none;border-left:3px solid transparent;" :style="'border-left-color:' + severityColor(r.severity)">
-            <span class="text-sm" :style="'color:' + severityColor(r.severity) + ';font-weight:600;'" x-text="r.label"></span>
-            <div class="text-xs text-muted mt-1" x-show="r.sublabel" x-text="r.sublabel"></div>
-          </a>
+          <div class="topbar-search-result" style="padding:8px;border-radius:var(--radius-md);border-left:3px solid transparent;" :style="'border-left-color:' + severityColor(r.severity)">
+            <a :href="r.href" style="display:block;text-decoration:none;">
+              <span class="text-sm" :style="'color:' + severityColor(r.severity) + ';font-weight:600;'" x-text="r.label"></span>
+              <div class="text-xs text-muted mt-1" x-show="r.sublabel" x-text="r.sublabel"></div>
+            </a>
+            <button type="button" class="btn btn-ghost btn-sm mt-1" x-show="r.completable" @click.prevent="completeReminder(r)" style="padding:2px 8px;height:auto;font-size:11px;">Marcar como concluído</button>
+          </div>
         </template>
       </div>
     </div>
