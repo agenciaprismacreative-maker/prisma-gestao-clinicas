@@ -479,6 +479,7 @@ create table public.clinic_expenses (
   ),
   amount numeric(10, 2) not null default 0,
   is_recurring boolean not null default false,
+  duration_months integer,
   expense_date date not null default current_date,
   notes text,
   created_by uuid references public.users (id) on delete set null,

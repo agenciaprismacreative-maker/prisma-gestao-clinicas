@@ -211,7 +211,7 @@
                     <td><span class="badge badge-neutral" x-text="categoryLabel(e.category)"></span></td>
                     <td x-text="formatCurrency(e.amount)"></td>
                     <td x-text="formatDate(e.expense_date)"></td>
-                    <td x-text="e.is_recurring ? 'Sim, mensal' : 'Não'"></td>
+                    <td x-text="recurrenceLabel(e)"></td>
                     <td class="flex gap-2">
                       <button class="btn btn-ghost btn-sm" type="button" @click="openEditExpenseForm(e)">Editar</button>
                       <button class="btn btn-ghost btn-sm" type="button" @click="removeExpense(e)">Remover</button>
@@ -258,6 +258,11 @@
             <div class="form-group flex items-center gap-2">
               <input type="checkbox" x-model="expenseForm.is_recurring" id="isrecurring" style="width:auto;">
               <label for="isrecurring" class="text-sm" style="margin:0;">Despesa recorrente (se repete todo mês)</label>
+            </div>
+            <div class="form-group" x-show="expenseForm.is_recurring" x-cloak>
+              <label class="label">Duração (meses)</label>
+              <input class="input" type="number" min="1" step="1" x-model="expenseForm.duration_months" placeholder="Ex.: 12" style="max-width:160px;">
+              <p class="text-xs text-muted" style="margin-top:4px;">Deixe em branco se não tiver prazo para acabar (ex.: aluguel). Preencha para despesas com prazo, como um financiamento em 12x.</p>
             </div>
             <div class="form-group">
               <label class="label">Observações (opcional)</label>
@@ -523,7 +528,7 @@ function financeiroApp() {
     expenses: [],
     showExpenseForm: false,
     editingExpenseId: null,
-    expenseForm: { description: '', category: 'outros', amount: '', is_recurring: false, expense_date: new Date().toISOString().slice(0, 10), notes: '' },
+    expenseForm: { description: '', category: 'outros', amount: '', is_recurring: false, duration_months: '', expense_date: new Date().toISOString().slice(0, 10), notes: '' },
     feedback: { type: '', message: '' },
 
     async init() {
@@ -533,13 +538,26 @@ function financeiroApp() {
       this.loading = false;
     },
 
+    // define se uma despesa "vale" (deve ser contabilizada) no mês/ano dados.
+    // Recorrente sem duration_months conta indefinidamente a partir de
+    // expense_date; com duration_months, conta só pelos N meses seguintes
+    // (ex.: financiamento em 12x); sem ser recorrente, conta só no mês exato
+    // do lançamento.
+    expenseAppliesToMonth(e, year, month) {
+      if (!e.expense_date) return false;
+      const start = new Date(e.expense_date);
+      const startKey = start.getFullYear() * 12 + start.getMonth();
+      const targetKey = year * 12 + month;
+      if (targetKey < startKey) return false;
+      if (!e.is_recurring) return targetKey === startKey;
+      if (e.duration_months) return targetKey < startKey + Number(e.duration_months);
+      return true;
+    },
+
     get expensesThisMonthTotal() {
       const now = new Date();
       return this.expenses
-        .filter(e => {
-          const d = new Date(e.expense_date);
-          return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
-        })
+        .filter(e => this.expenseAppliesToMonth(e, now.getFullYear(), now.getMonth()))
         .reduce((sum, e) => sum + Number(e.amount || 0), 0);
     },
 
@@ -557,7 +575,7 @@ function financeiroApp() {
 
     openNewExpenseForm() {
       this.editingExpenseId = null;
-      this.expenseForm = { description: '', category: 'outros', amount: '', is_recurring: false, expense_date: new Date().toISOString().slice(0, 10), notes: '' };
+      this.expenseForm = { description: '', category: 'outros', amount: '', is_recurring: false, duration_months: '', expense_date: new Date().toISOString().slice(0, 10), notes: '' };
       this.showExpenseForm = true;
     },
 
@@ -568,6 +586,7 @@ function financeiroApp() {
         category: e.category || 'outros',
         amount: numberToCurrencyInput(e.amount),
         is_recurring: !!e.is_recurring,
+        duration_months: e.duration_months != null ? String(e.duration_months) : '',
         expense_date: e.expense_date ? String(e.expense_date).slice(0, 10) : new Date().toISOString().slice(0, 10),
         notes: e.notes || ''
       };
@@ -582,6 +601,7 @@ function financeiroApp() {
         category: this.expenseForm.category,
         amount: parseCurrencyToNumber(this.expenseForm.amount),
         is_recurring: this.expenseForm.is_recurring,
+        duration_months: (this.expenseForm.is_recurring && this.expenseForm.duration_months) ? parseInt(this.expenseForm.duration_months, 10) : null,
         expense_date: this.expenseForm.expense_date,
         notes: this.expenseForm.notes || null
       };
@@ -664,9 +684,18 @@ function financeiroApp() {
     async loadExpenses() {
       const { data, error } = await supabaseClient
         .from('clinic_expenses')
-        .select('id, description, category, amount, is_recurring, expense_date, notes')
+        .select('id, description, category, amount, is_recurring, duration_months, expense_date, notes')
         .order('expense_date', { ascending: false });
       this.expenses = error ? [] : (data || []);
+    },
+
+    recurrenceLabel(e) {
+      if (!e.is_recurring) return 'Não';
+      if (!e.duration_months) return 'Sim · sem prazo definido';
+      const end = new Date(e.expense_date);
+      end.setMonth(end.getMonth() + Number(e.duration_months) - 1);
+      const label = end.toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' });
+      return 'Sim · ' + e.duration_months + ' meses (até ' + label.charAt(0).toUpperCase() + label.slice(1) + ')';
     },
 
     async loadProducts() {
