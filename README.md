@@ -18,6 +18,10 @@ python3 -m http.server 8000
 
 Depois acesse `http://localhost:8000` e entre com um usuário já cadastrado em Authentication → Users no painel do Supabase.
 
+## Migrations pendentes de aplicar no Supabase (ação necessária)
+
+O arquivo `database/schema.sql` é sempre a fonte da verdade do estado final esperado do banco, mas ele **não roda sozinho** no Supabase de produção: cada migration em `database/migrations/` precisa ser colada e executada manualmente no SQL Editor do painel do Supabase, em ordem numérica, uma vez cada. Se uma tela der erro do tipo "column ... does not exist" ou "table ... not found in schema cache", quase sempre é uma migration que ainda não rodou nesse banco, não um bug de código. Confirmado neste projeto até agora: a migration **011** (desconto e pagamento combinado em vendas, indicação, modelos de pacote, `clinic_settings` e bucket de logotipo) e a migration **014** (separação de Insumos e Produtos de revenda, validade, itens de produto em vendas) ainda precisam ser rodadas — é a causa direta do erro "Erro ao carregar vendas: column sales.discount_percentage does not exist".
+
 ## Três papéis de acesso
 
 O sistema é dividido em três papéis, definidos pela coluna `role` em `public.users`: `administrador`, `atendente` e `esteticista` (o papel interno `equipe_prisma`, usado pela própria Prisma Creative, enxerga tudo em qualquer clínica).
@@ -41,7 +45,7 @@ vendas.html            venda de planos: carrinho com múltiplos serviços, desco
 financeiro.html         transações, comissão com percentual, pacotes (com margem sobre insumos), maquininhas e parcelamento (administrador)
 reativacao.html         pacientes elegíveis à reativação e histórico de contatos (administrador)
 servicos.html           cadastro de serviços e de insumos, com cálculo de custo e margem (administrador)
-estoque.html            controle de insumos: quantidade em mão, mínimo/máximo com alerta, entradas e saídas, histórico de movimentações e custo por procedimento (administrador)
+estoque.html            controle de insumos (uso clínico) e produtos de revenda (preço de venda e margem) separados por aba: quantidade em mão nunca fica negativa, mínimo/máximo e validade com alerta persistente na própria página e no Dashboard, entradas e saídas, histórico de movimentações e custo por procedimento (administrador)
 bi.html                 visão executiva por área para o Administrador (incluindo ranking de metas com pódio e gráficos mês a mês); para Atendente/Esteticista, mostra a própria comissão, indicações, clientes atendidos e meta do mês
 configuracoes.html      identidade visual, tema claro/escuro, regras de agendamento, senha de gerente e permissão de visualização do desempenho pela equipe (administrador)
 partials/               cabeçalho (busca de paciente, lembretes e atalho de novo paciente) e menu lateral, incluídos via JavaScript
@@ -51,6 +55,7 @@ js/auth-guard.js        exige sessão ativa e redireciona quem tenta acessar pá
 js/include.js            injeta os fragmentos HTML, popula usuário/clínica no menu, aplica as configurações da clínica (logotipo, tema, visibilidade do BI) e esconde itens fora do papel do usuário
 js/topbar.js            busca de paciente, central de lembretes e atalho de novo paciente no cabeçalho
 js/currency-mask.js      máscara de valor em reais (com casas decimais) usada nos campos de preço, custo e venda
+js/confirm-dialog.js    modal de confirmação estilizado (confirmDialog), substitui o window.confirm() nativo em toda ação de remover/aprovar/cancelar
 database/schema.sql      schema completo com RLS por clínica (fonte da verdade, já reflete todas as migrations)
 database/grants.sql      permissões de acesso do role authenticated
 database/seed.sql        clínica e usuário de teste
@@ -64,7 +69,7 @@ Login e sessão real via Supabase Auth, com três papéis de acesso e redirecion
 
 A ficha do paciente também mostra os pacotes contratados (sem repetição de serviço, com sessões agendadas, concluídas, canceladas e remarcadas em cada um), o retorno financeiro total já gerado, a galeria de fotos de evolução com comparador antes/depois, os amigos indicados por aquele paciente (quando a indicação gerou outra venda) e um botão para agendar um novo atendimento direto da ficha.
 
-Agenda com visão diária (colunas por profissional), semanal e mensal, navegação entre períodos, busca de paciente digitando o nome (com o resumo dos serviços contratados em aberto), menu de clique direito sobre um horário livre ou sobre um dia inteiro (incluir agendamento, bloquear horário, gerenciar bloqueios, ver agenda do dia, imprimir), ficha rápida ao clicar num agendamento existente com opção de reagendar ou cancelar com motivo, e bloqueio de horário (feriado, folga, manutenção). Esteticista vê só a própria agenda. Bloqueio de duplo agendamento do mesmo profissional no mesmo horário e formato de exibição do nome do paciente (completo, primeiro nome ou nome e sobrenome) são configuráveis na tela de Configurações.
+Agenda com visão diária (colunas por profissional), semanal e mensal, navegação entre períodos, filtro por profissional (clicando no nome da coluna na visão diária ou pelo seletor no topo, válido nas três visões), busca de paciente digitando o nome, vínculo direto a um pacote em aberto do paciente (sem repetir a mesma informação em dois lugares), aviso ao vivo no próprio formulário quando o profissional escolhido já tem atendimento marcado no mesmo horário, menu de clique direito sobre um horário livre ou sobre um dia inteiro (incluir agendamento, bloquear horário, gerenciar bloqueios, ver agenda do dia, imprimir), ficha rápida ao clicar num agendamento existente com opção de reagendar ou cancelar com motivo, e bloqueio de horário (feriado, folga, manutenção). Esteticista vê só a própria agenda. Bloqueio de duplo agendamento do mesmo profissional no mesmo horário e formato de exibição do nome do paciente (completo, primeiro nome ou nome e sobrenome) são configuráveis na tela de Configurações.
 
 Atendimento e prontuário, com fila do dia (filtrada por profissional para a visão Esteticista), registro de evolução por sessão, upload de fotos para o Supabase Storage com nome de arquivo sanitizado, opção de remover foto antes de concluir, remanejamento de horário direto da fila, vínculo (ou correção do vínculo) a um pacote de sessões no momento da conclusão, consumo automático de sessão de pacote e de insumos do estoque ao concluir um atendimento, e criação automática de uma tarefa de retorno quando o serviço atendido tem intervalo de retorno definido.
 

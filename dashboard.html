@@ -83,7 +83,7 @@
 
       <div class="grid grid-4 mb-5" x-show="!loading">
 
-        <div class="stat-card">
+        <div class="stat-card" style="--accent-color:var(--color-primary);">
           <div class="stat-label">
             Ocupação da agenda hoje
             <div class="stat-icon" style="background:var(--color-primary-light);color:var(--color-primary);">
@@ -92,11 +92,11 @@
               </svg>
             </div>
           </div>
-          <div class="stat-value" x-text="occupancyToday + '%'"></div>
+          <div class="stat-value" style="color:var(--color-primary);" x-text="occupancyToday + '%'"></div>
           <div class="stat-trend text-muted">Com base nos profissionais ativos, janela 08h–18h</div>
         </div>
 
-        <div class="stat-card">
+        <div class="stat-card" style="--accent-color:var(--color-success);">
           <div class="stat-label">
             Taxa de comparecimento (mês)
             <div class="stat-icon" style="background:var(--color-success-bg);color:var(--color-success);">
@@ -105,11 +105,11 @@
               </svg>
             </div>
           </div>
-          <div class="stat-value" x-text="attendanceRateMonth === null ? '—' : attendanceRateMonth + '%'"></div>
+          <div class="stat-value" style="color:var(--color-success);" x-text="attendanceRateMonth === null ? '—' : attendanceRateMonth + '%'"></div>
           <div class="stat-trend text-muted">Concluídos vs. faltas neste mês</div>
         </div>
 
-        <div class="stat-card">
+        <div class="stat-card" style="--accent-color:var(--color-accent);">
           <div class="stat-label">
             Ticket médio
             <div class="stat-icon" style="background:var(--color-accent-light);color:var(--color-accent);">
@@ -118,11 +118,11 @@
               </svg>
             </div>
           </div>
-          <div class="stat-value" x-text="formatCurrency(avgTicket30d)"></div>
+          <div class="stat-value" style="color:var(--color-accent);" x-text="formatCurrency(avgTicket30d)"></div>
           <div class="stat-trend text-muted">Últimos 30 dias</div>
         </div>
 
-        <div class="stat-card">
+        <div class="stat-card" style="--accent-color:var(--color-warning);">
           <div class="stat-label">
             Agendamentos sem confirmação
             <div class="stat-icon" style="background:var(--color-warning-bg);color:var(--color-warning);">
@@ -131,10 +131,43 @@
               </svg>
             </div>
           </div>
-          <div class="stat-value" x-text="pendingConfirmations.length"></div>
+          <div class="stat-value" style="color:var(--color-warning);" x-text="pendingConfirmations.length"></div>
           <div class="stat-trend" style="color:var(--color-warning);">Nas próximas 48 horas</div>
         </div>
 
+      </div>
+
+      <div class="grid grid-4 mb-5" x-show="!loading && lowStockAlerts.length > 0" x-cloak>
+        <div class="stat-card" style="--accent-color:var(--color-danger);grid-column:1 / -1;background:var(--color-danger-bg);border-color:var(--color-danger);">
+          <div class="flex items-center justify-between" style="flex-wrap:wrap;gap:12px;">
+            <div class="flex items-center gap-3">
+              <div class="stat-icon" style="background:var(--color-danger);color:#fff;">
+                <svg class="icon" style="width:17px;height:17px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4"/><circle cx="12" cy="12" r="9"/><path d="M12 16h.01"/></svg>
+              </div>
+              <div>
+                <strong class="text-sm" style="color:var(--color-danger);" x-text="lowStockAlerts.length + ' item(ns) de estoque precisam de atenção'"></strong>
+                <p class="text-xs text-muted mt-1" x-text="lowStockAlertSummary"></p>
+              </div>
+            </div>
+            <a href="estoque.html" class="btn btn-sm" style="background:var(--color-danger);border-color:var(--color-danger);color:#fff;">Ver estoque</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid-2 gap-3 mb-5" x-show="!loading">
+        <div class="card card-shadow">
+          <div class="card-header">
+            <div><h3>Faturamento — últimos 14 dias</h3><p>Procedimentos e pacotes pagos</p></div>
+          </div>
+          <canvas id="dashRevenueChart" height="210"></canvas>
+        </div>
+        <div class="card card-shadow">
+          <div class="card-header">
+            <div><h3>Agendamentos de hoje por status</h3><p x-text="appointmentsToday.length + ' no total'"></p></div>
+          </div>
+          <div x-show="appointmentsToday.length === 0" class="empty-note" style="margin:20px;">Nenhum agendamento para hoje.</div>
+          <canvas id="dashStatusChart" height="210" x-show="appointmentsToday.length > 0"></canvas>
+        </div>
       </div>
 
       <div class="card card-shadow mb-5" x-show="!loading && dashboardLeaderboard.length > 0">
@@ -310,7 +343,83 @@
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <script>
+let dashRevenueChartInstance = null;
+let dashStatusChartInstance = null;
+
+function cssVar(name, fallback) {
+  const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return v || fallback;
+}
+
+function renderDashRevenueChart(app) {
+  const canvas = document.getElementById('dashRevenueChart');
+  if (!canvas || !window.Chart) return;
+  const days = [];
+  const now = new Date();
+  for (let i = 13; i >= 0; i--) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - i);
+    days.push(d.toISOString().slice(0, 10));
+  }
+  const sums = {};
+  app.transactions30d
+    .filter(t => t.type === 'pagamento_procedimento' || t.type === 'venda_pacote')
+    .forEach(t => { sums[t.transaction_date] = (sums[t.transaction_date] || 0) + Number(t.amount || 0); });
+  const values = days.map(d => sums[d] || 0);
+  const labels = days.map(d => { const parts = d.split('-'); return parts[2] + '/' + parts[1]; });
+  const c1 = cssVar('--chart-1', '#2F4A45');
+  const c2 = cssVar('--chart-2', '#B8912F');
+
+  if (dashRevenueChartInstance) dashRevenueChartInstance.destroy();
+  dashRevenueChartInstance = new Chart(canvas.getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Faturamento',
+        data: values,
+        backgroundColor: values.map((v, idx) => idx === values.length - 1 ? c2 : c1),
+        borderRadius: 5,
+        maxBarThickness: 26
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: (ctx) => (Number(ctx.parsed.y) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) } }
+      },
+      scales: {
+        y: { beginAtZero: true, ticks: { callback: (v) => 'R$ ' + Number(v).toLocaleString('pt-BR') } },
+        x: { grid: { display: false } }
+      }
+    }
+  });
+}
+
+function renderDashStatusChart(app) {
+  const canvas = document.getElementById('dashStatusChart');
+  if (!canvas || !window.Chart || app.appointmentsToday.length === 0) return;
+  const counts = {};
+  app.appointmentsToday.forEach(a => { counts[a.status] = (counts[a.status] || 0) + 1; });
+  const statusOrder = ['agendado', 'confirmado', 'em_atendimento', 'concluido', 'faltou', 'cancelado'];
+  const statusColorVar = { agendado: '--chart-2', confirmado: '--chart-6', em_atendimento: '--chart-4', concluido: '--chart-1', faltou: '--chart-3', cancelado: '--color-text-soft' };
+  const statusLabels = { agendado: 'Agendado', confirmado: 'Confirmado', em_atendimento: 'Em atendimento', concluido: 'Concluído', faltou: 'Faltou', cancelado: 'Cancelado' };
+  const present = statusOrder.filter(s => counts[s] > 0);
+  const data = present.map(s => counts[s]);
+  const colors = present.map(s => cssVar(statusColorVar[s], '#999'));
+  const labels = present.map(s => statusLabels[s]);
+
+  if (dashStatusChartInstance) dashStatusChartInstance.destroy();
+  dashStatusChartInstance = new Chart(canvas.getContext('2d'), {
+    type: 'doughnut',
+    data: { labels, datasets: [{ data, backgroundColor: colors, borderWidth: 2, borderColor: cssVar('--color-surface', '#fff') }] },
+    options: { responsive: true, cutout: '62%', plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, padding: 12, font: { size: 11 } } } } }
+  });
+}
+
 function dashboardApp() {
   return {
     loading: true,
@@ -326,6 +435,8 @@ function dashboardApp() {
     newNoteText: '',
     newNoteTarget: '',
     currentUserId: null,
+    lowStockProducts: [],
+    expiringProducts: [],
 
     get visibleNotes() {
       return this.notes.filter((n) => !n.target_user_id || n.target_user_id === this.currentUserId);
@@ -341,9 +452,46 @@ function dashboardApp() {
         this.loadUpcoming48h(),
         this.loadReactivationCandidates(),
         this.loadBirthdays(),
-        this.loadNotes()
+        this.loadNotes(),
+        this.loadLowStockAlerts()
       ]);
       this.loading = false;
+      this.$nextTick(() => {
+        renderDashRevenueChart(this);
+        renderDashStatusChart(this);
+      });
+    },
+
+    async loadLowStockAlerts() {
+      const { data, error } = await supabaseClient
+        .from('products')
+        .select('id, name, stock_quantity, min_stock_quantity, expiry_date')
+        .not('min_stock_quantity', 'is', null);
+      if (error) {
+        this.lowStockProducts = [];
+        this.expiringProducts = [];
+        return;
+      }
+      this.lowStockProducts = (data || []).filter(p => Number(p.stock_quantity || 0) <= Number(p.min_stock_quantity));
+      const soon = new Date();
+      soon.setDate(soon.getDate() + 30);
+      this.expiringProducts = (data || []).filter(p => p.expiry_date && new Date(p.expiry_date) <= soon);
+    },
+
+    get lowStockAlerts() {
+      const ids = new Set();
+      const combined = [];
+      [...this.lowStockProducts, ...this.expiringProducts].forEach(p => {
+        if (!ids.has(p.id)) { ids.add(p.id); combined.push(p); }
+      });
+      return combined;
+    },
+
+    get lowStockAlertSummary() {
+      const parts = [];
+      if (this.lowStockProducts.length > 0) parts.push(this.lowStockProducts.length + ' abaixo do estoque mínimo');
+      if (this.expiringProducts.length > 0) parts.push(this.expiringProducts.length + ' vencendo em até 30 dias');
+      return parts.join(' · ');
     },
 
     async loadClinicId() {

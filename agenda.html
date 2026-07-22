@@ -50,6 +50,16 @@
             <button type="button" :class="{ active: view === 'mes' }" @click="setView('mes')">Mês</button>
           </div>
 
+          <div class="flex items-center gap-2" x-show="professionals.length > 1" x-cloak>
+            <select class="input" style="max-width:200px;" x-model="professionalFilter">
+              <option value="">Todos os profissionais</option>
+              <template x-for="pr in professionals" :key="pr.id">
+                <option :value="pr.id" x-text="pr.full_name"></option>
+              </template>
+            </select>
+            <button type="button" class="btn btn-ghost btn-sm" x-show="professionalFilter" @click="clearProfessionalFilter()">✕ Limpar</button>
+          </div>
+
           <div class="agenda-legend">
             <span class="badge badge-success"><span class="badge-dot"></span>Confirmado</span>
             <span class="badge badge-warning"><span class="badge-dot"></span>Agendado</span>
@@ -83,10 +93,10 @@
               <div class="agenda-hour-label" style="top:764px;">18:00</div>
             </div>
 
-            <div class="agenda-columns" :style="'grid-template-columns: repeat(' + professionals.length + ', minmax(180px, 1fr))'">
-              <template x-for="prof in professionals" :key="prof.id">
+            <div class="agenda-columns" :style="'grid-template-columns: repeat(' + visibleProfessionals.length + ', minmax(180px, 1fr))'">
+              <template x-for="prof in visibleProfessionals" :key="prof.id">
                 <div class="agenda-col">
-                  <div class="agenda-col-header" x-text="prof.full_name"></div>
+                  <div class="agenda-col-header" style="cursor:pointer;" :title="professionalFilter === prof.id ? 'Ver todos os profissionais' : 'Ver só a agenda de ' + prof.full_name" @click="setProfessionalFilter(prof.id)" x-text="prof.full_name + (professionalFilter === prof.id ? ' ✕' : '')"></div>
                   <div class="agenda-col-body" style="height:792px;" @contextmenu.prevent="onContextMenu($event, prof.id)">
                     <template x-for="appt in apptsFor(prof.id)" :key="appt.id">
                       <div class="agenda-event" :class="statusClass(appt.status)" :style="'cursor:pointer; top:' + topFor(appt.scheduled_at) + 'px; height:' + heightFor(appt.duration_minutes) + 'px;'" @click.stop="showApptDetail(appt)">
@@ -245,50 +255,46 @@
             </div>
             <div class="form-group">
               <label class="label">Profissional</label>
-              <select class="input" x-model="newAppt.professional_id" required>
+              <select class="input" x-model="newAppt.professional_id" required @change="checkLiveConflict()">
                 <option value="" disabled>Selecione</option>
                 <template x-for="pr in professionals" :key="pr.id">
                   <option :value="pr.id" x-text="pr.full_name"></option>
                 </template>
               </select>
             </div>
+            <div class="form-group" x-show="newAppt.patient_id" x-cloak>
+              <label class="label">Vincular a pacote (opcional)</label>
+              <div x-show="patientPackages.length === 0" class="text-xs text-muted">Nenhum pacote em aberto para este paciente — selecione o serviço abaixo para uma sessão avulsa.</div>
+              <select class="input" x-model="newAppt.package_id" x-show="patientPackages.length > 0" @change="onPackageChangeForAppt()">
+                <option value="">Sessão avulsa (sem pacote)</option>
+                <template x-for="pk in patientPackages" :key="pk.id">
+                  <option :value="pk.id" x-text="(pk.services ? pk.services.name : 'Pacote') + ' · ' + pk.used_sessions + ' de ' + pk.total_sessions + ' usadas · faltam ' + (pk.total_sessions - pk.used_sessions)"></option>
+                </template>
+              </select>
+              <p class="input-hint" x-show="patientPackages.length > 0">O serviço abaixo é preenchido automaticamente pelo pacote escolhido. Ao concluir o atendimento, a sessão usada é contabilizada.</p>
+            </div>
             <div class="form-group">
               <label class="label">Serviço</label>
-              <select class="input" x-model="newAppt.service_id">
+              <select class="input" x-model="newAppt.service_id" @change="checkLiveConflict()" :disabled="!!newAppt.package_id">
                 <option value="">Nenhum</option>
                 <template x-for="s in services" :key="s.id">
                   <option :value="s.id" x-text="s.name"></option>
                 </template>
               </select>
-            </div>
-            <div class="form-group" x-show="newAppt.patient_id" x-cloak>
-              <label class="label">Serviços contratados em aberto</label>
-              <div x-show="patientPackages.length === 0" class="text-xs text-muted">Nenhum pacote em aberto para este paciente.</div>
-              <div class="flex gap-2" style="flex-wrap:wrap;" x-show="patientPackages.length > 0">
-                <template x-for="grp in groupedOpenServices" :key="'chip-' + grp.name">
-                  <span class="badge badge-accent" x-text="grp.name + ' · faltam ' + grp.remaining"></span>
-                </template>
-              </div>
-            </div>
-            <div class="form-group" x-show="patientPackages.length > 0" x-cloak>
-              <label class="label">Vincular a pacote (opcional)</label>
-              <select class="input" x-model="newAppt.package_id">
-                <option value="">Sessão avulsa</option>
-                <template x-for="pk in patientPackages" :key="pk.id">
-                  <option :value="pk.id" x-text="(pk.services ? pk.services.name : 'Pacote') + ' · ' + pk.used_sessions + ' de ' + pk.total_sessions + ' usadas · faltam ' + (pk.total_sessions - pk.used_sessions)"></option>
-                </template>
-              </select>
-              <p class="input-hint">Ao concluir o atendimento, a sessão usada deste pacote é contabilizada automaticamente.</p>
+              <p class="input-hint" x-show="newAppt.package_id">Travado no serviço do pacote vinculado acima. Escolha "Sessão avulsa" para liberar.</p>
             </div>
             <div class="grid grid-2 gap-3">
               <div class="form-group">
                 <label class="label">Data</label>
-                <input class="input" type="date" x-model="newAppt.date" required>
+                <input class="input" type="date" x-model="newAppt.date" required @change="checkLiveConflict()">
               </div>
               <div class="form-group">
                 <label class="label">Hora</label>
-                <input class="input" type="time" x-model="newAppt.time" required>
+                <input class="input" type="time" x-model="newAppt.time" required @change="checkLiveConflict()">
               </div>
+            </div>
+            <div class="card mb-3" style="padding:10px 14px;border-color:var(--color-danger);background:var(--color-danger-bg);" x-show="liveConflictWarning" x-cloak>
+              <p class="text-xs" style="color:var(--color-danger);margin:0;">⚠ <span x-text="liveConflictWarning"></span></p>
             </div>
             <button class="btn btn-primary btn-block mt-2" type="submit" :disabled="saving">
               <span x-show="!saving">Criar agendamento</span>
@@ -375,6 +381,7 @@ function agendaApp() {
     isEsteticista: false,
     view: 'dia',
     currentDate: new Date(),
+    professionalFilter: '',
     professionals: [],
     patients: [],
     services: [],
@@ -387,6 +394,8 @@ function agendaApp() {
     patientDropdownOpen: false,
     patientPackages: [],
     newAppt: { patient_id: '', professional_id: '', service_id: '', package_id: '', date: '', time: '09:00' },
+    liveConflictWarning: '',
+    lastUsedServiceId: '',
     newBlock: { professional_id: '', date: '', start_time: '09:00', end_time: '10:00', reason: '' },
     contextMenu: { show: false, x: 0, y: 0, professionalId: null, time: '09:00', date: null, showViewDay: false },
     apptDetail: { show: false, appt: null, mode: 'view', rescheduleDate: '', rescheduleTime: '', cancelReason: '' },
@@ -545,11 +554,27 @@ function agendaApp() {
     apptsForDay(day) {
       return this.appointments
         .filter(a => this.isSameDate(new Date(a.scheduled_at), day))
+        .filter(a => !this.professionalFilter || a.professional_id === this.professionalFilter)
         .sort((a, b) => new Date(a.scheduled_at) - new Date(b.scheduled_at));
     },
 
+    get visibleProfessionals() {
+      if (!this.professionalFilter) return this.professionals;
+      return this.professionals.filter(p => p.id === this.professionalFilter);
+    },
+
+    setProfessionalFilter(id) {
+      this.professionalFilter = this.professionalFilter === id ? '' : id;
+    },
+
+    clearProfessionalFilter() {
+      this.professionalFilter = '';
+    },
+
     blocksForDay(day) {
-      return this.blocks.filter(b => this.isSameDate(new Date(b.start_at), day));
+      return this.blocks
+        .filter(b => this.isSameDate(new Date(b.start_at), day))
+        .filter(b => !this.professionalFilter || b.professional_id === this.professionalFilter || b.professional_id === null);
     },
 
     topFor(scheduledAt) {
@@ -714,7 +739,7 @@ function agendaApp() {
       const time = this.contextMenu.time;
       const date = this.contextMenu.date || this.currentDate;
       this.contextMenu.show = false;
-      this.newAppt = { patient_id: '', professional_id: profId, service_id: '', package_id: '', date: this.toDateInputValue(date), time };
+      this.newAppt = { patient_id: '', professional_id: profId, service_id: this.lastUsedServiceId, package_id: '', date: this.toDateInputValue(date), time };
       this.patientSearch = '';
       this.patientDropdownOpen = false;
       this.patientPackages = [];
@@ -813,17 +838,6 @@ function agendaApp() {
       return this.patients.filter(p => p.full_name.toLowerCase().includes(q)).slice(0, 20);
     },
 
-    get groupedOpenServices() {
-      const map = {};
-      this.patientPackages.forEach(pk => {
-        const name = pk.services ? pk.services.name : 'Pacote';
-        const remaining = Number(pk.total_sessions) - Number(pk.used_sessions);
-        if (!map[name]) map[name] = 0;
-        map[name] += remaining;
-      });
-      return Object.keys(map).sort().map(name => ({ name, remaining: map[name] }));
-    },
-
     async selectPatientForAppt(p) {
       this.newAppt.patient_id = p.id;
       this.newAppt.package_id = '';
@@ -835,18 +849,48 @@ function agendaApp() {
     async loadPatientPackages(patientId) {
       const { data, error } = await supabaseClient
         .from('packages')
-        .select('id, total_sessions, used_sessions, expires_at, services ( name )')
+        .select('id, service_id, total_sessions, used_sessions, expires_at, services ( name )')
         .eq('patient_id', patientId);
       const list = error ? [] : (data || []);
       this.patientPackages = list.filter(pk => pk.used_sessions < pk.total_sessions);
+      // Se o paciente tem só um pacote em aberto, já vincula automaticamente
+      // e sincroniza o serviço — evita escolher serviço e pacote em separado
+      // para algo que é, na prática, a mesma informação.
+      if (this.patientPackages.length === 1) {
+        this.newAppt.package_id = this.patientPackages[0].id;
+        this.newAppt.service_id = this.patientPackages[0].service_id || this.newAppt.service_id;
+      }
+    },
+
+    onPackageChangeForAppt() {
+      if (this.newAppt.package_id) {
+        const pkg = this.patientPackages.find((pk) => pk.id === this.newAppt.package_id);
+        if (pkg && pkg.service_id) this.newAppt.service_id = pkg.service_id;
+      }
+      this.checkLiveConflict();
     },
 
     openNewForm() {
-      this.newAppt = { patient_id: '', professional_id: this.isEsteticista ? this.currentUserId : '', service_id: '', package_id: '', date: this.toDateInputValue(this.currentDate), time: '09:00' };
+      this.newAppt = { patient_id: '', professional_id: this.isEsteticista ? this.currentUserId : '', service_id: this.lastUsedServiceId, package_id: '', date: this.toDateInputValue(this.currentDate), time: '09:00' };
       this.patientSearch = '';
       this.patientDropdownOpen = false;
       this.patientPackages = [];
+      this.liveConflictWarning = '';
       this.showNewForm = true;
+      if (this.newAppt.professional_id) this.checkLiveConflict();
+    },
+
+    async checkLiveConflict() {
+      this.liveConflictWarning = '';
+      if (!this.newAppt.professional_id || !this.newAppt.date || !this.newAppt.time) return;
+      const scheduledAt = new Date(this.newAppt.date + 'T' + this.newAppt.time + ':00');
+      if (isNaN(scheduledAt.getTime())) return;
+      const service = this.services.find(s => s.id === this.newAppt.service_id);
+      const durationMinutes = service ? service.default_duration_minutes : 60;
+      const hasConflict = await this.hasSchedulingConflict(this.newAppt.professional_id, scheduledAt, durationMinutes, null);
+      if (!hasConflict) return;
+      const prof = this.professionals.find(pr => pr.id === this.newAppt.professional_id);
+      this.liveConflictWarning = (prof ? prof.full_name : 'Este profissional') + ' já tem um atendimento nesse horário. Escolha outro horário ou outro profissional.';
     },
 
     displayPatientName(fullName) {
@@ -889,6 +933,10 @@ function agendaApp() {
         this.showFeedback('error', 'Selecione um paciente na busca antes de salvar.');
         return;
       }
+      if (!this.newAppt.professional_id) {
+        this.showFeedback('error', 'Selecione o profissional responsável antes de salvar.');
+        return;
+      }
       const service = this.services.find(s => s.id === this.newAppt.service_id);
       const scheduledAt = new Date(this.newAppt.date + 'T' + (this.newAppt.time || '09:00') + ':00');
       const durationMinutes = service ? service.default_duration_minutes : 60;
@@ -921,6 +969,9 @@ function agendaApp() {
       }
       this.showNewForm = false;
       this.showFeedback('success', 'Agendamento criado com sucesso.');
+      // Lembra o último serviço usado: agendar várias sessões seguidas do
+      // mesmo procedimento (comum) não deve exigir escolher de novo toda vez.
+      if (this.newAppt.service_id) this.lastUsedServiceId = this.newAppt.service_id;
       await this.loadAll();
     },
 

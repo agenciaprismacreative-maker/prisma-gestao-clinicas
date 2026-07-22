@@ -64,7 +64,9 @@ function topbarApp() {
       this.remindersLoading = true;
       const now = new Date();
       const in48h = new Date(now.getTime() + 48 * 3600 * 1000);
-      const [tasksRes, apptRes] = await Promise.all([
+      const in3days = new Date(now.getTime() + 3 * 24 * 3600 * 1000);
+
+      const queries = [
         supabaseClient
           .from('tasks')
           .select('id, title, due_date, status, assigned_to')
@@ -77,33 +79,108 @@ function topbarApp() {
           .eq('status', 'agendado')
           .gte('scheduled_at', now.toISOString())
           .lte('scheduled_at', in48h.toISOString())
-      ]);
+      ];
 
+      // Fontes extras, só para administrador: estoque baixo/vencendo e
+      // vendas paradas aguardando aprovação. Consultas feitas com try/catch
+      // implícito (erro vira lista vazia) para não quebrar o sino de
+      // lembretes inteiro se alguma migração ainda não tiver sido aplicada.
+      if (this.isAdmin) {
+        queries.push(
+          supabaseClient
+            .from('products')
+            .select('id, name, stock_quantity, min_stock_quantity, expiry_date')
+            .eq('clinic_id', this.clinicId)
+            .not('min_stock_quantity', 'is', null),
+          supabaseClient
+            .from('sales')
+            .select('id, created_at, patients ( full_name )')
+            .eq('clinic_id', this.clinicId)
+            .eq('status', 'pendente')
+        );
+      }
+
+      const [tasksRes, apptRes, productsRes, salesRes] = await Promise.all(queries);
       const items = [];
+
+      // Tarefas: só entram no sino as atrasadas ou que vencem nos próximos
+      // 3 dias. Mostrar toda tarefa aberta (sem olhar prazo) é o que deixava
+      // isso raso — a lista virava ruído em vez de aviso.
       (tasksRes.data || []).forEach((t) => {
         if (!this.isAdmin && t.assigned_to !== this.currentUserId) return;
         const due = t.due_date ? new Date(t.due_date) : null;
-        const overdue = !!(due && due < now);
+        if (!due || due > in3days) return;
+        const overdue = due < now;
         items.push({
           label: t.title,
-          overdue,
+          sublabel: overdue ? 'Tarefa atrasada' : 'Vence nos próximos dias',
+          severity: overdue ? 'urgent' : 'warning',
           href: 'equipe.html'
         });
       });
+
       (apptRes.data || []).forEach((a) => {
         items.push({
-          label: 'Confirmar agendamento: ' + (a.patients ? a.patients.full_name : 'paciente'),
-          overdue: false,
+          label: 'Confirmar: ' + (a.patients ? a.patients.full_name : 'paciente'),
+          sublabel: 'Agendamento nas próximas 48h ainda sem confirmação',
+          severity: 'info',
           href: 'agenda.html'
         });
       });
-      items.sort((a, b) => (b.overdue ? 1 : 0) - (a.overdue ? 1 : 0));
-      this.reminders = items.slice(0, 15);
+
+      if (this.isAdmin && productsRes && !productsRes.error) {
+        const products = productsRes.data || [];
+        products
+          .filter((p) => Number(p.stock_quantity || 0) <= Number(p.min_stock_quantity))
+          .forEach((p) => {
+            items.push({
+              label: 'Estoque baixo: ' + p.name,
+              sublabel: Number(p.stock_quantity || 0) + ' em estoque (mínimo ' + p.min_stock_quantity + ')',
+              severity: 'urgent',
+              href: 'estoque.html'
+            });
+          });
+
+        const in7days = new Date(now.getTime() + 7 * 24 * 3600 * 1000);
+        products
+          .filter((p) => p.expiry_date && new Date(p.expiry_date) <= in7days)
+          .forEach((p) => {
+            const expired = new Date(p.expiry_date) < now;
+            items.push({
+              label: (expired ? 'Vencido: ' : 'Vence em breve: ') + p.name,
+              sublabel: expired ? 'Já passou da validade' : 'Vence em até 7 dias',
+              severity: expired ? 'urgent' : 'warning',
+              href: 'estoque.html'
+            });
+          });
+      }
+
+      if (this.isAdmin && salesRes && !salesRes.error) {
+        (salesRes.data || []).forEach((s) => {
+          const daysWaiting = Math.floor((now - new Date(s.created_at)) / 86400000);
+          items.push({
+            label: 'Venda pendente: ' + (s.patients ? s.patients.full_name : 'paciente'),
+            sublabel: daysWaiting > 0 ? ('Aguardando aprovação há ' + daysWaiting + ' dia(s)') : 'Aguardando aprovação',
+            severity: daysWaiting >= 2 ? 'urgent' : 'warning',
+            href: 'vendas.html'
+          });
+        });
+      }
+
+      const severityWeight = { urgent: 0, warning: 1, info: 2 };
+      items.sort((a, b) => severityWeight[a.severity] - severityWeight[b.severity]);
+      this.reminders = items.slice(0, 20);
       this.remindersLoading = false;
     },
 
-    get overdueCount() {
-      return this.reminders.filter((r) => r.overdue).length;
+    get urgentCount() {
+      return this.reminders.filter((r) => r.severity === 'urgent').length;
+    },
+
+    severityColor(severity) {
+      if (severity === 'urgent') return 'var(--color-danger)';
+      if (severity === 'warning') return 'var(--color-warning)';
+      return 'var(--color-text)';
     }
   };
 }

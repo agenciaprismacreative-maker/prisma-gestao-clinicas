@@ -397,6 +397,7 @@
 </div>
 
 <script src="js/currency-mask.js"></script>
+<script src="js/confirm-dialog.js"></script>
 <script>
 function financeiroApp() {
   return {
@@ -593,7 +594,7 @@ function financeiroApp() {
     },
 
     async removeTemplate(tpl) {
-      if (!window.confirm('Remover o pacote "' + tpl.name + '"? Isso não afeta pacotes já vendidos.')) return;
+      if (!(await confirmDialog('Tem certeza que deseja remover o pacote "' + tpl.name + '"? Isso não afeta pacotes já vendidos.'))) return;
       const { error } = await supabaseClient.from('plan_templates').delete().eq('id', tpl.id);
       if (error) {
         this.showFeedback('error', 'Erro ao remover pacote: ' + error.message);

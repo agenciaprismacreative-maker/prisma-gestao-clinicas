@@ -36,16 +36,17 @@
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <path d="M6 9a6 6 0 0 1 12 0c0 4 1.5 5.5 1.5 5.5H4.5S6 13 6 9z"/><path d="M10 18a2 2 0 0 0 4 0"/>
         </svg>
-        <span class="dot" x-show="reminders.length > 0"></span>
+        <span class="dot" :style="urgentCount > 0 ? 'background:var(--color-danger);' : ''" x-show="reminders.length > 0"></span>
       </button>
 
-      <div x-show="showReminders" x-cloak @click.outside="showReminders = false" class="card card-shadow" style="position:absolute;top:calc(100% + 6px);right:0;width:300px;padding:8px;z-index:70;max-height:360px;overflow-y:auto;">
+      <div x-show="showReminders" x-cloak @click.outside="showReminders = false" class="card card-shadow" style="position:absolute;top:calc(100% + 6px);right:0;width:320px;padding:8px;z-index:70;max-height:400px;overflow-y:auto;">
         <p class="text-xs text-muted mb-2" style="padding:4px 8px;">Lembretes e pendências</p>
         <div x-show="remindersLoading" class="text-xs text-muted" style="padding:8px;">Carregando…</div>
         <div x-show="!remindersLoading && reminders.length === 0" class="text-xs text-muted" style="padding:8px;">Nada pendente por aqui.</div>
         <template x-for="(r, i) in reminders" :key="i">
-          <a :href="r.href" class="topbar-search-result" style="display:block;padding:8px;border-radius:var(--radius-md);text-decoration:none;">
-            <span class="text-sm" :style="'color:' + (r.overdue ? 'var(--color-danger)' : 'var(--color-text)')" x-text="r.label"></span>
+          <a :href="r.href" class="topbar-search-result" style="display:block;padding:8px;border-radius:var(--radius-md);text-decoration:none;border-left:3px solid transparent;" :style="'border-left-color:' + severityColor(r.severity)">
+            <span class="text-sm" :style="'color:' + severityColor(r.severity) + ';font-weight:600;'" x-text="r.label"></span>
+            <div class="text-xs text-muted mt-1" x-show="r.sublabel" x-text="r.sublabel"></div>
           </a>
         </template>
       </div>

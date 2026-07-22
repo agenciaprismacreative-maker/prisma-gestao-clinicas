@@ -445,7 +445,9 @@
               <div class="grid grid-2 gap-3">
                 <div class="form-group">
                   <label class="label">CEP</label>
-                  <input class="input" x-model="newPatient.address_cep" @input="newPatient.address_cep = maskCep($event.target.value)" placeholder="00000-000" maxlength="9">
+                  <input class="input" x-model="newPatient.address_cep" @input="onCepInput($event)" @blur="lookupCep()" placeholder="00000-000" maxlength="9">
+                  <p class="input-hint" x-show="cepLoading" x-cloak>Buscando endereço…</p>
+                  <p class="input-hint" x-show="!cepLoading">Preenche rua, bairro, cidade e UF automaticamente.</p>
                 </div>
                 <div class="form-group">
                   <label class="label">UF</label>
@@ -525,22 +527,26 @@
                 <p class="input-hint">Serve para reconhecer/bonificar quem trouxe o novo paciente. Entra na aba de metas de quem indicou.</p>
               </div>
 
-              <hr class="divider">
-              <h4 class="text-xs text-muted mb-2" style="text-transform:uppercase;letter-spacing:.04em;">Responsável legal</h4>
-              <p class="text-xs text-soft mb-3">Preencher apenas se o paciente for menor de idade ou dependente de outra pessoa.</p>
-              <div class="grid grid-2 gap-3">
-                <div class="form-group">
-                  <label class="label">Nome do responsável</label>
-                  <input class="input" x-model="newPatient.legal_guardian_name">
+              <div class="card" style="background:var(--color-surface-alt);border:1px dashed var(--color-border);box-shadow:none;padding:14px 16px;margin-top:8px;">
+                <div class="flex items-center gap-2 mb-1">
+                  <h4 class="text-sm" style="margin:0;font-weight:600;">Responsável legal</h4>
+                  <span class="badge badge-neutral" style="font-size:10.5px;padding:2px 8px;">Opcional</span>
                 </div>
-                <div class="form-group">
-                  <label class="label">CPF do responsável</label>
-                  <input class="input" x-model="newPatient.legal_guardian_cpf" @input="newPatient.legal_guardian_cpf = maskCpf($event.target.value)" maxlength="14">
+                <p class="text-xs text-soft mb-3">Só se aplica a pacientes menores de idade ou dependentes de outra pessoa. Para pacientes adultos, pode deixar em branco e seguir em frente.</p>
+                <div class="grid grid-2 gap-3">
+                  <div class="form-group">
+                    <label class="label">Nome do responsável</label>
+                    <input class="input" x-model="newPatient.legal_guardian_name">
+                  </div>
+                  <div class="form-group">
+                    <label class="label">CPF do responsável</label>
+                    <input class="input" x-model="newPatient.legal_guardian_cpf" @input="newPatient.legal_guardian_cpf = maskCpf($event.target.value)" maxlength="14">
+                  </div>
                 </div>
-              </div>
-              <div class="form-group">
-                <label class="label">Observações sobre o responsável</label>
-                <textarea class="input" x-model="newPatient.legal_guardian_notes" rows="2"></textarea>
+                <div class="form-group" style="margin-bottom:0;">
+                  <label class="label">Observações sobre o responsável</label>
+                  <textarea class="input" x-model="newPatient.legal_guardian_notes" rows="2"></textarea>
+                </div>
               </div>
             </div>
 
@@ -568,28 +574,8 @@
             <div x-show="formTab==='outros'" x-cloak>
               <div class="grid grid-2 gap-3">
                 <div class="form-group">
-                  <label class="label">Naturalidade</label>
-                  <input class="input" x-model="newPatient.naturality" placeholder="Cidade/UF onde nasceu">
-                </div>
-                <div class="form-group">
                   <label class="label">Nº de prontuário</label>
                   <input class="input" x-model="newPatient.record_number">
-                </div>
-              </div>
-              <div class="grid grid-2 gap-3">
-                <div class="form-group">
-                  <label class="label">Nome do pai</label>
-                  <input class="input" x-model="newPatient.father_name">
-                </div>
-                <div class="form-group">
-                  <label class="label">Nome da mãe</label>
-                  <input class="input" x-model="newPatient.mother_name">
-                </div>
-              </div>
-              <div class="grid grid-2 gap-3">
-                <div class="form-group">
-                  <label class="label">Profissão</label>
-                  <input class="input" x-model="newPatient.profession">
                 </div>
                 <div class="form-group">
                   <label class="label">Local de trabalho</label>
@@ -751,8 +737,37 @@ function pacientesApp() {
     photoLightbox: { show: false, photo: null },
     referredFriends: [],
     feedback: { type: '', message: '' },
+    cepLoading: false,
 
     maskPhone, maskCpf, maskCep, isValidEmail, isValidCpf,
+
+    onCepInput(e) {
+      this.newPatient.address_cep = maskCep(e.target.value);
+      const digits = this.newPatient.address_cep.replace(/\D/g, '');
+      if (digits.length === 8) this.lookupCep();
+    },
+
+    async lookupCep() {
+      const digits = (this.newPatient.address_cep || '').replace(/\D/g, '');
+      if (digits.length !== 8) return;
+      this.cepLoading = true;
+      try {
+        const res = await fetch('https://viacep.com.br/ws/' + digits + '/json/');
+        const data = await res.json();
+        if (!res.ok || data.erro) {
+          this.showFeedback('error', 'CEP não encontrado. Preencha o endereço manualmente.');
+          return;
+        }
+        this.newPatient.address_street = data.logradouro || this.newPatient.address_street;
+        this.newPatient.address_neighborhood = data.bairro || this.newPatient.address_neighborhood;
+        this.newPatient.address_city = data.localidade || this.newPatient.address_city;
+        this.newPatient.address_state = data.uf || this.newPatient.address_state;
+      } catch (err) {
+        this.showFeedback('error', 'Não foi possível buscar esse CEP agora. Preencha o endereço manualmente.');
+      } finally {
+        this.cepLoading = false;
+      }
+    },
 
     async init() {
       await this.loadClinicId();

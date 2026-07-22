@@ -35,6 +35,15 @@
   --color-info: #3A6B9C;
   --color-info-bg: #E8F0F8;
 
+  /* Paleta de gráficos — usada em Chart.js (dashboard e BI) para dar
+     distinção visual entre séries/categorias sem fugir do tom da marca. */
+  --chart-1: #2F4A45;
+  --chart-2: #B8912F;
+  --chart-3: #C1573D;
+  --chart-4: #3A6B9C;
+  --chart-5: #7C5A8C;
+  --chart-6: #3A8C82;
+
   /* Espaçamento */
   --space-1: 4px;
   --space-2: 8px;
@@ -88,10 +97,20 @@ html[data-theme="escuro"] {
   --color-info: #5C93C9;
   --color-info-bg: #1E2A34;
 
+  --chart-1: #4C7B72;
+  --chart-2: #D4AF52;
+  --chart-3: #D9765A;
+  --chart-4: #5C93C9;
+  --chart-5: #9B7BAE;
+  --chart-6: #4FADA0;
+
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, .3), 0 1px 3px rgba(0, 0, 0, .25);
   --shadow-md: 0 4px 16px rgba(0, 0, 0, .35);
   --shadow-lg: 0 16px 40px rgba(0, 0, 0, .5);
 }
+
+html[data-theme="escuro"] .podium-place.rank-2 { background: #232A2F; border-color: #3E4A52; }
+html[data-theme="escuro"] .podium-place.rank-3 { background: #2E2620; border-color: #5C4530; }
 
 * { box-sizing: border-box; }
 html, body { height: 100%; }
@@ -232,7 +251,8 @@ svg.icon { width: 20px; height: 20px; flex-shrink: 0; }
 .grid-2 { grid-template-columns: repeat(2, 1fr); }
 .grid-main-side { grid-template-columns: 1.6fr 1fr; }
 
-.stat-card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: var(--space-5); }
+.stat-card { position: relative; overflow: hidden; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: var(--space-5); }
+.stat-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: var(--accent-color, transparent); }
 .stat-card .stat-label { font-size: 12.5px; color: var(--color-text-muted); font-weight: 500; display: flex; align-items: center; justify-content: space-between; }
 .stat-card .stat-value { font-size: 28px; font-weight: 700; margin-top: var(--space-2); letter-spacing: -.02em; }
 .stat-card .stat-trend { font-size: 12.5px; margin-top: var(--space-2); display: flex; align-items: center; gap: 4px; }
@@ -494,8 +514,8 @@ textarea.input { resize: vertical; min-height: 80px; }
 .podium { display: flex; align-items: flex-end; justify-content: center; gap: 16px; flex-wrap: wrap; padding-top: 22px; }
 .podium-place { position: relative; width: 148px; background: var(--color-surface-alt); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: var(--space-4) var(--space-3) var(--space-4); text-align: center; }
 .podium-place.rank-1 { order: 2; background: var(--color-accent-light); border-color: var(--color-accent); padding-top: calc(var(--space-4) + 6px); box-shadow: 0 8px 22px rgba(184, 145, 47, .22); }
-.podium-place.rank-2 { order: 1; margin-bottom: 12px; }
-.podium-place.rank-3 { order: 3; margin-bottom: 22px; }
+.podium-place.rank-2 { order: 1; margin-bottom: 12px; background: #EAF0F4; border-color: #B9C6D1; }
+.podium-place.rank-3 { order: 3; margin-bottom: 22px; background: #FBEEE4; border-color: #DCAE85; }
 .podium-crown { position: absolute; top: -19px; left: 50%; transform: translateX(-50%); font-size: 24px; line-height: 1; }
 .podium-medal { width: 24px; height: 24px; border-radius: 50%; margin: 0 auto var(--space-2); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #fff; background: var(--color-text-soft); }
 .podium-place.rank-1 .podium-medal { background: var(--color-accent); }

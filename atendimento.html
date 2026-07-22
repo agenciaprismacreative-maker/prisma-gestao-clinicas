@@ -21,6 +21,10 @@
           <h2>Atendimento</h2>
           <p>Fila de hoje e registro de prontuário por sessão</p>
         </div>
+        <a href="agenda.html?novo_agendamento=1" class="btn btn-primary">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+          Novo agendamento
+        </a>
       </div>
 
       <div x-show="feedback.message" x-cloak class="card mb-4" :style="'padding:12px 16px;border-color:' + (feedback.type==='error' ? 'var(--color-danger)' : 'var(--color-success)')">
@@ -529,18 +533,27 @@ function atendimentoApp() {
                 .eq('id', row.product_id)
                 .single();
               if (productError || !product) continue;
+              // Nunca deixa o estoque ficar negativo: se o consumo pedido
+              // pela receita do serviço for maior que o disponível, consome
+              // só o que existe e registra o ajuste no motivo da saída.
+              const currentStock = Number(product.stock_quantity || 0);
+              const requestedQty = Number(row.quantity_used || 0);
+              const consumedQty = Math.min(requestedQty, currentStock);
+              if (consumedQty <= 0) continue;
               await supabaseClient.from('stock_movements').insert({
                 clinic_id: this.clinicId,
                 product_id: row.product_id,
                 movement_type: 'saida',
-                quantity: row.quantity_used,
-                reason: 'Consumo automático em atendimento',
+                quantity: consumedQty,
+                reason: consumedQty < requestedQty
+                  ? 'Consumo automático em atendimento (estoque insuficiente, quantidade ajustada)'
+                  : 'Consumo automático em atendimento',
                 appointment_id: this.selectedAppt.id,
                 created_by: user ? user.id : null
               });
               await supabaseClient
                 .from('products')
-                .update({ stock_quantity: Number(product.stock_quantity || 0) - Number(row.quantity_used) })
+                .update({ stock_quantity: Math.max(0, currentStock - consumedQty) })
                 .eq('id', row.product_id);
             }
           } catch (stockErr) {

@@ -284,6 +284,9 @@ create table public.products (
   stock_quantity numeric(10, 2),
   min_stock_quantity numeric(10, 2),
   max_stock_quantity numeric(10, 2),
+  product_type text not null default 'insumo' check (product_type in ('insumo', 'revenda')),
+  sale_price numeric(10, 2),
+  expiry_date date,
   created_at timestamptz not null default now()
 );
 
@@ -312,6 +315,7 @@ create table public.stock_movements (
   unit_cost numeric(10, 2),
   reason text,
   appointment_id uuid references public.appointments (id) on delete set null,
+  sale_id uuid references public.sales (id) on delete set null,
   created_by uuid references public.users (id) on delete set null,
   created_at timestamptz not null default now()
 );
@@ -379,14 +383,19 @@ create table public.sales (
 create table public.sale_items (
   id uuid primary key default gen_random_uuid(),
   sale_id uuid not null references public.sales (id) on delete cascade,
-  service_id uuid not null references public.services (id),
+  service_id uuid references public.services (id),
+  product_id uuid references public.products (id) on delete restrict,
   quantity integer not null default 1,
   unit_price numeric(10, 2) not null default 0,
   discount_percentage numeric(5, 2) not null default 0,
   is_courtesy boolean not null default false,
   line_total numeric(10, 2) not null default 0,
   package_id uuid references public.packages (id) on delete set null,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  constraint sale_items_service_or_product_check check (
+    (service_id is not null and product_id is null) or
+    (service_id is null and product_id is not null)
+  )
 );
 
 -- ============================================================================
@@ -462,6 +471,7 @@ create index idx_products_clinic on public.products (clinic_id);
 create index idx_stock_movements_product on public.stock_movements (product_id);
 create index idx_stock_movements_clinic on public.stock_movements (clinic_id);
 create index idx_stock_movements_created_at on public.stock_movements (created_at);
+create index idx_stock_movements_sale on public.stock_movements (sale_id);
 create index idx_patient_photos_appointment on public.patient_photos (appointment_id);
 create index idx_goals_clinic_period on public.goals (clinic_id, period_month);
 create index idx_goals_professional on public.goals (professional_id);
@@ -471,6 +481,7 @@ create index idx_transactions_sale_group on public.transactions (sale_group_id);
 create index idx_sales_clinic_status on public.sales (clinic_id, status);
 create index idx_sales_patient on public.sales (patient_id);
 create index idx_sale_items_sale on public.sale_items (sale_id);
+create index idx_sale_items_product on public.sale_items (product_id);
 create index idx_dashboard_notes_clinic on public.dashboard_notes (clinic_id, created_at);
 create index idx_dashboard_notes_target on public.dashboard_notes (target_user_id);
 create index idx_sales_referred_patient on public.sales (referred_by_patient_id);

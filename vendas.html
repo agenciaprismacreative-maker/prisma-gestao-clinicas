@@ -102,7 +102,7 @@
                 <tbody>
                   <template x-for="item in viewingSaleItems" :key="item.id">
                     <tr>
-                      <td x-text="(item.services ? item.services.name : '—') + (item.is_courtesy ? ' (cortesia)' : '')"></td>
+                      <td x-text="saleItemName(item) + (item.is_courtesy ? ' (cortesia)' : '')"></td>
                       <td x-text="item.quantity"></td>
                       <td x-text="item.discount_percentage ? item.discount_percentage + '%' : '—'"></td>
                       <td x-text="formatCurrency(item.line_total)"></td>
@@ -232,13 +232,41 @@
           </div>
           <button type="button" class="btn btn-secondary btn-sm mb-3" @click="addDraftItem()" :disabled="!draftItem.service_id">+ Adicionar ao carrinho</button>
 
+          <div x-show="products.length > 0" x-cloak>
+            <hr class="divider">
+            <h4 class="text-xs text-muted mb-2" style="text-transform:uppercase;letter-spacing:.04em;">Adicionar produto ao carrinho</h4>
+            <div class="grid grid-2 gap-3">
+              <div class="form-group">
+                <label class="label">Produto</label>
+                <select class="input" x-model="draftProductItem.product_id" @change="onDraftProductChange()">
+                  <option value="">Selecione</option>
+                  <template x-for="p in products" :key="p.id">
+                    <option :value="p.id" x-text="p.name + (Number(p.stock_quantity || 0) <= 0 ? ' (sem estoque)' : '')"></option>
+                  </template>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="label">Quantidade</label>
+                <input class="input" type="number" min="1" x-model="draftProductItem.quantity">
+              </div>
+            </div>
+            <div class="form-group" style="max-width:220px;">
+              <label class="label">Valor unitário (R$)</label>
+              <input class="input" type="text" inputmode="decimal" x-model="draftProductItem.unit_price" @input="draftProductItem.unit_price = maskCurrencyInput($event.target.value)" placeholder="R$ 0,00">
+            </div>
+            <button type="button" class="btn btn-secondary btn-sm mb-3" @click="addDraftProductItem()" :disabled="!draftProductItem.product_id">+ Adicionar produto ao carrinho</button>
+          </div>
+
           <div x-show="cart.length > 0" class="mb-3">
             <table class="table">
-              <thead><tr><th>Serviço</th><th>Qtd</th><th>Desc.</th><th>Total</th><th></th></tr></thead>
+              <thead><tr><th>Item</th><th>Qtd</th><th>Desc.</th><th>Total</th><th></th></tr></thead>
               <tbody>
                 <template x-for="(item, idx) in cart" :key="idx">
                   <tr>
-                    <td x-text="serviceName(item.service_id) + (item.is_courtesy ? ' (cortesia)' : '')"></td>
+                    <td>
+                      <span x-text="cartItemName(item) + (item.is_courtesy ? ' (cortesia)' : '')"></span>
+                      <span class="badge badge-neutral" style="margin-left:6px;" x-show="item.product_id">produto</span>
+                    </td>
                     <td x-text="item.quantity"></td>
                     <td x-text="item.discount_percentage ? item.discount_percentage + '%' : '—'"></td>
                     <td x-text="formatCurrency(cartItemTotal(item))"></td>
@@ -306,8 +334,12 @@
               </p>
             </div>
           </template>
-          <button type="button" class="btn btn-secondary btn-sm mb-3" x-show="newSale.paymentLines.length < 2" @click="newSale.paymentLines.push(emptyPaymentLine())">+ Adicionar forma de pagamento</button>
-          <p class="text-sm mb-3">Total combinado no pagamento: <strong x-text="formatCurrency(paymentLinesTotal(newSale.paymentLines))"></strong></p>
+          <button type="button" class="btn btn-secondary btn-sm mb-3" x-show="newSale.paymentLines.length < 2" @click="addPaymentLine()">+ Adicionar forma de pagamento</button>
+          <p class="text-sm">Total combinado no pagamento: <strong x-text="formatCurrency(paymentLinesTotal(newSale.paymentLines))"></strong></p>
+          <p class="text-sm mb-3" :style="remainingToAllocate > 0.004 ? 'color:var(--color-danger);' : 'color:var(--color-success);'">
+            <span x-show="remainingToAllocate > 0.004">Falta alocar: <strong x-text="formatCurrency(remainingToAllocate)"></strong></span>
+            <span x-show="remainingToAllocate <= 0.004">Valor do plano totalmente coberto pelas formas de pagamento.</span>
+          </p>
 
           <p class="input-hint mb-3">A venda é salva como "pendente". As sessões só entram no cadastro do paciente e o valor só entra no caixa depois de aprovada.</p>
 
@@ -324,6 +356,7 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="js/currency-mask.js"></script>
+<script src="js/confirm-dialog.js"></script>
 <script>
 function vendasApp() {
   return {
@@ -335,6 +368,7 @@ function vendasApp() {
     saleItemsBySale: {},
     patients: [],
     services: [],
+    products: [],
     users: [],
     paymentMachines: [],
     planTemplates: [],
@@ -354,13 +388,23 @@ function vendasApp() {
       paymentLines: []
     },
     draftItem: { service_id: '', quantity: 1, unit_price: '', discount_percentage: 0, is_courtesy: false },
+    draftProductItem: { product_id: '', quantity: 1, unit_price: '' },
     cart: [],
     feedback: { type: '', message: '' },
 
     async init() {
       await this.loadClinicId();
-      await Promise.all([this.loadSales(), this.loadPatients(), this.loadServices(), this.loadUsers(), this.loadPaymentMachines(), this.loadAllSaleItems(), this.loadPlanTemplates()]);
+      await Promise.all([this.loadSales(), this.loadPatients(), this.loadServices(), this.loadProducts(), this.loadUsers(), this.loadPaymentMachines(), this.loadAllSaleItems(), this.loadPlanTemplates()]);
       this.loading = false;
+    },
+
+    async loadProducts() {
+      const { data, error } = await supabaseClient
+        .from('products')
+        .select('id, name, sale_price, stock_quantity')
+        .eq('product_type', 'revenda')
+        .order('name');
+      this.products = error ? [] : (data || []);
     },
 
     async loadUsers() {
@@ -407,6 +451,27 @@ function vendasApp() {
       return { payment_method: 'Dinheiro', amount: '', installments: 1, payment_machine_id: '' };
     },
 
+    addPaymentLine() {
+      const line = this.emptyPaymentLine();
+      const remaining = this.remainingToAllocate;
+      if (remaining > 0.004) {
+        line.amount = numberToCurrencyInput(remaining);
+      }
+      // Sugere uma forma diferente da já usada: dividir pagamento normalmente
+      // significa 2 métodos diferentes (ex.: parte em dinheiro, parte no cartão).
+      const usedMethods = this.newSale.paymentLines.map(l => l.payment_method);
+      if (usedMethods.includes('Dinheiro') && !usedMethods.includes('Cartão de crédito')) {
+        line.payment_method = 'Cartão de crédito';
+      } else if (usedMethods.includes('Cartão de crédito') || usedMethods.includes('Cartão de débito')) {
+        line.payment_method = 'Pix';
+      }
+      this.newSale.paymentLines.push(line);
+    },
+
+    get remainingToAllocate() {
+      return Math.max(0, Math.round((this.cartTotalAfterDiscount - this.paymentLinesTotal(this.newSale.paymentLines)) * 100) / 100);
+    },
+
     feeRateFor(machineId, installments) {
       const machine = this.paymentMachines.find(m => m.id === machineId);
       if (!machine || !machine.fee_rates) return 0;
@@ -431,7 +496,7 @@ function vendasApp() {
     async loadAllSaleItems() {
       const { data, error } = await supabaseClient
         .from('sale_items')
-        .select('id, sale_id, service_id, quantity, unit_price, discount_percentage, is_courtesy, line_total, services ( name )');
+        .select('id, sale_id, service_id, product_id, quantity, unit_price, discount_percentage, is_courtesy, line_total, services ( name ), products ( name )');
       if (error) return;
       const map = {};
       (data || []).forEach(item => {
@@ -465,7 +530,7 @@ function vendasApp() {
       if (this.saleItemsBySale[saleId]) return this.saleItemsBySale[saleId];
       const { data, error } = await supabaseClient
         .from('sale_items')
-        .select('id, service_id, quantity, unit_price, discount_percentage, is_courtesy, line_total, services ( name )')
+        .select('id, service_id, product_id, quantity, unit_price, discount_percentage, is_courtesy, line_total, services ( name ), products ( name )')
         .eq('sale_id', saleId);
       const items = error ? [] : (data || []);
       this.saleItemsBySale[saleId] = items;
@@ -502,6 +567,20 @@ function vendasApp() {
     serviceName(id) {
       const s = this.services.find(sv => sv.id === id);
       return s ? s.name : '—';
+    },
+
+    productName(id) {
+      const p = this.products.find(pp => pp.id === id);
+      return p ? p.name : '—';
+    },
+
+    cartItemName(item) {
+      return item.product_id ? this.productName(item.product_id) : this.serviceName(item.service_id);
+    },
+
+    saleItemName(item) {
+      if (item.product_id) return (item.products ? item.products.name : this.productName(item.product_id));
+      return (item.services ? item.services.name : this.serviceName(item.service_id));
     },
 
     enforceDiscountCap(value) {
@@ -553,6 +632,23 @@ function vendasApp() {
     onDraftServiceChange() {
       const s = this.services.find(sv => sv.id === this.draftItem.service_id);
       this.draftItem.unit_price = s && s.price !== null ? numberToCurrencyInput(s.price) : '';
+    },
+
+    onDraftProductChange() {
+      const p = this.products.find(pp => pp.id === this.draftProductItem.product_id);
+      this.draftProductItem.unit_price = p && p.sale_price !== null && p.sale_price !== undefined ? numberToCurrencyInput(p.sale_price) : '';
+    },
+
+    addDraftProductItem() {
+      if (!this.draftProductItem.product_id) return;
+      this.cart.push({
+        product_id: this.draftProductItem.product_id,
+        quantity: this.draftProductItem.quantity || 1,
+        unit_price: this.draftProductItem.unit_price,
+        discount_percentage: 0,
+        is_courtesy: false
+      });
+      this.draftProductItem = { product_id: '', quantity: 1, unit_price: '' };
     },
 
     cartItemTotal(item) {
@@ -634,7 +730,8 @@ function vendasApp() {
 
       const itemsPayload = this.cart.map(item => ({
         sale_id: sale.id,
-        service_id: item.service_id,
+        service_id: item.product_id ? null : item.service_id,
+        product_id: item.product_id || null,
         quantity: item.quantity || 1,
         unit_price: parseCurrencyToNumber(item.unit_price) || 0,
         discount_percentage: item.discount_percentage || 0,
@@ -665,16 +762,47 @@ function vendasApp() {
     },
 
     async approveSale(sale) {
-      if (!window.confirm('Aprovar esta venda? Isso vai gerar as sessões no cadastro do paciente e lançar o valor no financeiro.')) return;
+      if (!(await confirmDialog('Aprovar esta venda? Isso vai gerar as sessões no cadastro do paciente e lançar o valor no financeiro.', { danger: false, confirmLabel: 'Aprovar' }))) return;
       this.approving = true;
       const items = await this.loadSaleItems(sale.id);
       const { data: { user } } = await supabaseClient.auth.getUser();
       const today = new Date().toISOString().slice(0, 10);
 
       try {
-        // 1) gera um pacote de sessões por serviço do carrinho, independente
-        // de como o pagamento foi dividido
+        // 1) para itens de serviço, gera um pacote de sessões (independente
+        // de como o pagamento foi dividido). Para itens de produto de
+        // revenda, não há sessão: desconta do estoque em vez disso, nunca
+        // deixando a quantidade ficar negativa.
         for (const item of items) {
+          if (item.product_id) {
+            const { data: product, error: productFetchError } = await supabaseClient
+              .from('products')
+              .select('stock_quantity')
+              .eq('id', item.product_id)
+              .single();
+            if (productFetchError) throw productFetchError;
+            const currentStock = Number(product ? product.stock_quantity || 0 : 0);
+            const consumedQty = Math.min(Number(item.quantity || 0), currentStock);
+            if (consumedQty > 0) {
+              const { error: moveError } = await supabaseClient.from('stock_movements').insert({
+                clinic_id: this.clinicId,
+                product_id: item.product_id,
+                movement_type: 'saida',
+                quantity: consumedQty,
+                reason: 'Venda ao paciente',
+                sale_id: sale.id,
+                created_by: user ? user.id : null
+              });
+              if (moveError) throw moveError;
+              const { error: stockUpdateError } = await supabaseClient
+                .from('products')
+                .update({ stock_quantity: Math.max(0, currentStock - consumedQty) })
+                .eq('id', item.product_id);
+              if (stockUpdateError) throw stockUpdateError;
+            }
+            continue;
+          }
+
           const { data: pkg, error: pkgError } = await supabaseClient
             .from('packages')
             .insert({
@@ -766,8 +894,9 @@ function vendasApp() {
       y += 6;
       doc.setFontSize(9);
       items.forEach(item => {
-        const line = (item.services ? item.services.name : 'Serviço') + (item.is_courtesy ? ' (cortesia)' : '') +
-          ' · ' + item.quantity + ' sessão(ões) · ' + this.formatCurrency(item.line_total);
+        const unitLabel = item.product_id ? 'un.' : 'sessão(ões)';
+        const line = this.saleItemName(item) + (item.is_courtesy ? ' (cortesia)' : '') +
+          ' · ' + item.quantity + ' ' + unitLabel + ' · ' + this.formatCurrency(item.line_total);
         doc.text(line, 14, y);
         y += 6;
       });
@@ -791,7 +920,7 @@ function vendasApp() {
     },
 
     async cancelSale(sale) {
-      if (!window.confirm('Cancelar esta venda pendente?')) return;
+      if (!(await confirmDialog('Tem certeza que deseja cancelar esta venda pendente?', { confirmLabel: 'Cancelar venda' }))) return;
       const { error } = await supabaseClient.from('sales').update({ status: 'cancelada' }).eq('id', sale.id);
       if (error) {
         this.showFeedback('error', 'Erro ao cancelar venda: ' + error.message);
@@ -804,7 +933,12 @@ function vendasApp() {
     itemsSummary(sale) {
       const items = this.saleItemsBySale[sale.id];
       if (!items) return 'Ver detalhes';
-      return items.length + ' serviço(s)';
+      const serviceCount = items.filter(i => i.service_id).length;
+      const productCount = items.filter(i => i.product_id).length;
+      const parts = [];
+      if (serviceCount > 0) parts.push(serviceCount + ' serviço(s)');
+      if (productCount > 0) parts.push(productCount + ' produto(s)');
+      return parts.join(' · ') || (items.length + ' item(ns)');
     },
 
     get salesByStatus() {

@@ -19,11 +19,11 @@
       <div class="page-header">
         <div>
           <h2>Estoque</h2>
-          <p>Insumos, movimentações e custo por procedimento</p>
+          <p>Insumos clínicos, produtos de revenda, movimentações e custo por procedimento</p>
         </div>
         <button class="btn btn-primary" type="button" @click="openNewProductForm()">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
-          <span>Novo insumo</span>
+          <span x-text="tab === 'produtos' ? 'Novo produto' : 'Novo insumo'"></span>
         </button>
       </div>
 
@@ -36,48 +36,66 @@
       <div x-show="!loading">
 
         <div class="grid grid-4 mb-5">
-          <div class="stat-card">
-            <div class="stat-label">Insumos cadastrados</div>
+          <div class="stat-card" style="--accent-color:var(--color-primary);">
+            <div class="stat-label">Itens cadastrados</div>
             <div class="stat-value" x-text="products.length"></div>
+            <div class="stat-trend text-muted" x-text="insumos.length + ' insumo(s) · ' + produtosRevenda.length + ' produto(s)'"></div>
           </div>
-          <div class="stat-card">
+          <div class="stat-card" style="--accent-color:var(--color-danger);">
             <div class="stat-label">Abaixo do mínimo</div>
             <div class="stat-value" :style="lowStockProducts.length > 0 ? 'color:var(--color-danger);' : ''" x-text="lowStockProducts.length"></div>
             <div class="stat-trend text-muted">Alerta de reposição</div>
           </div>
-          <div class="stat-card">
+          <div class="stat-card" style="--accent-color:var(--color-warning);">
+            <div class="stat-label">Vencendo em 30 dias</div>
+            <div class="stat-value" :style="expiringProducts.length > 0 ? 'color:var(--color-warning);' : ''" x-text="expiringProducts.length"></div>
+            <div class="stat-trend text-muted" x-text="expiredProducts.length > 0 ? (expiredProducts.length + ' já vencido(s)') : 'Nenhum já vencido'"></div>
+          </div>
+          <div class="stat-card" style="--accent-color:var(--color-accent);">
             <div class="stat-label">Valor em estoque atual</div>
             <div class="stat-value" x-text="formatCurrency(currentStockValue)"></div>
             <div class="stat-trend text-muted">Quantidade × custo unitário</div>
           </div>
-          <div class="stat-card">
-            <div class="stat-label">Valor investido (histórico)</div>
-            <div class="stat-value" x-text="formatCurrency(totalInvested)"></div>
-            <div class="stat-trend text-muted">Soma de todas as entradas</div>
+        </div>
+
+        <div class="card mb-5" style="padding:16px 18px;border-color:var(--color-danger);background:var(--color-danger-bg);" x-show="lowStockProducts.length > 0 || expiringProducts.length > 0" x-cloak>
+          <div class="flex items-center gap-2 mb-2">
+            <svg viewBox="0 0 24 24" fill="none" stroke="var(--color-danger)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;flex-shrink:0;"><path d="M12 9v4"/><circle cx="12" cy="12" r="9"/><path d="M12 16h.01"/></svg>
+            <strong class="text-sm" style="color:var(--color-danger);">Avisos de estoque</strong>
           </div>
+          <p class="text-sm mb-2" style="color:var(--color-danger);" x-show="lowStockProducts.length > 0">
+            <strong>Estoque mínimo:</strong> <span x-text="lowStockProducts.map(p => p.name).join(', ')"></span>
+            <span x-text="lowStockProducts.length === 1 ? 'está' : 'estão'"></span> abaixo do estoque mínimo definido.
+          </p>
+          <p class="text-sm" style="color:var(--color-danger);" x-show="expiringProducts.length > 0">
+            <strong>Validade:</strong>
+            <template x-for="(p, idx) in expiringProducts" :key="p.id">
+              <span>
+                <span x-text="p.name + (isExpired(p) ? ' (vencido em ' + formatDateShort(p.expiry_date) + ')' : ' (vence em ' + formatDateShort(p.expiry_date) + ')')"></span><span x-show="idx < expiringProducts.length - 1">, </span>
+              </span>
+            </template>
+          </p>
         </div>
 
-        <div class="card mb-5" style="padding:14px 18px;border-color:var(--color-danger);" x-show="lowStockProducts.length > 0">
-          <p class="text-sm" style="color:var(--color-danger);"><strong>Atenção:</strong> <span x-text="lowStockProducts.map(p => p.name).join(', ')"></span> <span x-text="lowStockProducts.length === 1 ? 'está' : 'estão'"></span> abaixo do estoque mínimo.</p>
-        </div>
-
-        <div class="flex gap-2 mb-5">
+        <div class="flex gap-2 mb-5" style="flex-wrap:wrap;">
           <button class="btn btn-sm" :class="tab==='insumos' ? 'btn-primary' : 'btn-secondary'" @click="tab='insumos'">Insumos</button>
+          <button class="btn btn-sm" :class="tab==='produtos' ? 'btn-primary' : 'btn-secondary'" @click="tab='produtos'">Produtos (revenda)</button>
           <button class="btn btn-sm" :class="tab==='movimentacoes' ? 'btn-primary' : 'btn-secondary'" @click="tab='movimentacoes'">Movimentações</button>
           <button class="btn btn-sm" :class="tab==='custo' ? 'btn-primary' : 'btn-secondary'" @click="tab='custo'">Custo por procedimento</button>
         </div>
 
         <!-- ===================== INSUMOS ===================== -->
         <div x-show="tab==='insumos'">
+          <p class="text-xs text-soft mb-3">Insumos são de uso clínico interno (consumidos em procedimentos) e não aparecem para venda direta ao paciente.</p>
           <div class="card card-shadow" style="padding:0;">
-            <div x-show="products.length === 0" class="empty-note" style="margin:20px;">
+            <div x-show="insumos.length === 0" class="empty-note" style="margin:20px;">
               Nenhum insumo cadastrado ainda. Use "Novo insumo" para começar a controlar o estoque.
             </div>
-            <div class="table-wrap" x-show="products.length > 0">
+            <div class="table-wrap" x-show="insumos.length > 0">
               <table class="table">
-                <thead><tr><th>Insumo</th><th>Estoque atual</th><th>Mínimo</th><th>Máximo</th><th>Status</th><th>Custo unitário</th><th></th></tr></thead>
+                <thead><tr><th>Insumo</th><th>Estoque atual</th><th>Mínimo</th><th>Máximo</th><th>Status</th><th>Custo unitário</th><th>Validade</th><th></th></tr></thead>
                 <tbody>
-                  <template x-for="p in products" :key="p.id">
+                  <template x-for="p in insumos" :key="p.id">
                     <tr>
                       <td>
                         <strong x-text="p.name"></strong>
@@ -88,6 +106,59 @@
                       <td x-text="p.max_stock_quantity !== null ? p.max_stock_quantity : '—'"></td>
                       <td><span class="badge" :class="stockStatus(p).cls" x-text="stockStatus(p).label"></span></td>
                       <td x-text="p.unit_cost !== null ? formatCurrency(p.unit_cost) : '—'"></td>
+                      <td>
+                        <span x-show="!p.expiry_date">—</span>
+                        <span x-show="p.expiry_date" :style="isExpired(p) ? 'color:var(--color-danger);font-weight:600;' : (isExpiringSoon(p) ? 'color:var(--color-warning);font-weight:600;' : '')" x-text="formatDateShort(p.expiry_date)"></span>
+                      </td>
+                      <td>
+                        <div class="flex gap-2" style="flex-wrap:wrap;">
+                          <button class="btn btn-secondary btn-sm" type="button" @click="openMovementForm('entrada', p)">Entrada</button>
+                          <button class="btn btn-secondary btn-sm" type="button" @click="openMovementForm('saida', p)">Saída</button>
+                          <button class="btn btn-ghost btn-sm" type="button" @click="openEditProductForm(p)">Editar</button>
+                          <button class="btn btn-ghost btn-sm" type="button" @click="removeProduct(p)">Remover</button>
+                        </div>
+                      </td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- ===================== PRODUTOS (REVENDA) ===================== -->
+        <div x-show="tab==='produtos'" x-cloak>
+          <p class="text-xs text-soft mb-3">Produtos de revenda podem ser vendidos diretamente ao paciente (ex.: sérum, protetor solar, cinta modeladora). Aparecem como item avulso na tela de Vendas.</p>
+          <div class="card card-shadow" style="padding:0;">
+            <div x-show="produtosRevenda.length === 0" class="empty-note" style="margin:20px;">
+              Nenhum produto de revenda cadastrado ainda. Use "Novo produto" para cadastrar itens vendáveis ao paciente.
+            </div>
+            <div class="table-wrap" x-show="produtosRevenda.length > 0">
+              <table class="table">
+                <thead><tr><th>Produto</th><th>Estoque atual</th><th>Mínimo</th><th>Status</th><th>Custo</th><th>Preço de venda</th><th>Margem</th><th>Validade</th><th></th></tr></thead>
+                <tbody>
+                  <template x-for="p in produtosRevenda" :key="p.id">
+                    <tr>
+                      <td>
+                        <strong x-text="p.name"></strong>
+                        <div class="text-xs text-muted" x-show="p.barcode" x-text="p.barcode"></div>
+                      </td>
+                      <td x-text="(p.stock_quantity !== null ? p.stock_quantity : 0) + (p.unit_of_measure ? (' ' + p.unit_of_measure) : '')"></td>
+                      <td x-text="p.min_stock_quantity !== null ? p.min_stock_quantity : '—'"></td>
+                      <td><span class="badge" :class="stockStatus(p).cls" x-text="stockStatus(p).label"></span></td>
+                      <td x-text="p.unit_cost !== null ? formatCurrency(p.unit_cost) : '—'"></td>
+                      <td x-text="p.sale_price !== null && p.sale_price !== undefined ? formatCurrency(p.sale_price) : '—'"></td>
+                      <td>
+                        <span x-show="marginFor(p) === null">—</span>
+                        <span x-show="marginFor(p) !== null" :style="marginFor(p) < 0 ? 'color:var(--color-danger);' : 'color:var(--color-success);'">
+                          <span x-text="formatCurrency(marginFor(p))"></span>
+                          <span class="text-xs" x-show="marginPercentFor(p) !== null" x-text="' (' + marginPercentFor(p) + '%)'"></span>
+                        </span>
+                      </td>
+                      <td>
+                        <span x-show="!p.expiry_date">—</span>
+                        <span x-show="p.expiry_date" :style="isExpired(p) ? 'color:var(--color-danger);font-weight:600;' : (isExpiringSoon(p) ? 'color:var(--color-warning);font-weight:600;' : '')" x-text="formatDateShort(p.expiry_date)"></span>
+                      </td>
                       <td>
                         <div class="flex gap-2" style="flex-wrap:wrap;">
                           <button class="btn btn-secondary btn-sm" type="button" @click="openMovementForm('entrada', p)">Entrada</button>
@@ -112,7 +183,7 @@
             </div>
             <div class="table-wrap" x-show="movements.length > 0">
               <table class="table">
-                <thead><tr><th>Data</th><th>Insumo</th><th>Tipo</th><th>Quantidade</th><th>Custo unitário</th><th>Motivo</th><th>Registrado por</th></tr></thead>
+                <thead><tr><th>Data</th><th>Item</th><th>Tipo</th><th>Quantidade</th><th>Custo unitário</th><th>Motivo</th><th>Registrado por</th></tr></thead>
                 <tbody>
                   <template x-for="m in recentMovements" :key="m.id">
                     <tr>
@@ -159,17 +230,27 @@
 
       </div>
 
-      <!-- modal novo/editar insumo -->
+      <!-- modal novo/editar insumo ou produto -->
       <div x-show="showProductForm" x-cloak class="modal-overlay" @click.self="showProductForm = false">
         <div class="card card-shadow" style="margin:auto;width:100%;max-width:460px;max-height:88vh;overflow-y:auto;">
           <div class="card-header">
-            <h3 x-text="editingProductId ? 'Editar insumo' : 'Novo insumo'"></h3>
+            <h3 x-text="(editingProductId ? 'Editar ' : 'Novo ') + (productForm.product_type === 'revenda' ? 'produto' : 'insumo')"></h3>
             <button class="btn btn-ghost btn-sm" type="button" @click="showProductForm = false">Fechar</button>
           </div>
           <form @submit.prevent="saveProduct()">
+
             <div class="form-group">
-              <label class="label">Nome do insumo</label>
-              <input class="input" x-model="productForm.name" required placeholder="Ex.: Toxina botulínica 100U">
+              <label class="label">Tipo</label>
+              <div class="flex gap-2">
+                <button type="button" class="btn btn-sm" style="flex:1;" :class="productForm.product_type === 'insumo' ? 'btn-primary' : 'btn-secondary'" @click="productForm.product_type = 'insumo'">Insumo (uso clínico)</button>
+                <button type="button" class="btn btn-sm" style="flex:1;" :class="productForm.product_type === 'revenda' ? 'btn-primary' : 'btn-secondary'" @click="productForm.product_type = 'revenda'">Produto (revenda)</button>
+              </div>
+              <p class="input-hint">Insumo é consumido em procedimentos. Produto de revenda pode ser vendido direto ao paciente.</p>
+            </div>
+
+            <div class="form-group">
+              <label class="label">Nome</label>
+              <input class="input" x-model="productForm.name" required placeholder="Ex.: Toxina botulínica 100U ou Protetor solar FPS 50">
             </div>
             <div class="grid grid-2 gap-3">
               <div class="form-group">
@@ -181,9 +262,24 @@
                 <input class="input" x-model="productForm.unit_of_measure" placeholder="Ex.: ml, un, g">
               </div>
             </div>
-            <div class="form-group">
-              <label class="label">Código de barras (opcional)</label>
-              <input class="input" x-model="productForm.barcode">
+
+            <div class="form-group" x-show="productForm.product_type === 'revenda'" x-cloak>
+              <label class="label">Preço de venda (R$)</label>
+              <input class="input" type="text" inputmode="decimal" x-model="productForm.sale_price" @input="productForm.sale_price = maskCurrencyInput($event.target.value)" placeholder="R$ 0,00">
+              <p class="input-hint" x-show="productForm.sale_price && productForm.unit_cost">
+                Margem estimada: <strong x-text="formatCurrency((parseCurrencyToNumber(productForm.sale_price) || 0) - (parseCurrencyToNumber(productForm.unit_cost) || 0))"></strong>
+              </p>
+            </div>
+
+            <div class="grid grid-2 gap-3">
+              <div class="form-group">
+                <label class="label">Código de barras (opcional)</label>
+                <input class="input" x-model="productForm.barcode">
+              </div>
+              <div class="form-group">
+                <label class="label">Validade (opcional)</label>
+                <input class="input" type="date" x-model="productForm.expiry_date">
+              </div>
             </div>
 
             <hr class="divider">
@@ -206,10 +302,10 @@
                 <input class="input" type="number" min="0" step="0.001" x-model="productForm.max_stock_quantity" placeholder="Opcional">
               </div>
             </div>
-            <p class="input-hint">Definir mínimo ativa o alerta de reposição no topo desta página.</p>
+            <p class="input-hint">Definir mínimo ativa o alerta de reposição no topo desta página e no Dashboard.</p>
 
             <button class="btn btn-primary btn-block mt-2" type="submit" :disabled="saving">
-              <span x-show="!saving">Salvar insumo</span>
+              <span x-show="!saving" x-text="editingProductId ? 'Salvar alterações' : (productForm.product_type === 'revenda' ? 'Salvar produto' : 'Salvar insumo')"></span>
               <span x-show="saving" x-cloak>Salvando…</span>
             </button>
           </form>
@@ -225,14 +321,15 @@
           </div>
           <form @submit.prevent="saveMovement()">
             <div class="form-group">
-              <label class="label">Insumo</label>
+              <label class="label">Item</label>
               <select class="input" x-model="movementForm.product_id" required>
-                <option value="">Selecione o insumo</option>
+                <option value="">Selecione o item</option>
                 <template x-for="p in products" :key="p.id">
-                  <option :value="p.id" x-text="p.name"></option>
+                  <option :value="p.id" x-text="p.name + (p.product_type === 'revenda' ? ' (produto)' : ' (insumo)')"></option>
                 </template>
               </select>
             </div>
+            <p class="input-hint mb-2" x-show="movementType === 'saida' && selectedMovementProduct" x-text="'Estoque atual: ' + (selectedMovementProduct.stock_quantity || 0) + (selectedMovementProduct.unit_of_measure ? (' ' + selectedMovementProduct.unit_of_measure) : '')"></p>
             <div class="form-group">
               <label class="label">Quantidade</label>
               <input class="input" type="number" min="0.001" step="0.001" x-model="movementForm.quantity" required>
@@ -240,7 +337,7 @@
             <div class="form-group" x-show="movementType === 'entrada'">
               <label class="label">Custo unitário desta entrada (R$)</label>
               <input class="input" type="text" inputmode="decimal" x-model="movementForm.unit_cost" @input="movementForm.unit_cost = maskCurrencyInput($event.target.value)" placeholder="R$ 0,00">
-              <p class="input-hint">Se preenchido, atualiza o custo unitário de referência do insumo.</p>
+              <p class="input-hint">Se preenchido, atualiza o custo unitário de referência do item.</p>
             </div>
             <div class="form-group">
               <label class="label" x-text="movementType === 'entrada' ? 'Observação (opcional)' : 'Motivo'"></label>
@@ -259,6 +356,7 @@
 </div>
 
 <script src="js/currency-mask.js"></script>
+<script src="js/confirm-dialog.js"></script>
 <script>
 function estoqueApp() {
   return {
@@ -275,7 +373,7 @@ function estoqueApp() {
 
     showProductForm: false,
     editingProductId: null,
-    productForm: { name: '', unit_cost: '', unit_of_measure: '', barcode: '', stock_quantity: '0', min_stock_quantity: '', max_stock_quantity: '' },
+    productForm: { name: '', product_type: 'insumo', unit_cost: '', sale_price: '', unit_of_measure: '', barcode: '', stock_quantity: '0', min_stock_quantity: '', max_stock_quantity: '', expiry_date: '' },
 
     showMovementForm: false,
     movementType: 'entrada',
@@ -302,7 +400,7 @@ function estoqueApp() {
     async loadProducts() {
       const { data, error } = await supabaseClient
         .from('products')
-        .select('id, name, unit_cost, unit_of_measure, barcode, stock_quantity, min_stock_quantity, max_stock_quantity')
+        .select('id, name, unit_cost, sale_price, product_type, expiry_date, unit_of_measure, barcode, stock_quantity, min_stock_quantity, max_stock_quantity')
         .order('name');
       this.products = error ? [] : (data || []);
     },
@@ -339,8 +437,36 @@ function estoqueApp() {
       }, 0);
     },
 
+    get insumos() {
+      return this.products.filter(p => p.product_type !== 'revenda');
+    },
+
+    get produtosRevenda() {
+      return this.products.filter(p => p.product_type === 'revenda');
+    },
+
     get lowStockProducts() {
       return this.products.filter(p => p.min_stock_quantity !== null && Number(p.stock_quantity || 0) <= Number(p.min_stock_quantity));
+    },
+
+    isExpired(p) {
+      if (!p.expiry_date) return false;
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      return new Date(p.expiry_date) < today;
+    },
+
+    isExpiringSoon(p) {
+      if (!p.expiry_date) return false;
+      const soon = new Date(); soon.setDate(soon.getDate() + 30);
+      return new Date(p.expiry_date) <= soon;
+    },
+
+    get expiringProducts() {
+      return this.products.filter(p => this.isExpiringSoon(p)).sort((a, b) => new Date(a.expiry_date) - new Date(b.expiry_date));
+    },
+
+    get expiredProducts() {
+      return this.products.filter(p => this.isExpired(p));
     },
 
     get currentStockValue() {
@@ -359,6 +485,21 @@ function estoqueApp() {
 
     get editingProduct() {
       return this.products.find(p => p.id === this.editingProductId) || null;
+    },
+
+    get selectedMovementProduct() {
+      return this.products.find(p => p.id === this.movementForm.product_id) || null;
+    },
+
+    marginFor(p) {
+      if (p.sale_price === null || p.sale_price === undefined || p.unit_cost === null || p.unit_cost === undefined) return null;
+      return Number(p.sale_price) - Number(p.unit_cost);
+    },
+
+    marginPercentFor(p) {
+      const margin = this.marginFor(p);
+      if (margin === null || !Number(p.sale_price)) return null;
+      return Math.round((margin / Number(p.sale_price)) * 1000) / 10;
     },
 
     stockStatus(p) {
@@ -388,9 +529,20 @@ function estoqueApp() {
       return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) + ' às ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
     },
 
+    formatDateShort(value) {
+      if (!value) return '—';
+      const parts = String(value).slice(0, 10).split('-');
+      if (parts.length !== 3) return value;
+      return parts[2] + '/' + parts[1] + '/' + parts[0];
+    },
+
     openNewProductForm() {
       this.editingProductId = null;
-      this.productForm = { name: '', unit_cost: '', unit_of_measure: '', barcode: '', stock_quantity: '0', min_stock_quantity: '', max_stock_quantity: '' };
+      this.productForm = {
+        name: '', product_type: this.tab === 'produtos' ? 'revenda' : 'insumo',
+        unit_cost: '', sale_price: '', unit_of_measure: '', barcode: '',
+        stock_quantity: '0', min_stock_quantity: '', max_stock_quantity: '', expiry_date: ''
+      };
       this.showProductForm = true;
     },
 
@@ -398,12 +550,15 @@ function estoqueApp() {
       this.editingProductId = p.id;
       this.productForm = {
         name: p.name,
+        product_type: p.product_type === 'revenda' ? 'revenda' : 'insumo',
         unit_cost: p.unit_cost !== null ? numberToCurrencyInput(p.unit_cost) : '',
+        sale_price: (p.sale_price !== null && p.sale_price !== undefined) ? numberToCurrencyInput(p.sale_price) : '',
         unit_of_measure: p.unit_of_measure || '',
         barcode: p.barcode || '',
         stock_quantity: p.stock_quantity !== null ? String(p.stock_quantity) : '0',
         min_stock_quantity: p.min_stock_quantity !== null ? String(p.min_stock_quantity) : '',
-        max_stock_quantity: p.max_stock_quantity !== null ? String(p.max_stock_quantity) : ''
+        max_stock_quantity: p.max_stock_quantity !== null ? String(p.max_stock_quantity) : '',
+        expiry_date: p.expiry_date ? String(p.expiry_date).slice(0, 10) : ''
       };
       this.showProductForm = true;
     },
@@ -411,46 +566,63 @@ function estoqueApp() {
     async saveProduct() {
       if (!this.clinicId) return;
       this.saving = true;
-      const payload = {
-        name: this.productForm.name,
-        unit_cost: parseCurrencyToNumber(this.productForm.unit_cost),
-        unit_of_measure: this.productForm.unit_of_measure || null,
-        barcode: this.productForm.barcode || null,
-        min_stock_quantity: this.productForm.min_stock_quantity === '' ? null : Number(this.productForm.min_stock_quantity),
-        max_stock_quantity: this.productForm.max_stock_quantity === '' ? null : Number(this.productForm.max_stock_quantity)
-      };
-      let error;
-      if (this.editingProductId) {
-        // Estoque atual não é editado direto aqui: passa sempre por uma
-        // movimentação (Entrada/Saída), para manter o histórico coerente.
-        ({ error } = await supabaseClient.from('products').update(payload).eq('id', this.editingProductId));
-      } else {
-        payload.stock_quantity = this.productForm.stock_quantity === '' ? 0 : Number(this.productForm.stock_quantity);
-        ({ error } = await supabaseClient.from('products').insert({ ...payload, clinic_id: this.clinicId }));
+      try {
+        const isRevenda = this.productForm.product_type === 'revenda';
+        const payload = {
+          name: this.productForm.name,
+          product_type: isRevenda ? 'revenda' : 'insumo',
+          unit_cost: parseCurrencyToNumber(this.productForm.unit_cost),
+          sale_price: isRevenda ? parseCurrencyToNumber(this.productForm.sale_price) : null,
+          unit_of_measure: this.productForm.unit_of_measure || null,
+          barcode: this.productForm.barcode || null,
+          min_stock_quantity: this.productForm.min_stock_quantity === '' ? null : Number(this.productForm.min_stock_quantity),
+          max_stock_quantity: this.productForm.max_stock_quantity === '' ? null : Number(this.productForm.max_stock_quantity),
+          expiry_date: this.productForm.expiry_date || null
+        };
+        let error, data;
+        if (this.editingProductId) {
+          // Estoque atual não é editado direto aqui: passa sempre por uma
+          // movimentação (Entrada/Saída), para manter o histórico coerente.
+          ({ error, data } = await supabaseClient.from('products').update(payload).eq('id', this.editingProductId).select());
+        } else {
+          payload.stock_quantity = this.productForm.stock_quantity === '' ? 0 : Number(this.productForm.stock_quantity);
+          ({ error, data } = await supabaseClient.from('products').insert({ ...payload, clinic_id: this.clinicId }).select());
+        }
+        if (error) {
+          this.showFeedback('error', 'Erro ao salvar: ' + error.message);
+          return;
+        }
+        if (!data || data.length === 0) {
+          this.showFeedback('error', 'Não foi possível salvar: nenhum registro foi alterado. Verifique se você está com permissão de administrador.');
+          return;
+        }
+        this.showProductForm = false;
+        this.showFeedback('success', this.editingProductId ? 'Item atualizado.' : 'Item cadastrado.');
+        await this.loadProducts();
+      } catch (err) {
+        this.showFeedback('error', 'Erro inesperado ao salvar: ' + err.message);
+      } finally {
+        this.saving = false;
       }
-      this.saving = false;
-      if (error) {
-        this.showFeedback('error', 'Erro ao salvar insumo: ' + error.message);
-        return;
-      }
-      this.showProductForm = false;
-      this.showFeedback('success', this.editingProductId ? 'Insumo atualizado.' : 'Insumo cadastrado.');
-      await this.loadProducts();
     },
 
     async removeProduct(p) {
-      if (!window.confirm('Remover o insumo "' + p.name + '"? O histórico de movimentações associado também será removido.')) return;
-      const { error } = await supabaseClient.from('products').delete().eq('id', p.id);
-      if (error) {
-        if (error.code === '23503') {
-          this.showFeedback('error', 'Não é possível remover: este insumo está vinculado a algum serviço.');
-        } else {
-          this.showFeedback('error', 'Erro ao remover insumo: ' + error.message);
+      if (!(await confirmDialog('Tem certeza que deseja remover "' + p.name + '" do seu estoque? O histórico de movimentações associado também será removido.'))) return;
+      try {
+        const { error } = await supabaseClient.from('products').delete().eq('id', p.id);
+        if (error) {
+          if (error.code === '23503') {
+            this.showFeedback('error', 'Não é possível remover: este item está vinculado a um serviço ou a uma venda.');
+          } else {
+            this.showFeedback('error', 'Erro ao remover: ' + error.message);
+          }
+          return;
         }
-        return;
+        this.showFeedback('success', 'Item removido.');
+        await Promise.all([this.loadProducts(), this.loadMovements()]);
+      } catch (err) {
+        this.showFeedback('error', 'Erro inesperado ao remover: ' + err.message);
       }
-      this.showFeedback('success', 'Insumo removido.');
-      await Promise.all([this.loadProducts(), this.loadMovements()]);
     },
 
     openMovementForm(type, product) {
@@ -472,48 +644,66 @@ function estoqueApp() {
       if (!this.clinicId) return;
       const product = this.products.find(p => p.id === this.movementForm.product_id);
       if (!product) {
-        this.showFeedback('error', 'Selecione um insumo.');
+        this.showFeedback('error', 'Selecione um item.');
         return;
       }
-      const qty = Number(this.movementForm.quantity);
+      let qty = Number(this.movementForm.quantity);
       if (!qty || qty <= 0) {
         this.showFeedback('error', 'Informe uma quantidade válida.');
         return;
       }
+
+      const currentStock = Number(product.stock_quantity || 0);
+      let warning = '';
+      if (this.movementType === 'saida') {
+        if (currentStock <= 0) {
+          this.showFeedback('error', 'Este item já está com estoque zerado. Não há quantidade disponível para saída.');
+          return;
+        }
+        if (qty > currentStock) {
+          warning = ' Quantidade ajustada para ' + currentStock + ' (o estoque não pode ficar negativo).';
+          qty = currentStock;
+        }
+      }
+
       this.saving = true;
-      const unitCost = this.movementForm.unit_cost ? parseCurrencyToNumber(this.movementForm.unit_cost) : null;
+      try {
+        const unitCost = this.movementForm.unit_cost ? parseCurrencyToNumber(this.movementForm.unit_cost) : null;
 
-      const { error: moveError } = await supabaseClient.from('stock_movements').insert({
-        clinic_id: this.clinicId,
-        product_id: product.id,
-        movement_type: this.movementType,
-        quantity: qty,
-        unit_cost: unitCost,
-        reason: this.movementForm.reason || null,
-        created_by: this.currentUserId
-      });
-      if (moveError) {
+        const { error: moveError } = await supabaseClient.from('stock_movements').insert({
+          clinic_id: this.clinicId,
+          product_id: product.id,
+          movement_type: this.movementType,
+          quantity: qty,
+          unit_cost: unitCost,
+          reason: this.movementForm.reason || null,
+          created_by: this.currentUserId
+        });
+        if (moveError) {
+          this.showFeedback('error', 'Erro ao registrar movimentação: ' + moveError.message);
+          return;
+        }
+
+        const delta = this.movementType === 'saida' ? -qty : qty;
+        const newStock = Math.max(0, currentStock + delta);
+        const productUpdate = { stock_quantity: newStock };
+        if (this.movementType === 'entrada' && unitCost !== null) {
+          productUpdate.unit_cost = unitCost;
+        }
+        const { error: updateError } = await supabaseClient.from('products').update(productUpdate).eq('id', product.id);
+
+        this.showMovementForm = false;
+        if (updateError) {
+          this.showFeedback('error', 'Movimentação registrada, mas houve erro ao atualizar o estoque: ' + updateError.message);
+        } else {
+          this.showFeedback('success', 'Movimentação registrada.' + warning);
+        }
+        await Promise.all([this.loadProducts(), this.loadMovements()]);
+      } catch (err) {
+        this.showFeedback('error', 'Erro inesperado ao registrar movimentação: ' + err.message);
+      } finally {
         this.saving = false;
-        this.showFeedback('error', 'Erro ao registrar movimentação: ' + moveError.message);
-        return;
       }
-
-      const delta = this.movementType === 'saida' ? -qty : qty;
-      const newStock = Number(product.stock_quantity || 0) + delta;
-      const productUpdate = { stock_quantity: newStock };
-      if (this.movementType === 'entrada' && unitCost !== null) {
-        productUpdate.unit_cost = unitCost;
-      }
-      const { error: updateError } = await supabaseClient.from('products').update(productUpdate).eq('id', product.id);
-
-      this.saving = false;
-      this.showMovementForm = false;
-      if (updateError) {
-        this.showFeedback('error', 'Movimentação registrada, mas houve erro ao atualizar o estoque: ' + updateError.message);
-      } else {
-        this.showFeedback('success', 'Movimentação registrada.');
-      }
-      await Promise.all([this.loadProducts(), this.loadMovements()]);
     },
 
     showFeedback(type, message) {

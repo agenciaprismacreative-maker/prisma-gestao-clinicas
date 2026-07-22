@@ -198,6 +198,7 @@
 </div>
 
 <script src="js/currency-mask.js"></script>
+<script src="js/confirm-dialog.js"></script>
 <script>
 function servicosApp() {
   return {
@@ -247,7 +248,7 @@ function servicosApp() {
     },
 
     async loadProducts() {
-      const { data, error } = await supabaseClient.from('products').select('id, name, unit_cost, unit_of_measure, barcode').order('name');
+      const { data, error } = await supabaseClient.from('products').select('id, name, unit_cost, unit_of_measure, barcode').eq('product_type', 'insumo').order('name');
       this.products = error ? [] : (data || []);
     },
 
@@ -357,7 +358,7 @@ function servicosApp() {
     },
 
     async removeService(s) {
-      if (!window.confirm('Remover o serviço "' + s.name + '"? Essa ação não pode ser desfeita.')) return;
+      if (!(await confirmDialog('Tem certeza que deseja remover o serviço "' + s.name + '" da sua lista de serviços? Essa ação não pode ser desfeita.'))) return;
       const { error } = await supabaseClient.from('services').delete().eq('id', s.id);
       if (error) {
         if (error.code === '23503') {
@@ -391,30 +392,40 @@ function servicosApp() {
     async saveProduct() {
       if (!this.clinicId) return;
       this.saving = true;
-      const payload = {
-        name: this.productForm.name,
-        unit_cost: parseCurrencyToNumber(this.productForm.unit_cost),
-        unit_of_measure: this.productForm.unit_of_measure || null,
-        barcode: this.productForm.barcode || null
-      };
-      let error;
-      if (this.editingProductId) {
-        ({ error } = await supabaseClient.from('products').update(payload).eq('id', this.editingProductId));
-      } else {
-        ({ error } = await supabaseClient.from('products').insert({ ...payload, clinic_id: this.clinicId }));
+      try {
+        const payload = {
+          name: this.productForm.name,
+          product_type: 'insumo',
+          unit_cost: parseCurrencyToNumber(this.productForm.unit_cost),
+          unit_of_measure: this.productForm.unit_of_measure || null,
+          barcode: this.productForm.barcode || null
+        };
+        let error, data;
+        if (this.editingProductId) {
+          ({ error, data } = await supabaseClient.from('products').update(payload).eq('id', this.editingProductId).select());
+        } else {
+          ({ error, data } = await supabaseClient.from('products').insert({ ...payload, clinic_id: this.clinicId }).select());
+        }
+        if (error) {
+          this.showFeedback('error', 'Erro ao salvar insumo: ' + error.message);
+          return;
+        }
+        if (!data || data.length === 0) {
+          this.showFeedback('error', 'Não foi possível salvar: nenhum registro foi alterado. Verifique se você está com permissão de administrador.');
+          return;
+        }
+        this.showProductForm = false;
+        this.showFeedback('success', this.editingProductId ? 'Insumo atualizado.' : 'Insumo cadastrado.');
+        await this.loadProducts();
+      } catch (err) {
+        this.showFeedback('error', 'Erro inesperado ao salvar insumo: ' + err.message);
+      } finally {
+        this.saving = false;
       }
-      this.saving = false;
-      if (error) {
-        this.showFeedback('error', 'Erro ao salvar insumo: ' + error.message);
-        return;
-      }
-      this.showProductForm = false;
-      this.showFeedback('success', this.editingProductId ? 'Insumo atualizado.' : 'Insumo cadastrado.');
-      await this.loadProducts();
     },
 
     async removeProduct(p) {
-      if (!window.confirm('Remover o insumo "' + p.name + '"?')) return;
+      if (!(await confirmDialog('Tem certeza que deseja remover o insumo "' + p.name + '" da sua lista de insumos?'))) return;
       const { error } = await supabaseClient.from('products').delete().eq('id', p.id);
       if (error) {
         if (error.code === '23503') {
