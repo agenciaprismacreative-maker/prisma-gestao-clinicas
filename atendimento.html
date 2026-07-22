@@ -479,6 +479,7 @@ function atendimentoApp() {
             const { error: photoRowError } = await supabaseClient.from('patient_photos').insert({
               clinic_id: this.clinicId,
               patient_id: this.selectedAppt.patient_id,
+              appointment_id: this.selectedAppt.id,
               storage_path: path,
               marketing_consent: this.marketingConsent
             });
