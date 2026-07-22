@@ -204,9 +204,11 @@
               </select>
             </div>
             <div class="form-group" x-show="isReassigningProfessional" x-cloak>
-              <label class="label">Motivo da troca de profissional</label>
-              <textarea class="input" rows="2" x-model="rescheduleForm.reassign_reason" placeholder="Por que esse atendimento está sendo passado para outro profissional"></textarea>
+              <label class="label">Motivo da troca de profissional *</label>
+              <textarea class="input" rows="2" x-model="rescheduleForm.reassign_reason" placeholder="Por que esse atendimento está sendo passado para outro profissional" required></textarea>
+              <p class="input-hint">Obrigatório: o profissional que vai receber o paciente será avisado com esse motivo.</p>
             </div>
+            <p class="text-sm mb-2" x-show="feedback.message" x-cloak x-text="feedback.message" :style="'color:' + (feedback.type==='error' ? 'var(--color-danger)' : 'var(--color-success)')"></p>
             <button class="btn btn-primary btn-block mt-2" type="submit" :disabled="saving">
               <span x-show="!saving">Confirmar remanejamento</span>
               <span x-show="saving" x-cloak>Salvando…</span>
@@ -458,17 +460,21 @@ function atendimentoApp() {
     async confirmReschedule() {
       if (!this.reschedulingAppt) return;
       if (this.isReassigningProfessional && !this.rescheduleForm.reassign_reason.trim()) {
-        this.showFeedback('error', 'Descreva o motivo da troca de profissional.');
+        this.showFeedback('error', 'Descreva o motivo da troca de profissional. Esse aviso é obrigatório porque o novo profissional será notificado com esse motivo.');
         return;
       }
       this.saving = true;
       const newScheduledAt = new Date(this.rescheduleForm.date + 'T' + this.rescheduleForm.time + ':00');
+      const wasReassigning = this.isReassigningProfessional;
+      const newProfessionalId = this.rescheduleForm.professional_id || null;
+      const reason = this.rescheduleForm.reassign_reason.trim();
+      const patientName = this.reschedulingAppt.patients ? this.reschedulingAppt.patients.full_name : 'um paciente';
       const payload = {
         scheduled_at: newScheduledAt.toISOString(),
-        professional_id: this.rescheduleForm.professional_id || null,
+        professional_id: newProfessionalId,
         rescheduled_count: (this.reschedulingAppt.rescheduled_count || 0) + 1
       };
-      if (this.isReassigningProfessional) payload.reassign_reason = this.rescheduleForm.reassign_reason.trim();
+      if (wasReassigning) payload.reassign_reason = reason;
       const { error } = await supabaseClient
         .from('appointments')
         .update(payload)
@@ -477,6 +483,19 @@ function atendimentoApp() {
       if (error) {
         this.showFeedback('error', 'Erro ao remanejar horário: ' + error.message);
         return;
+      }
+      // avisa quem recebeu o paciente, pelo mesmo mecanismo das anotações
+      // direcionadas (aparece no sino de lembretes da pessoa). Melhor
+      // esforço: se essa notificação falhar, não desfaz nem trava o
+      // remanejamento em si, que já foi salvo com sucesso.
+      if (wasReassigning && newProfessionalId) {
+        const dateLabel = newScheduledAt.toLocaleDateString('pt-BR') + ' às ' + newScheduledAt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+        await supabaseClient.from('dashboard_notes').insert({
+          clinic_id: this.clinicId,
+          author_id: this.currentUserId,
+          target_user_id: newProfessionalId,
+          content: 'Atendimento remanejado para você: ' + patientName + ', ' + dateLabel + '. Motivo: ' + reason
+        });
       }
       this.showRescheduleForm = false;
       this.reschedulingAppt = null;
