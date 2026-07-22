@@ -198,13 +198,23 @@
 
           <div class="form-group">
             <label class="label">Profissional responsável pela venda</label>
-            <select class="input" x-model="newSale.sold_by_user_id">
-              <option value="">Selecione</option>
-              <template x-for="u in users" :key="u.id">
-                <option :value="u.id" x-text="u.full_name"></option>
-              </template>
-            </select>
-            <p class="input-hint">Define quem recebe o crédito nas metas, no ranking e na comissão desta venda. Vem preenchido com quem está logado, mas pode ser alterado.</p>
+            <template x-if="isAdmin">
+              <div>
+                <select class="input" x-model="newSale.sold_by_user_id">
+                  <option value="">Selecione</option>
+                  <template x-for="u in users" :key="u.id">
+                    <option :value="u.id" x-text="u.full_name"></option>
+                  </template>
+                </select>
+                <p class="input-hint">Define quem recebe o crédito nas metas, no ranking e na comissão desta venda. Vem preenchido com quem está logado, mas pode ser alterado.</p>
+              </div>
+            </template>
+            <template x-if="!isAdmin">
+              <div>
+                <input class="input" type="text" :value="referralStaffName(currentUserId)" disabled>
+                <p class="input-hint">Esta venda fica registrada em seu nome para fins de meta, ranking e comissão.</p>
+              </div>
+            </template>
           </div>
 
           <div class="grid grid-2 gap-3">
@@ -438,6 +448,7 @@ function vendasApp() {
     approving: false,
     clinicId: null,
     currentUserId: null,
+    currentUserRole: null,
     sales: [],
     saleItemsBySale: {},
     patients: [],
@@ -593,11 +604,12 @@ function vendasApp() {
       const { data: { user } } = await supabaseClient.auth.getUser();
       if (!user) return;
       this.currentUserId = user.id;
-      const { data, error } = await supabaseClient.from('users').select('clinic_id').eq('id', user.id).single();
+      const { data, error } = await supabaseClient.from('users').select('clinic_id, role').eq('id', user.id).single();
       if (error) {
         this.showFeedback('error', 'Erro ao identificar sua clínica: ' + error.message);
         return;
       }
+      this.currentUserRole = data ? data.role : null;
       this.clinicId = data ? data.clinic_id : null;
     },
 
@@ -640,6 +652,10 @@ function vendasApp() {
       const q = this.patientSearch.trim().toLowerCase();
       if (!q) return this.patients.slice(0, 20);
       return this.patients.filter(p => p.full_name.toLowerCase().includes(q)).slice(0, 20);
+    },
+
+    get isAdmin() {
+      return window.isAdminRole ? window.isAdminRole(this.currentUserRole) : false;
     },
 
     selectPatient(p) {
@@ -830,7 +846,7 @@ function vendasApp() {
         referred_by_patient_id: this.newSale.origin === 'Indicação de paciente' ? (this.newSale.referred_by_patient_id || null) : null,
         referred_by_user_id: this.newSale.origin === 'Indicação de funcionário' ? (this.newSale.referred_by_user_id || null) : null,
         referral_commission_percentage: this.newSale.origin === 'Indicação de funcionário' ? (this.newSale.referral_commission_percentage || null) : null,
-        created_by: this.newSale.sold_by_user_id || (user ? user.id : null)
+        created_by: this.isAdmin ? (this.newSale.sold_by_user_id || (user ? user.id : null)) : (user ? user.id : null)
       };
       const { data: sale, error } = await supabaseClient.from('sales').insert(payload).select().single();
       if (error) {

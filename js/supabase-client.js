@@ -27,8 +27,8 @@ window.isAdminRole = function (role) {
 window.PRISMA_ROLE_HOME = {
   administrador: 'dashboard.html',
   equipe_prisma: 'dashboard.html',
-  esteticista: 'atendimento.html',
-  atendente: 'agenda.html'
+  esteticista: 'dashboard.html',
+  atendente: 'dashboard.html'
 };
 window.homeForRole = function (role) {
   return window.PRISMA_ROLE_HOME[role] || 'agenda.html';

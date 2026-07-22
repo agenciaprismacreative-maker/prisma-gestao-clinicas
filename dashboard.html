@@ -275,6 +275,7 @@
           <div class="card-header">
             <div><h3>Meus atendimentos</h3><p>Concluídos x cancelados/faltas</p></div>
             <div class="flex gap-1">
+              <button type="button" class="btn btn-sm" :class="myAttendanceChartPeriodDays === 1 ? 'btn-primary' : 'btn-secondary'" @click="setMyAttendanceChartPeriod(1)">Hoje</button>
               <button type="button" class="btn btn-sm" :class="myAttendanceChartPeriodDays === 7 ? 'btn-primary' : 'btn-secondary'" @click="setMyAttendanceChartPeriod(7)">7d</button>
               <button type="button" class="btn btn-sm" :class="myAttendanceChartPeriodDays === 30 ? 'btn-primary' : 'btn-secondary'" @click="setMyAttendanceChartPeriod(30)">30d</button>
               <button type="button" class="btn btn-sm" :class="myAttendanceChartPeriodDays === 90 ? 'btn-primary' : 'btn-secondary'" @click="setMyAttendanceChartPeriod(90)">3 meses</button>
