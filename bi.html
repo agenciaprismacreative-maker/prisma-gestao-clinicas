@@ -41,6 +41,7 @@
             <div class="stat-label">Realizado no mês</div>
             <div class="stat-value" x-text="formatCurrency(myMonthRevenue)"></div>
             <div class="stat-trend" :style="'color:' + (myGoalPct !== null && myGoalPct >= 100 ? 'var(--color-success)' : 'var(--color-text-muted)')" x-text="myGoalPct !== null ? (myGoalPct + '% da meta atingida') : 'Vendas e atendimentos em seu nome'"></div>
+            <div class="text-xs text-muted mt-1" x-show="myCommissionTierPct !== null">Sua faixa de comissão atual: <strong x-text="myCommissionTierPct + '%'"></strong></div>
           </div>
           <div class="stat-card">
             <div class="stat-label">Comissões do mês</div>
@@ -401,12 +402,39 @@
             </div>
           </div>
 
+          <div class="card card-shadow mb-5">
+            <h3 class="mb-2" style="font-size:15px;">Faixas de comissão por atingimento de meta</h3>
+            <p class="text-xs text-soft mb-3">Regra única para toda a equipe: a partir de tal % da meta batida, tal % de comissão sobre o realizado. A faixa com o maior "a partir de" que a pessoa já alcançou é a que vale.</p>
+
+            <div x-show="commissionTiers.length === 0" class="text-sm text-muted mb-3">Nenhuma faixa cadastrada ainda — sem faixas, a coluna "Comissão sugerida" fica vazia.</div>
+            <div class="flex" style="flex-direction:column;gap:8px;margin-bottom:14px;" x-show="commissionTiers.length > 0">
+              <template x-for="tier in commissionTiers" :key="tier.id">
+                <div class="flex items-center justify-between" style="padding:8px 12px;background:var(--color-surface-alt);border-radius:var(--radius-md);">
+                  <span class="text-sm">A partir de <strong x-text="tier.min_achievement_pct + '%'"></strong> da meta → <strong x-text="tier.commission_percentage + '%'"></strong> de comissão</span>
+                  <a href="#" class="text-xs" @click.prevent="removeCommissionTier(tier)">remover</a>
+                </div>
+              </template>
+            </div>
+
+            <div class="flex items-end gap-2" style="flex-wrap:wrap;">
+              <div class="form-group" style="margin:0;">
+                <label class="label">A partir de (% da meta)</label>
+                <input class="input" type="number" min="0" step="1" x-model="newTierMinPct" placeholder="Ex.: 100" style="max-width:160px;">
+              </div>
+              <div class="form-group" style="margin:0;">
+                <label class="label">Comissão (%)</label>
+                <input class="input" type="number" min="0" step="0.1" x-model="newTierCommissionPct" placeholder="Ex.: 5" style="max-width:160px;">
+              </div>
+              <button class="btn btn-secondary btn-sm" type="button" @click="addCommissionTier()" :disabled="savingTier">Adicionar faixa</button>
+            </div>
+          </div>
+
           <div class="grid grid-main-side mb-2">
             <div class="card card-shadow" style="padding:0;">
               <div style="padding:20px 20px 0;"><h3 style="font-size:15px;">Metas e realizado por integrante</h3></div>
               <div class="table-wrap">
                 <table class="table">
-                  <thead><tr><th>Integrante</th><th>Meta do mês</th><th>Realizado</th><th>% atingido</th><th>Clientes atendidos</th><th>Indicações (mês)</th><th></th></tr></thead>
+                  <thead><tr><th>Integrante</th><th>Meta do mês</th><th>Realizado</th><th>% atingido</th><th>Comissão sugerida</th><th>Clientes atendidos</th><th>Indicações (mês)</th><th></th></tr></thead>
                   <tbody>
                     <template x-for="u in users" :key="u.id">
                       <tr>
@@ -418,6 +446,10 @@
                         <td>
                           <span class="badge" :class="goalPctFor(u.id) === null ? 'badge-neutral' : (goalPctFor(u.id) >= 100 ? 'badge-success' : 'badge-warning')"
                                 x-text="goalPctFor(u.id) === null ? '—' : goalPctFor(u.id) + '%'"></span>
+                        </td>
+                        <td>
+                          <span x-show="suggestedCommissionFor(u.id) === null" class="text-xs text-muted">—</span>
+                          <span x-show="suggestedCommissionFor(u.id) !== null" x-text="formatCurrency(suggestedCommissionFor(u.id)) + ' (' + commissionTierFor(goalPctFor(u.id)) + '%)'"></span>
                         </td>
                         <td x-text="clientsAttendedFor(u.id)"></td>
                         <td x-text="referralsFor(u.id)"></td>
@@ -484,6 +516,10 @@ function biApp() {
     showAttendanceModal: false,
     expenses: [],
     saleItemsForCosts: [],
+    commissionTiers: [],
+    newTierMinPct: '',
+    newTierCommissionPct: '',
+    savingTier: false,
 
     async init() {
       await this.loadClinicId();
@@ -492,7 +528,7 @@ function biApp() {
         this.loadPackages(), this.loadLeads(), this.loadCommunications(),
         this.loadTasks(), this.loadUsers(), this.loadBlocks(), this.loadGoals(),
         this.loadProducts(), this.loadServices(), this.loadServiceProductsMap(),
-        this.loadExpenses(), this.loadSaleItemsForCosts()
+        this.loadExpenses(), this.loadSaleItemsForCosts(), this.loadCommissionTiers()
       ]);
       this.syncGoalInputs();
       this.loading = false;
@@ -899,6 +935,61 @@ function biApp() {
       this.saleItemsForCosts = error ? [] : (data || []);
     },
 
+    async loadCommissionTiers() {
+      const { data, error } = await supabaseClient
+        .from('commission_tiers')
+        .select('id, min_achievement_pct, commission_percentage')
+        .order('min_achievement_pct', { ascending: true });
+      this.commissionTiers = error ? [] : (data || []);
+    },
+
+    async addCommissionTier() {
+      const minPct = Number(this.newTierMinPct);
+      const commPct = Number(this.newTierCommissionPct);
+      if (!(minPct >= 0) || !(commPct >= 0) || this.newTierMinPct === '' || this.newTierCommissionPct === '') {
+        this.showFeedback('error', 'Informe o atingimento mínimo e o percentual de comissão da faixa.');
+        return;
+      }
+      this.savingTier = true;
+      const { error } = await supabaseClient.from('commission_tiers').insert({
+        clinic_id: this.clinicId, min_achievement_pct: minPct, commission_percentage: commPct
+      });
+      this.savingTier = false;
+      if (error) {
+        this.showFeedback('error', 'Erro ao adicionar faixa: ' + error.message);
+        return;
+      }
+      this.newTierMinPct = '';
+      this.newTierCommissionPct = '';
+      this.showFeedback('success', 'Faixa de comissão adicionada.');
+      await this.loadCommissionTiers();
+    },
+
+    async removeCommissionTier(tier) {
+      if (!(await confirmDialog('Remover a faixa "a partir de ' + tier.min_achievement_pct + '% da meta"?'))) return;
+      const { error } = await supabaseClient.from('commission_tiers').delete().eq('id', tier.id);
+      if (error) {
+        this.showFeedback('error', 'Erro ao remover faixa: ' + error.message);
+        return;
+      }
+      this.showFeedback('success', 'Faixa removida.');
+      await this.loadCommissionTiers();
+    },
+
+    commissionTierFor(goalPct) {
+      if (goalPct === null || goalPct === undefined) return null;
+      const applicable = this.commissionTiers
+        .filter(t => goalPct >= Number(t.min_achievement_pct))
+        .sort((a, b) => Number(b.min_achievement_pct) - Number(a.min_achievement_pct));
+      return applicable.length > 0 ? Number(applicable[0].commission_percentage) : null;
+    },
+
+    suggestedCommissionFor(userId) {
+      const tierPct = this.commissionTierFor(this.goalPctFor(userId));
+      if (tierPct === null) return null;
+      return this.monthRevenueFor(userId) * tierPct / 100;
+    },
+
     async loadBlocks() {
       const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 30);
       const { data, error } = await supabaseClient.from('schedule_blocks').select('id, start_at').gte('start_at', cutoff.toISOString());
@@ -1163,6 +1254,10 @@ function biApp() {
       return this.goalPctFor(this.currentUserId);
     },
 
+    get myCommissionTierPct() {
+      return this.commissionTierFor(this.myGoalPct);
+    },
+
     get myMonthRevenue() {
       return this.monthRevenueFor(this.currentUserId);
     },
@@ -1260,6 +1355,7 @@ function biApp() {
 <script src="js/auth-guard.js"></script>
 <script src="js/topbar.js"></script>
 <script src="js/currency-mask.js"></script>
+<script src="js/confirm-dialog.js"></script>
 <script src="js/include.js" defer></script>
 </body>
 </html>

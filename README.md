@@ -20,15 +20,23 @@ Depois acesse `http://localhost:8000` e entre com um usuário já cadastrado em 
 
 ## Migrations pendentes de aplicar no Supabase (ação necessária)
 
-O arquivo `database/schema.sql` é sempre a fonte da verdade do estado final esperado do banco, mas ele **não roda sozinho** no Supabase de produção: cada migration em `database/migrations/` precisa ser colada e executada manualmente no SQL Editor do painel do Supabase, em ordem numérica, uma vez cada. Se uma tela der erro do tipo "column ... does not exist" ou "table ... not found in schema cache", quase sempre é uma migration que ainda não rodou nesse banco, não um bug de código. Confirmado neste projeto até agora: a migration **011** (desconto e pagamento combinado em vendas, indicação, modelos de pacote, `clinic_settings` e bucket de logotipo) e a migration **014** (separação de Insumos e Produtos de revenda, validade, itens de produto em vendas) ainda precisam ser rodadas — é a causa direta do erro "Erro ao carregar vendas: column sales.discount_percentage does not exist".
+O arquivo `database/schema.sql` é sempre a fonte da verdade do estado final esperado do banco, mas ele **não roda sozinho** no Supabase de produção: cada migration em `database/migrations/` precisa ser colada e executada manualmente no SQL Editor do painel do Supabase, em ordem numérica, uma vez cada. Todas são idempotentes (seguro rodar mais de uma vez), então na dúvida é sempre seguro rodar de novo. Se uma tela der erro do tipo "column ... does not exist", "table ... not found in schema cache" ou "more than one relationship was found", quase sempre é uma migration que ainda não rodou nesse banco, não um bug de código.
+
+Para reduzir o número de arquivos para rodar, as migrations 011 a 014 (que ainda podem estar pendentes) foram juntadas em **`database/migrations/011_a_014_consolidado.sql`** — basta colar esse arquivo único no SQL Editor e rodar uma vez. Depois dele, roda-se a **015** (`015_marca_produtos.sql`), que adiciona marca/descrição em produtos, dados fiscais da clínica (razão social, CNPJ, endereço) e a base do módulo de custos e folha (despesas fixas + salário por funcionário). Por fim, roda-se a **016** (`016_faixas_comissao.sql`), que cria a tabela de faixas de comissão por atingimento de meta usada na aba Metas da equipe do BI.
+
+Os erros "Could not find the 'accent_color' column of 'clinic_settings'" e "Could not find the table 'public.clinic_expenses'" são exatamente esse caso: as migrations 011-014 e 015 ainda não foram rodadas nesse banco. Rodando as três (011_a_014_consolidado, depois 015, depois 016) na ordem, ambos os erros somem.
+
+Regra geral daqui para frente: só é preciso rodar um novo arquivo SQL quando uma mudança de tela também mexe no banco (nova coluna, nova tabela) — isso é sinalizado explicitamente na entrega. Mudanças de layout, texto ou comportamento de interface não exigem nada no Supabase.
 
 ## Três papéis de acesso
 
 O sistema é dividido em três papéis, definidos pela coluna `role` em `public.users`: `administrador`, `atendente` e `esteticista` (o papel interno `equipe_prisma`, usado pela própria Prisma Creative, enxerga tudo em qualquer clínica).
 
-- **Administrador**: menu completo, incluindo Dashboard, Financeiro, Vendas, Serviços, Equipe e a visão executiva de Desempenho (BI).
-- **Atendente**: Pacientes, Agenda completa e Vendas, para tocar o dia a dia comercial e de recepção.
-- **Esteticista**: agenda e fila de atendimento apenas dos próprios horários, mais a própria aba de Desempenho (comissões e meta do mês).
+- **Administrador**: menu completo, incluindo Dashboard, Financeiro, Vendas, Serviços, Equipe, Estoque e a visão executiva de Desempenho (BI), com custos, folha e lucro.
+- **Atendente**: Pacientes, Agenda completa, Vendas, Desempenho e um Dashboard básico (própria agenda do dia, anotações e aniversariantes).
+- **Esteticista**: agenda e fila de atendimento apenas dos próprios horários, Vendas (pode criar uma venda, que segue para aprovação do Administrador), Desempenho (comissões, meta do mês e ranking visual da equipe) e o mesmo Dashboard básico do Atendente.
+
+Quando um Atendente ou Esteticista cria uma venda, ela nasce como "pendente" e só conta no faturamento, na meta e na comissão de quem a criou depois que um Administrador aprova (aba Vendas, ação Aprovar). O botão "Nova venda" fica disponível tanto em Vendas quanto como atalho na tela de Atendimento.
 
 Cada página trava o acesso por `data-allowed-roles` no `<body>`, o menu lateral esconde os itens fora do papel do usuário, e o login já redireciona cada pessoa direto para a tela inicial do seu papel. Alterar o papel de alguém só é permitido a um Administrador: existe um trigger no banco (`protect_role_change`) que bloqueia a troca mesmo que alguém tente contornar a tela e chamar a API diretamente.
 

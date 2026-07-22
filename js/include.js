@@ -178,6 +178,7 @@ function applyBrandColors(primary, accent) {
   }
 }
 window.shadeColor = shadeColor;
+window.hexToRgb = hexToRgb;
 window.relativeLuminance = relativeLuminance;
 window.contrastTextColor = contrastTextColor;
 window.ensureDarkEnough = ensureDarkEnough;

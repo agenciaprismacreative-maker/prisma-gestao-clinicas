@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="stylesheet" href="css/styles.css">
 </head>
-<body data-page="vendas" data-title="Vendas" data-subtitle="" data-allowed-roles="administrador,atendente" x-data="{ sidebarOpen:false }">
+<body data-page="vendas" data-title="Vendas" data-subtitle="" data-allowed-roles="administrador,atendente,esteticista" x-data="{ sidebarOpen:false }">
 
 <div class="app-shell">
   <div data-include="partials/sidebar.html"></div>
@@ -75,7 +75,7 @@
                     <button class="btn btn-ghost btn-sm" type="button" @click="viewSale(s)">Ver</button>
                     <button class="btn btn-secondary btn-sm" type="button" x-show="s.status === 'pendente'" @click="approveSale(s)" :disabled="approving">Aprovar</button>
                     <button class="btn btn-ghost btn-sm" type="button" x-show="s.status === 'pendente'" @click="cancelSale(s)">Cancelar</button>
-                    <button class="btn btn-ghost btn-sm" type="button" x-show="s.status === 'aprovada'" @click="downloadReceipt(s)">Comprovante</button>
+                    <button class="btn btn-ghost btn-sm" type="button" x-show="s.status === 'aprovada'" @click="openReceiptPreview(s)">Comprovante</button>
                   </td>
                 </tr>
               </template>
@@ -113,9 +113,26 @@
               <p class="text-sm"><strong>Total: </strong><span x-text="formatCurrency(viewingSale.total_amount)"></span></p>
               <p class="text-xs text-muted mt-1" x-show="viewingSale.origin">Origem: <span x-text="viewingSale.origin"></span></p>
               <p class="text-xs text-muted" x-show="viewingSale.approved_at">Aprovada em <span x-text="formatDate(viewingSale.approved_at)"></span></p>
-              <button class="btn btn-secondary btn-sm mt-3" type="button" x-show="viewingSale.status === 'aprovada'" @click="downloadReceipt(viewingSale)">Baixar comprovante em PDF</button>
+              <button class="btn btn-secondary btn-sm mt-3" type="button" x-show="viewingSale.status === 'aprovada'" @click="openReceiptPreview(viewingSale)">Ver comprovante</button>
             </div>
           </template>
+        </div>
+      </div>
+
+      <!-- modal de pré-visualização do comprovante -->
+      <div x-show="showReceiptPreview" x-cloak class="modal-overlay" @click.self="closeReceiptPreview()">
+        <div class="card card-shadow" style="margin:auto;width:100%;max-width:680px;max-height:92vh;display:flex;flex-direction:column;">
+          <div class="card-header">
+            <h3>Comprovante de venda</h3>
+            <button class="btn btn-ghost btn-sm" @click="closeReceiptPreview()">Fechar</button>
+          </div>
+          <div style="flex:1;min-height:60vh;padding:0 20px;">
+            <iframe :src="receiptPreview.url" title="Pré-visualização do comprovante" style="width:100%;height:65vh;border:1px solid var(--color-border);border-radius:var(--radius-md);"></iframe>
+          </div>
+          <div class="flex justify-end gap-2" style="padding:16px 20px;">
+            <button class="btn btn-ghost btn-sm" type="button" @click="closeReceiptPreview()">Fechar</button>
+            <button class="btn btn-primary btn-sm" type="button" @click="downloadReceiptFromPreview()">Baixar PDF</button>
+          </div>
         </div>
       </div>
 
@@ -381,6 +398,8 @@ function vendasApp() {
     referralPatientSearch: '',
     referralPatientDropdownOpen: false,
     viewingSale: null,
+    showReceiptPreview: false,
+    receiptPreview: { url: '', doc: null, sale: null },
     newSale: {
       patient_id: '', origin: '', validity_months: '',
       referred_by_patient_id: '', referred_by_user_id: '', referral_commission_percentage: 10,
@@ -832,6 +851,7 @@ function vendasApp() {
             clinic_id: this.clinicId,
             type: 'venda_pacote',
             patient_id: sale.patient_id,
+            professional_id: sale.created_by || null,
             amount: line.amount,
             payment_method: line.payment_method || null,
             installments: line.installments || 1,
@@ -876,60 +896,170 @@ function vendasApp() {
       this.approving = false;
     },
 
-    downloadReceipt(sale) {
+    buildReceiptDoc(sale) {
       const items = this.saleItemsBySale[sale.id] || [];
       const settings = window.__prismaClinicSettings || {};
       const clinicName = settings.legal_name || window.__prismaClinicName || 'Clínica';
+      const primaryHex = settings.primary_color || '#2F4A45';
+      const accentHex = settings.accent_color || '#B8912F';
+      const primaryRgb = (window.hexToRgb && window.hexToRgb(primaryHex)) || { r: 47, g: 74, b: 69 };
+      const accentRgb = (window.hexToRgb && window.hexToRgb(accentHex)) || { r: 184, g: 145, b: 47 };
+      const headerTextDark = window.contrastTextColor ? window.contrastTextColor(primaryHex) === '#1F2624' : false;
+      const accentTextDark = window.contrastTextColor ? window.contrastTextColor(accentHex) === '#1F2624' : false;
+
       const doc = new window.jspdf.jsPDF();
-      let y = 20;
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const marginX = 14;
+      const contentWidth = pageWidth - marginX * 2;
+      const textColor = [38, 38, 36];
+      const mutedColor = [114, 111, 104];
 
-      doc.setFontSize(14);
-      doc.text(clinicName, 14, y);
-      y += 6;
-      doc.setFontSize(9);
-      if (settings.cnpj) { doc.text('CNPJ: ' + settings.cnpj, 14, y); y += 5; }
-      if (settings.company_address) { doc.text(settings.company_address, 14, y); y += 5; }
-      y += 5;
+      const ensureSpace = (needed) => {
+        if (y + needed > pageHeight - 22) {
+          doc.addPage();
+          y = 20;
+        }
+      };
+      const truncate = (text, maxWidth) => {
+        const parts = doc.splitTextToSize(String(text), maxWidth);
+        return parts.length > 1 ? parts[0].replace(/.{1}$/, '') + '…' : parts[0];
+      };
 
-      doc.setFontSize(16);
-      doc.text('Comprovante de venda', 14, y);
-      y += 10;
-      doc.setFontSize(10);
-      doc.text('Data da aprovação: ' + this.formatDate(sale.approved_at || sale.created_at), 14, y);
-      y += 6;
-      doc.text('Paciente: ' + ((sale.patients && sale.patients.full_name) || '—'), 14, y);
-      y += 6;
-      doc.text('Vendedor(a): ' + ((sale.users && sale.users.full_name) || '—'), 14, y);
-      y += 10;
+      // cabeçalho colorido com a identidade da clínica
+      doc.setFillColor(primaryRgb.r, primaryRgb.g, primaryRgb.b);
+      doc.rect(0, 0, pageWidth, 30, 'F');
+      doc.setTextColor(headerTextDark ? 31 : 255, headerTextDark ? 38 : 255, headerTextDark ? 36 : 255);
+      doc.setFont(undefined, 'bold');
+      doc.setFontSize(15);
+      doc.text(clinicName, marginX, 14);
+      doc.setFont(undefined, 'normal');
+      doc.setFontSize(8.5);
+      const headerLine2 = [];
+      if (settings.cnpj) headerLine2.push('CNPJ: ' + settings.cnpj);
+      if (settings.company_address) headerLine2.push(settings.company_address);
+      if (headerLine2.length) doc.text(headerLine2.join('   ·   '), marginX, 21);
 
+      doc.setFont(undefined, 'bold');
+      doc.setFontSize(12);
+      doc.text('COMPROVANTE DE VENDA', pageWidth - marginX, 13, { align: 'right' });
+      doc.setFont(undefined, 'normal');
+      doc.setFontSize(8);
+      doc.text('Nº ' + sale.id.slice(0, 8).toUpperCase(), pageWidth - marginX, 19, { align: 'right' });
+      doc.text(this.formatDate(sale.approved_at || sale.created_at), pageWidth - marginX, 24, { align: 'right' });
+
+      let y = 42;
+
+      // caixa com paciente / vendedor(a)
+      doc.setDrawColor(230, 226, 217);
+      doc.setFillColor(250, 248, 245);
+      doc.roundedRect(marginX, y, contentWidth, 24, 2, 2, 'FD');
+      doc.setFontSize(8);
+      doc.setTextColor(mutedColor[0], mutedColor[1], mutedColor[2]);
+      doc.text('PACIENTE', marginX + 6, y + 8);
+      doc.text('VENDEDOR(A)', marginX + contentWidth / 2 + 4, y + 8);
+      doc.setFont(undefined, 'bold');
       doc.setFontSize(11);
-      doc.text('Itens', 14, y);
-      y += 6;
-      doc.setFontSize(9);
-      items.forEach(item => {
-        const unitLabel = item.product_id ? 'un.' : 'sessão(ões)';
-        const line = this.saleItemName(item) + (item.is_courtesy ? ' (cortesia)' : '') +
-          ' · ' + item.quantity + ' ' + unitLabel + ' · ' + this.formatCurrency(item.line_total);
-        doc.text(line, 14, y);
-        y += 6;
-      });
+      doc.setTextColor(textColor[0], textColor[1], textColor[2]);
+      doc.text(truncate((sale.patients && sale.patients.full_name) || '—', contentWidth / 2 - 12), marginX + 6, y + 15.5);
+      doc.text(truncate((sale.users && sale.users.full_name) || '—', contentWidth / 2 - 12), marginX + contentWidth / 2 + 4, y + 15.5);
+      doc.setFont(undefined, 'normal');
 
-      y += 4;
-      doc.setFontSize(11);
-      doc.text('Total pago: ' + this.formatCurrency(sale.total_amount), 14, y);
+      y += 34;
+
+      // tabela de itens
+      ensureSpace(16);
+      doc.setFillColor(243, 241, 236);
+      doc.rect(marginX, y, contentWidth, 8, 'F');
+      doc.setFont(undefined, 'bold');
+      doc.setFontSize(8.5);
+      doc.setTextColor(textColor[0], textColor[1], textColor[2]);
+      doc.text('ITEM', marginX + 3, y + 5.5);
+      doc.text('QTD', marginX + contentWidth - 58, y + 5.5, { align: 'right' });
+      doc.text('VALOR', marginX + contentWidth - 3, y + 5.5, { align: 'right' });
+      doc.setFont(undefined, 'normal');
       y += 8;
 
-      doc.setFontSize(9);
-      const lines = (sale.payment_lines && sale.payment_lines.length > 0) ? sale.payment_lines : [{ payment_method: sale.payment_method, amount: sale.total_amount, installments: sale.installments }];
-      doc.text('Forma de pagamento:', 14, y);
+      items.forEach((item, idx) => {
+        ensureSpace(9);
+        const rowHeight = 8;
+        if (idx % 2 === 1) {
+          doc.setFillColor(250, 248, 245);
+          doc.rect(marginX, y, contentWidth, rowHeight, 'F');
+        }
+        const unitLabel = item.product_id ? 'un.' : 'sessão(ões)';
+        doc.setFontSize(9);
+        doc.setTextColor(textColor[0], textColor[1], textColor[2]);
+        const name = this.saleItemName(item) + (item.is_courtesy ? ' (cortesia)' : '');
+        doc.text(truncate(name, contentWidth - 75), marginX + 3, y + 5.5);
+        doc.text(item.quantity + ' ' + unitLabel, marginX + contentWidth - 58, y + 5.5, { align: 'right' });
+        doc.text(this.formatCurrency(item.line_total), marginX + contentWidth - 3, y + 5.5, { align: 'right' });
+        y += rowHeight;
+      });
+
       y += 6;
-      lines.forEach(line => {
+      ensureSpace(24);
+
+      // total em destaque
+      doc.setFillColor(accentRgb.r, accentRgb.g, accentRgb.b);
+      doc.roundedRect(marginX + contentWidth - 78, y, 78, 16, 2, 2, 'F');
+      doc.setTextColor(accentTextDark ? 31 : 255, accentTextDark ? 38 : 255, accentTextDark ? 36 : 255);
+      doc.setFont(undefined, 'bold');
+      doc.setFontSize(9);
+      doc.text('TOTAL PAGO', marginX + contentWidth - 72, y + 6);
+      doc.setFontSize(13);
+      doc.text(this.formatCurrency(sale.total_amount), marginX + contentWidth - 72, y + 12.5);
+      doc.setFont(undefined, 'normal');
+      doc.setTextColor(textColor[0], textColor[1], textColor[2]);
+
+      y += 26;
+
+      // forma de pagamento
+      ensureSpace(16);
+      doc.setFont(undefined, 'bold');
+      doc.setFontSize(9);
+      doc.text('Forma de pagamento', marginX, y);
+      doc.setFont(undefined, 'normal');
+      y += 6;
+      const paymentLines = (sale.payment_lines && sale.payment_lines.length > 0) ? sale.payment_lines : [{ payment_method: sale.payment_method, amount: sale.total_amount, installments: sale.installments }];
+      paymentLines.forEach(line => {
+        ensureSpace(7);
         const parcelas = line.installments > 1 ? (' em ' + line.installments + 'x') : '';
-        doc.text('- ' + (line.payment_method || 'não informado') + parcelas + ': ' + this.formatCurrency(line.amount), 14, y);
+        doc.setFontSize(9);
+        doc.setTextColor(mutedColor[0], mutedColor[1], mutedColor[2]);
+        doc.text('• ' + (line.payment_method || 'não informado') + parcelas, marginX, y);
+        doc.setTextColor(textColor[0], textColor[1], textColor[2]);
+        doc.text(this.formatCurrency(line.amount), marginX + contentWidth, y, { align: 'right' });
         y += 6;
       });
 
-      doc.save('comprovante-' + sale.id.slice(0, 8) + '.pdf');
+      // rodapé
+      const finalPageHeight = doc.internal.pageSize.getHeight();
+      doc.setDrawColor(230, 226, 217);
+      doc.line(marginX, finalPageHeight - 18, marginX + contentWidth, finalPageHeight - 18);
+      doc.setFontSize(7.5);
+      doc.setTextColor(154, 150, 141);
+      doc.text('Comprovante gerado em ' + new Date().toLocaleString('pt-BR') + '   ·   ' + clinicName, pageWidth / 2, finalPageHeight - 12, { align: 'center' });
+
+      return doc;
+    },
+
+    openReceiptPreview(sale) {
+      const doc = this.buildReceiptDoc(sale);
+      if (this.receiptPreview.url) URL.revokeObjectURL(this.receiptPreview.url);
+      this.receiptPreview = { url: doc.output('bloburl'), doc, sale };
+      this.showReceiptPreview = true;
+    },
+
+    closeReceiptPreview() {
+      if (this.receiptPreview.url) URL.revokeObjectURL(this.receiptPreview.url);
+      this.showReceiptPreview = false;
+      this.receiptPreview = { url: '', doc: null, sale: null };
+    },
+
+    downloadReceiptFromPreview() {
+      if (!this.receiptPreview.doc || !this.receiptPreview.sale) return;
+      this.receiptPreview.doc.save('comprovante-' + this.receiptPreview.sale.id.slice(0, 8) + '.pdf');
     },
 
     async cancelSale(sale) {

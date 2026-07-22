@@ -482,6 +482,18 @@ create table public.clinic_expenses (
 );
 
 -- ============================================================================
+-- COMMISSION_TIERS (faixas de comissão por atingimento de meta, ex.: 100% da
+-- meta = 5%, 120% = 7%, 150% = 10%). Compartilhada pela clínica inteira.
+-- ============================================================================
+create table public.commission_tiers (
+  id uuid primary key default gen_random_uuid(),
+  clinic_id uuid not null references public.clinics (id) on delete cascade,
+  min_achievement_pct numeric(6, 2) not null,
+  commission_percentage numeric(5, 2) not null,
+  created_at timestamptz not null default now()
+);
+
+-- ============================================================================
 -- ÍNDICES (consultas mais comuns: por clínica e por data)
 -- ============================================================================
 create index idx_patients_clinic on public.patients (clinic_id);
@@ -497,6 +509,7 @@ create index idx_products_clinic on public.products (clinic_id);
 create index idx_products_brand on public.products (brand);
 create index idx_clinic_expenses_clinic on public.clinic_expenses (clinic_id);
 create index idx_clinic_expenses_date on public.clinic_expenses (expense_date);
+create index idx_commission_tiers_clinic on public.commission_tiers (clinic_id);
 create index idx_stock_movements_product on public.stock_movements (product_id);
 create index idx_stock_movements_clinic on public.stock_movements (clinic_id);
 create index idx_stock_movements_created_at on public.stock_movements (created_at);
@@ -761,6 +774,16 @@ create policy "clinic_settings_write" on public.clinic_settings for all
 alter table public.clinic_expenses enable row level security;
 
 create policy "clinic_expenses_all" on public.clinic_expenses for all
+  using (public.auth_is_prisma_team() or (clinic_id = public.auth_clinic_id() and public.auth_is_admin()))
+  with check (public.auth_is_prisma_team() or (clinic_id = public.auth_clinic_id() and public.auth_is_admin()));
+
+-- commission_tiers: só administrador (ou equipe Prisma) lê e escreve.
+alter table public.commission_tiers enable row level security;
+
+create policy "commission_tiers_select" on public.commission_tiers for select
+  using (clinic_id = public.auth_clinic_id() or public.auth_is_prisma_team());
+
+create policy "commission_tiers_write" on public.commission_tiers for all
   using (public.auth_is_prisma_team() or (clinic_id = public.auth_clinic_id() and public.auth_is_admin()))
   with check (public.auth_is_prisma_team() or (clinic_id = public.auth_clinic_id() and public.auth_is_admin()));
 

@@ -21,10 +21,16 @@
           <h2>Atendimento</h2>
           <p>Fila de hoje e registro de prontuário por sessão</p>
         </div>
-        <a href="agenda.html?novo_agendamento=1" class="btn btn-primary">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
-          Novo agendamento
-        </a>
+        <div class="flex gap-2">
+          <a href="vendas.html" class="btn btn-secondary">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><circle cx="9" cy="21" r="1.4"/><circle cx="18" cy="21" r="1.4"/><path d="M2.5 3h2.5l2.6 12.4a2 2 0 0 0 2 1.6h8a2 2 0 0 0 2-1.6L21.5 8H6"/></svg>
+            Nova venda
+          </a>
+          <a href="agenda.html?novo_agendamento=1" class="btn btn-primary">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+            Novo agendamento
+          </a>
+        </div>
       </div>
 
       <div x-show="feedback.message" x-cloak class="card mb-4" :style="'padding:12px 16px;border-color:' + (feedback.type==='error' ? 'var(--color-danger)' : 'var(--color-success)')">
