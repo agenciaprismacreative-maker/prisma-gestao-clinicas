@@ -249,16 +249,22 @@
 
           <div class="form-group" x-show="newSale.origin === 'Indicação de funcionário'" x-cloak>
             <label class="label">Funcionário que indicou</label>
-            <select class="input" x-model="newSale.referred_by_user_id">
+            <select class="input" x-model="newSale.referred_by_user_id" @change="refreshReferralPreview()">
               <option value="">Selecione</option>
               <template x-for="u in users" :key="u.id">
                 <option :value="u.id" x-text="u.full_name"></option>
               </template>
             </select>
           </div>
-          <p class="input-hint mb-3" x-show="newSale.origin === 'Indicação de funcionário'" x-cloak>
-            Não é preciso informar o percentual: ao aprovar a venda, a comissão é calculada automaticamente pela faixa de comissão de meta individual (Desempenho › Metas) que esse funcionário estiver atingindo no momento da aprovação.
+          <p class="input-hint mb-3" x-show="newSale.origin === 'Indicação de funcionário' && !newSale.referred_by_user_id" x-cloak>
+            Não é preciso informar percentual: ao aprovar a venda, a comissão dessa pessoa é calculada sozinha pela faixa de comissão de meta individual (Desempenho › Metas) que ela estiver atingindo naquele momento.
           </p>
+          <p class="input-hint mb-3" x-show="newSale.origin === 'Indicação de funcionário' && newSale.referred_by_user_id && referralPreview.loading" x-cloak>Calculando faixa de comissão…</p>
+          <div class="input-hint mb-3" x-show="newSale.origin === 'Indicação de funcionário' && newSale.referred_by_user_id && !referralPreview.loading" x-cloak>
+            <span x-show="!referralPreview.hasGoal">Este funcionário ainda não tem meta individual cadastrada este mês em Desempenho › Metas — sem meta, essa indicação não gera comissão.</span>
+            <span x-show="referralPreview.hasGoal && referralPreview.tierPct === null">Está em <strong x-text="referralPreview.goalPct + '%'"></strong> da própria meta (<span x-text="formatCurrency(referralPreview.revenue)"></span> de <span x-text="formatCurrency(referralPreview.target)"></span>) — ainda abaixo da 1ª faixa de comissão. Se aprovar agora, esta indicação não gera comissão.</span>
+            <span x-show="referralPreview.hasGoal && referralPreview.tierPct !== null">Está em <strong x-text="referralPreview.goalPct + '%'"></strong> da própria meta (<span x-text="formatCurrency(referralPreview.revenue)"></span> de <span x-text="formatCurrency(referralPreview.target)"></span>) — se aprovar agora, esta indicação gera <strong x-text="referralPreview.tierPct + '%'"></strong> de comissão.</span>
+          </div>
 
           <hr class="divider">
 
@@ -477,6 +483,7 @@ function vendasApp() {
     draftProductItem: { product_id: '', quantity: 1, unit_price: '' },
     cart: [],
     feedback: { type: '', message: '' },
+    referralPreview: { loading: false, hasGoal: false, revenue: 0, target: 0, goalPct: null, tierPct: null },
 
     async init() {
       await this.loadClinicId();
@@ -766,8 +773,10 @@ function vendasApp() {
     // calculada no momento da APROVAÇÃO da venda (não na criação), com base
     // em quanto quem indicou já vendeu no próprio nome neste mês. Se essa
     // pessoa não tem meta cadastrada ou está abaixo da primeira faixa,
-    // não há comissão de indicação nesta venda.
-    async referralCommissionPercentageFor(userId) {
+    // não há comissão de indicação nesta venda. Retorna os números todos
+    // (não só o percentual final) para dar pra mostrar isso na tela antes
+    // de aprovar, em vez de só descobrir depois.
+    async referralCommissionInfoFor(userId) {
       const now = new Date();
       const periodMonth = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-01';
       const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString().slice(0, 10);
@@ -776,13 +785,25 @@ function vendasApp() {
         supabaseClient.from('goals').select('target_amount').eq('clinic_id', this.clinicId).eq('professional_id', userId).eq('period_month', periodMonth).maybeSingle(),
         supabaseClient.from('transactions').select('amount').eq('professional_id', userId).in('type', ['pagamento_procedimento', 'venda_pacote']).gte('transaction_date', periodMonth).lt('transaction_date', nextMonth)
       ]);
-      if (!goal || !goal.target_amount) return null;
+      if (!goal || !goal.target_amount) return { hasGoal: false, revenue: 0, target: 0, goalPct: null, tierPct: null };
       const revenue = (txs || []).reduce((sum, t) => sum + Number(t.amount || 0), 0);
-      const goalPct = Math.round((revenue / Number(goal.target_amount)) * 100);
+      const target = Number(goal.target_amount);
+      const goalPct = Math.round((revenue / target) * 100);
       const applicable = (tiers || [])
         .filter(t => goalPct >= Number(t.min_achievement_pct))
         .sort((a, b) => Number(b.min_achievement_pct) - Number(a.min_achievement_pct));
-      return applicable.length > 0 ? Number(applicable[0].commission_percentage) : null;
+      const tierPct = applicable.length > 0 ? Number(applicable[0].commission_percentage) : null;
+      return { hasGoal: true, revenue, target, goalPct, tierPct };
+    },
+
+    async refreshReferralPreview() {
+      if (!this.newSale.referred_by_user_id) {
+        this.referralPreview = { loading: false, hasGoal: false, revenue: 0, target: 0, goalPct: null, tierPct: null };
+        return;
+      }
+      this.referralPreview = { ...this.referralPreview, loading: true };
+      const info = await this.referralCommissionInfoFor(this.newSale.referred_by_user_id);
+      this.referralPreview = { ...info, loading: false };
     },
 
     cartItemTotal(item) {
@@ -816,6 +837,7 @@ function vendasApp() {
         discount_percentage: 0,
         paymentLines: [this.emptyPaymentLine()]
       };
+      this.referralPreview = { loading: false, hasGoal: false, revenue: 0, target: 0, goalPct: null, tierPct: null };
       this.draftItem = { service_id: '', quantity: 1, unit_price: '', discount_percentage: 0, is_courtesy: false };
       this.cart = [];
       this.patientSearch = '';
@@ -1015,7 +1037,7 @@ function vendasApp() {
         // agora, calculada aqui na aprovação (não na criação da venda).
         let referralCommissionPct = null;
         if (sale.referred_by_user_id) {
-          referralCommissionPct = await this.referralCommissionPercentageFor(sale.referred_by_user_id);
+          referralCommissionPct = (await this.referralCommissionInfoFor(sale.referred_by_user_id)).tierPct;
           if (referralCommissionPct !== null && referralCommissionPct > 0) {
             const commissionAmount = Math.round(Number(sale.total_amount) * referralCommissionPct / 100 * 100) / 100;
             const { error: commError } = await supabaseClient.from('transactions').insert({
