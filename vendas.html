@@ -128,7 +128,7 @@
                 Indicado pelo paciente: <span x-text="referralPatientName(viewingSale.referred_by_patient_id)"></span>
               </p>
               <p class="text-xs text-muted" x-show="viewingSale.origin === 'Indicação de funcionário' && viewingSale.referred_by_user_id">
-                Indicado por: <span x-text="referralStaffName(viewingSale.referred_by_user_id)"></span><span x-show="viewingSale.referral_commission_percentage"> · comissão de <span x-text="viewingSale.referral_commission_percentage"></span>%</span>
+                Indicado por: <span x-text="referralStaffName(viewingSale.referred_by_user_id)"></span><span x-show="viewingSale.referral_commission_percentage"> · comissão de <span x-text="viewingSale.referral_commission_percentage"></span>% (calculada pela faixa de meta individual no momento da aprovação)</span><span x-show="!viewingSale.referral_commission_percentage && viewingSale.status === 'pendente'"> · comissão será calculada na aprovação, pela faixa de meta individual deste funcionário</span><span x-show="!viewingSale.referral_commission_percentage && viewingSale.status === 'aprovada'"> · sem comissão (fora das faixas de meta no momento da aprovação)</span>
               </p>
               <p class="text-xs text-muted" x-show="viewingSale.approved_at">Aprovada em <span x-text="formatDate(viewingSale.approved_at)"></span></p>
               <p class="text-xs text-muted" x-show="viewingSale.status === 'cancelada' && viewingSale.cancel_reason">Motivo do cancelamento: <span x-text="viewingSale.cancel_reason"></span></p>
@@ -247,23 +247,17 @@
             </div>
           </div>
 
-          <div class="grid grid-2 gap-3" x-show="newSale.origin === 'Indicação de funcionário'" x-cloak>
-            <div class="form-group">
-              <label class="label">Funcionário que indicou</label>
-              <select class="input" x-model="newSale.referred_by_user_id" @change="onReferralUserChange()">
-                <option value="">Selecione</option>
-                <template x-for="u in users" :key="u.id">
-                  <option :value="u.id" x-text="u.full_name"></option>
-                </template>
-              </select>
-            </div>
-            <div class="form-group">
-              <label class="label">Comissão da indicação (%)</label>
-              <input class="input" type="number" min="0" max="100" step="0.1" x-model="newSale.referral_commission_percentage">
-            </div>
+          <div class="form-group" x-show="newSale.origin === 'Indicação de funcionário'" x-cloak>
+            <label class="label">Funcionário que indicou</label>
+            <select class="input" x-model="newSale.referred_by_user_id">
+              <option value="">Selecione</option>
+              <template x-for="u in users" :key="u.id">
+                <option :value="u.id" x-text="u.full_name"></option>
+              </template>
+            </select>
           </div>
           <p class="input-hint mb-3" x-show="newSale.origin === 'Indicação de funcionário'" x-cloak>
-            Preenchida automaticamente com o padrão definido pelo administrador para este funcionário (ajustável se necessário). Ao aprovar a venda, gera automaticamente um lançamento de comissão para este funcionário.
+            Não é preciso informar o percentual: ao aprovar a venda, a comissão é calculada automaticamente pela faixa de comissão de meta individual (Desempenho › Metas) que esse funcionário estiver atingindo no momento da aprovação.
           </p>
 
           <hr class="divider">
@@ -475,7 +469,7 @@ function vendasApp() {
     newSale: {
       patient_id: '', origin: '', validity_months: '',
       sold_by_user_id: '',
-      referred_by_patient_id: '', referred_by_user_id: '', referral_commission_percentage: 10,
+      referred_by_patient_id: '', referred_by_user_id: '',
       discount_percentage: 0,
       paymentLines: []
     },
@@ -502,7 +496,7 @@ function vendasApp() {
     },
 
     async loadUsers() {
-      const { data } = await supabaseClient.from('users').select('id, full_name, default_referral_commission_percentage').order('full_name');
+      const { data } = await supabaseClient.from('users').select('id, full_name').order('full_name');
       this.users = data || [];
     },
 
@@ -766,15 +760,29 @@ function vendasApp() {
       this.draftProductItem = { product_id: '', quantity: 1, unit_price: '' };
     },
 
-    // preenche a comissão de indicação automaticamente com o padrão que o
-    // administrador definiu para o funcionário escolhido (equipe.html); se
-    // esse funcionário não tem um padrão configurado, mantém 10% de base,
-    // igual ao comportamento anterior. O campo continua editável para casos
-    // em que essa venda específica precise de um valor diferente.
-    onReferralUserChange() {
-      const u = this.users.find(uu => uu.id === this.newSale.referred_by_user_id);
-      const hasDefault = u && u.default_referral_commission_percentage !== null && u.default_referral_commission_percentage !== undefined;
-      this.newSale.referral_commission_percentage = hasDefault ? Number(u.default_referral_commission_percentage) : 10;
+    // comissão de indicação de funcionário: não é mais um percentual fixo
+    // cadastrado por pessoa. Segue a mesma faixa de comissão por
+    // atingimento de meta individual configurada em Desempenho › Metas,
+    // calculada no momento da APROVAÇÃO da venda (não na criação), com base
+    // em quanto quem indicou já vendeu no próprio nome neste mês. Se essa
+    // pessoa não tem meta cadastrada ou está abaixo da primeira faixa,
+    // não há comissão de indicação nesta venda.
+    async referralCommissionPercentageFor(userId) {
+      const now = new Date();
+      const periodMonth = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-01';
+      const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString().slice(0, 10);
+      const [{ data: tiers }, { data: goal }, { data: txs }] = await Promise.all([
+        supabaseClient.from('commission_tiers').select('min_achievement_pct, commission_percentage').eq('clinic_id', this.clinicId).eq('goal_scope', 'individual'),
+        supabaseClient.from('goals').select('target_amount').eq('clinic_id', this.clinicId).eq('professional_id', userId).eq('period_month', periodMonth).maybeSingle(),
+        supabaseClient.from('transactions').select('amount').eq('professional_id', userId).in('type', ['pagamento_procedimento', 'venda_pacote']).gte('transaction_date', periodMonth).lt('transaction_date', nextMonth)
+      ]);
+      if (!goal || !goal.target_amount) return null;
+      const revenue = (txs || []).reduce((sum, t) => sum + Number(t.amount || 0), 0);
+      const goalPct = Math.round((revenue / Number(goal.target_amount)) * 100);
+      const applicable = (tiers || [])
+        .filter(t => goalPct >= Number(t.min_achievement_pct))
+        .sort((a, b) => Number(b.min_achievement_pct) - Number(a.min_achievement_pct));
+      return applicable.length > 0 ? Number(applicable[0].commission_percentage) : null;
     },
 
     cartItemTotal(item) {
@@ -804,7 +812,7 @@ function vendasApp() {
       this.newSale = {
         patient_id: '', origin: '', validity_months: '',
         sold_by_user_id: this.currentUserId || '',
-        referred_by_patient_id: '', referred_by_user_id: '', referral_commission_percentage: 10,
+        referred_by_patient_id: '', referred_by_user_id: '',
         discount_percentage: 0,
         paymentLines: [this.emptyPaymentLine()]
       };
@@ -845,7 +853,6 @@ function vendasApp() {
         })),
         referred_by_patient_id: this.newSale.origin === 'Indicação de paciente' ? (this.newSale.referred_by_patient_id || null) : null,
         referred_by_user_id: this.newSale.origin === 'Indicação de funcionário' ? (this.newSale.referred_by_user_id || null) : null,
-        referral_commission_percentage: this.newSale.origin === 'Indicação de funcionário' ? (this.newSale.referral_commission_percentage || null) : null,
         created_by: this.isAdmin ? (this.newSale.sold_by_user_id || (user ? user.id : null)) : (user ? user.id : null)
       };
       const { data: sale, error } = await supabaseClient.from('sales').insert(payload).select().single();
@@ -1002,29 +1009,39 @@ function vendasApp() {
         }
 
         // 3) se a venda veio de indicação de funcionário, gera a comissão
-        // dessa indicação automaticamente
-        if (sale.referred_by_user_id && sale.referral_commission_percentage) {
-          const commissionAmount = Math.round(Number(sale.total_amount) * Number(sale.referral_commission_percentage) / 100 * 100) / 100;
-          const { error: commError } = await supabaseClient.from('transactions').insert({
-            clinic_id: this.clinicId,
-            type: 'comissao_profissional',
-            patient_id: sale.patient_id,
-            professional_id: sale.referred_by_user_id,
-            amount: commissionAmount,
-            commission_percentage: sale.referral_commission_percentage,
-            base_amount: sale.total_amount,
-            payment_method: null,
-            sale_group_id: saleGroupId,
-            transaction_date: today
-          });
-          if (commError) throw commError;
+        // dessa indicação automaticamente. O percentual não vem mais de um
+        // padrão fixo por funcionário: segue a faixa de comissão de meta
+        // individual (Desempenho › Metas) que quem indicou está atingindo
+        // agora, calculada aqui na aprovação (não na criação da venda).
+        let referralCommissionPct = null;
+        if (sale.referred_by_user_id) {
+          referralCommissionPct = await this.referralCommissionPercentageFor(sale.referred_by_user_id);
+          if (referralCommissionPct !== null && referralCommissionPct > 0) {
+            const commissionAmount = Math.round(Number(sale.total_amount) * referralCommissionPct / 100 * 100) / 100;
+            const { error: commError } = await supabaseClient.from('transactions').insert({
+              clinic_id: this.clinicId,
+              type: 'comissao_profissional',
+              patient_id: sale.patient_id,
+              professional_id: sale.referred_by_user_id,
+              amount: commissionAmount,
+              commission_percentage: referralCommissionPct,
+              base_amount: sale.total_amount,
+              payment_method: null,
+              sale_group_id: saleGroupId,
+              transaction_date: today
+            });
+            if (commError) throw commError;
+          } else {
+            referralCommissionPct = null;
+          }
         }
 
         const { error: saleError } = await supabaseClient
           .from('sales')
-          .update({ status: 'aprovada', approved_at: new Date().toISOString(), approved_by: user ? user.id : null })
+          .update({ status: 'aprovada', approved_at: new Date().toISOString(), approved_by: user ? user.id : null, referral_commission_percentage: referralCommissionPct })
           .eq('id', sale.id);
         if (saleError) throw saleError;
+        sale.referral_commission_percentage = referralCommissionPct;
 
         this.showFeedback('success', 'Venda aprovada: sessões geradas e lançamento criado no financeiro.');
         await Promise.all([this.loadSales(), this.loadAllSaleItems()]);
