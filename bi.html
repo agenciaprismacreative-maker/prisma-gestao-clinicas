@@ -429,6 +429,20 @@
             </div>
           </div>
 
+          <div class="card card-shadow mb-5">
+            <h3 class="mb-2" style="font-size:15px;">Meta geral da equipe</h3>
+            <p class="text-xs text-soft mb-3">Defina o faturamento total esperado da equipe no mês (ex.: R$ 120.000) e divida igualmente entre os integrantes abaixo. Depois de dividir, ajuste manualmente quem precisar de uma meta diferente — por exemplo, um vendedor com desempenho historicamente maior — e salve.</p>
+            <div class="flex items-end gap-2" style="flex-wrap:wrap;">
+              <div class="form-group" style="margin:0;">
+                <label class="label">Meta geral do mês (R$)</label>
+                <input class="input" type="text" inputmode="decimal" x-model="teamGoalTotal" @input="teamGoalTotal = maskCurrencyInput($event.target.value)" placeholder="Ex.: 120.000,00" style="max-width:220px;">
+              </div>
+              <button class="btn btn-secondary btn-sm" type="button" @click="distributeTeamGoal()">Dividir igualmente entre a equipe</button>
+              <button class="btn btn-primary btn-sm" type="button" @click="saveAllGoals()" :disabled="savingGoal">Salvar todas as metas</button>
+            </div>
+            <p class="text-xs text-muted mt-2" x-show="users.length > 0">Soma das metas individuais preenchidas agora: <strong x-text="formatCurrency(sumOfIndividualGoals)"></strong> (<span x-text="users.length"></span> integrante(s))</p>
+          </div>
+
           <div class="grid grid-main-side mb-2">
             <div class="card card-shadow" style="padding:0;">
               <div style="padding:20px 20px 0;"><h3 style="font-size:15px;">Metas e realizado por integrante</h3></div>
@@ -506,6 +520,7 @@ function biApp() {
     goals: [],
     goalInputs: {},
     savingGoal: false,
+    teamGoalTotal: '',
     products: [],
     serviceProductsMap: {},
     services: [],
@@ -1325,13 +1340,11 @@ function biApp() {
       return new Date(value).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
     },
 
-    async saveGoal(userId) {
+    // Grava a meta de 1 integrante sem mexer em feedback/loading — usado
+    // tanto pelo salvar individual quanto pelo "salvar todas" em lote.
+    async persistGoal(userId) {
       const amount = parseCurrencyToNumber(this.goalInputs[userId]);
-      if (!amount || amount <= 0) {
-        this.showFeedback('error', 'Informe um valor de meta válido antes de salvar.');
-        return;
-      }
-      this.savingGoal = true;
+      if (!amount || amount <= 0) return { skipped: true };
       const existing = this.goalFor(userId);
       let error;
       if (existing) {
@@ -1341,12 +1354,65 @@ function biApp() {
           clinic_id: this.clinicId, professional_id: userId, period_month: this.currentPeriodMonth, target_amount: amount
         }));
       }
+      return { error };
+    },
+
+    async saveGoal(userId) {
+      const amount = parseCurrencyToNumber(this.goalInputs[userId]);
+      if (!amount || amount <= 0) {
+        this.showFeedback('error', 'Informe um valor de meta válido antes de salvar.');
+        return;
+      }
+      this.savingGoal = true;
+      const { error } = await this.persistGoal(userId);
       this.savingGoal = false;
       if (error) {
         this.showFeedback('error', 'Erro ao salvar meta: ' + error.message);
         return;
       }
       this.showFeedback('success', 'Meta salva.');
+      await this.loadGoals();
+    },
+
+    // Meta geral da equipe (ex.: R$120.000 de faturamento esperado no mês):
+    // divide igualmente entre todos os integrantes da tabela, preenchendo o
+    // campo individual de cada um. O valor pode ser ajustado manualmente
+    // depois, linha a linha, para o caso de alguém ter uma meta diferente
+    // (ex.: um vendedor com desempenho historicamente maior).
+    get sumOfIndividualGoals() {
+      return this.users.reduce((sum, u) => sum + (parseCurrencyToNumber(this.goalInputs[u.id]) || 0), 0);
+    },
+
+    distributeTeamGoal() {
+      const total = parseCurrencyToNumber(this.teamGoalTotal);
+      if (!total || total <= 0) {
+        this.showFeedback('error', 'Informe um valor de meta geral válido.');
+        return;
+      }
+      if (this.users.length === 0) {
+        this.showFeedback('error', 'Nenhum integrante para dividir a meta.');
+        return;
+      }
+      const perPerson = total / this.users.length;
+      this.users.forEach(u => { this.goalInputs[u.id] = numberToCurrencyInput(perPerson); });
+      this.showFeedback('success', 'Meta de ' + this.formatCurrency(total) + ' dividida entre ' + this.users.length + ' integrante(s): ' + this.formatCurrency(perPerson) + ' cada. Ajuste manualmente quem precisar de uma meta diferente e clique em "Salvar todas as metas".');
+    },
+
+    async saveAllGoals() {
+      const eligible = this.users.filter(u => (parseCurrencyToNumber(this.goalInputs[u.id]) || 0) > 0);
+      if (eligible.length === 0) {
+        this.showFeedback('error', 'Nenhuma meta preenchida para salvar.');
+        return;
+      }
+      this.savingGoal = true;
+      const results = await Promise.all(eligible.map(u => this.persistGoal(u.id)));
+      this.savingGoal = false;
+      const failed = results.filter(r => r.error);
+      if (failed.length > 0) {
+        this.showFeedback('error', failed.length + ' de ' + eligible.length + ' meta(s) não foram salvas. Tente novamente.');
+      } else {
+        this.showFeedback('success', 'Metas salvas para ' + eligible.length + ' integrante(s).');
+      }
       await this.loadGoals();
     },
 
