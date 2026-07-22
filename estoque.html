@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Estoque · Prisma Gestão de Clínicas</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body data-page="estoque" data-title="Estoque" data-subtitle="" data-allowed-roles="administrador" x-data="{ sidebarOpen:false }">
+
+<div class="app-shell">
+  <div data-include="partials/sidebar.html"></div>
+
+  <div class="main">
+    <header class="topbar" data-include="partials/topbar.html"></header>
+
+    <main class="content" x-data="estoqueApp()" x-init="init()">
+
+      <div class="page-header">
+        <div>
+          <h2>Estoque</h2>
+          <p>Insumos, movimentações e custo por procedimento</p>
+        </div>
+        <button class="btn btn-primary" type="button" @click="openNewProductForm()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+          <span>Novo insumo</span>
+        </button>
+      </div>
+
+      <div x-show="feedback.message" x-cloak class="card mb-4" :style="'padding:12px 16px;border-color:' + (feedback.type==='error' ? 'var(--color-danger)' : 'var(--color-success)')">
+        <span class="text-sm" x-text="feedback.message" :style="'color:' + (feedback.type==='error' ? 'var(--color-danger)' : 'var(--color-success)')"></span>
+      </div>
+
+      <div x-show="loading" class="text-sm text-muted">Carregando…</div>
+
+      <div x-show="!loading">
+
+        <div class="grid grid-4 mb-5">
+          <div class="stat-card">
+            <div class="stat-label">Insumos cadastrados</div>
+            <div class="stat-value" x-text="products.length"></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Abaixo do mínimo</div>
+            <div class="stat-value" :style="lowStockProducts.length > 0 ? 'color:var(--color-danger);' : ''" x-text="lowStockProducts.length"></div>
+            <div class="stat-trend text-muted">Alerta de reposição</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Valor em estoque atual</div>
+            <div class="stat-value" x-text="formatCurrency(currentStockValue)"></div>
+            <div class="stat-trend text-muted">Quantidade × custo unitário</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Valor investido (histórico)</div>
+            <div class="stat-value" x-text="formatCurrency(totalInvested)"></div>
+            <div class="stat-trend text-muted">Soma de todas as entradas</div>
+          </div>
+        </div>
+
+        <div class="card mb-5" style="padding:14px 18px;border-color:var(--color-danger);" x-show="lowStockProducts.length > 0">
+          <p class="text-sm" style="color:var(--color-danger);"><strong>Atenção:</strong> <span x-text="lowStockProducts.map(p => p.name).join(', ')"></span> <span x-text="lowStockProducts.length === 1 ? 'está' : 'estão'"></span> abaixo do estoque mínimo.</p>
+        </div>
+
+        <div class="flex gap-2 mb-5">
+          <button class="btn btn-sm" :class="tab==='insumos' ? 'btn-primary' : 'btn-secondary'" @click="tab='insumos'">Insumos</button>
+          <button class="btn btn-sm" :class="tab==='movimentacoes' ? 'btn-primary' : 'btn-secondary'" @click="tab='movimentacoes'">Movimentações</button>
+          <button class="btn btn-sm" :class="tab==='custo' ? 'btn-primary' : 'btn-secondary'" @click="tab='custo'">Custo por procedimento</button>
+        </div>
+
+        <!-- ===================== INSUMOS ===================== -->
+        <div x-show="tab==='insumos'">
+          <div class="card card-shadow" style="padding:0;">
+            <div x-show="products.length === 0" class="empty-note" style="margin:20px;">
+              Nenhum insumo cadastrado ainda. Use "Novo insumo" para começar a controlar o estoque.
+            </div>
+            <div class="table-wrap" x-show="products.length > 0">
+              <table class="table">
+                <thead><tr><th>Insumo</th><th>Estoque atual</th><th>Mínimo</th><th>Máximo</th><th>Status</th><th>Custo unitário</th><th></th></tr></thead>
+                <tbody>
+                  <template x-for="p in products" :key="p.id">
+                    <tr>
+                      <td>
+                        <strong x-text="p.name"></strong>
+                        <div class="text-xs text-muted" x-show="p.barcode" x-text="p.barcode"></div>
+                      </td>
+                      <td x-text="(p.stock_quantity !== null ? p.stock_quantity : 0) + (p.unit_of_measure ? (' ' + p.unit_of_measure) : '')"></td>
+                      <td x-text="p.min_stock_quantity !== null ? p.min_stock_quantity : '—'"></td>
+                      <td x-text="p.max_stock_quantity !== null ? p.max_stock_quantity : '—'"></td>
+                      <td><span class="badge" :class="stockStatus(p).cls" x-text="stockStatus(p).label"></span></td>
+                      <td x-text="p.unit_cost !== null ? formatCurrency(p.unit_cost) : '—'"></td>
+                      <td>
+                        <div class="flex gap-2" style="flex-wrap:wrap;">
+                          <button class="btn btn-secondary btn-sm" type="button" @click="openMovementForm('entrada', p)">Entrada</button>
+                          <button class="btn btn-secondary btn-sm" type="button" @click="openMovementForm('saida', p)">Saída</button>
+                          <button class="btn btn-ghost btn-sm" type="button" @click="openEditProductForm(p)">Editar</button>
+                          <button class="btn btn-ghost btn-sm" type="button" @click="removeProduct(p)">Remover</button>
+                        </div>
+                      </td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- ===================== MOVIMENTAÇÕES ===================== -->
+        <div x-show="tab==='movimentacoes'" x-cloak>
+          <div class="card card-shadow" style="padding:0;">
+            <div x-show="movements.length === 0" class="empty-note" style="margin:20px;">
+              Nenhuma movimentação registrada ainda.
+            </div>
+            <div class="table-wrap" x-show="movements.length > 0">
+              <table class="table">
+                <thead><tr><th>Data</th><th>Insumo</th><th>Tipo</th><th>Quantidade</th><th>Custo unitário</th><th>Motivo</th><th>Registrado por</th></tr></thead>
+                <tbody>
+                  <template x-for="m in recentMovements" :key="m.id">
+                    <tr>
+                      <td x-text="formatDateTime(m.created_at)"></td>
+                      <td x-text="m.products ? m.products.name : '—'"></td>
+                      <td><span class="badge" :class="m.movement_type === 'entrada' ? 'badge-success' : (m.movement_type === 'saida' ? 'badge-danger' : 'badge-neutral')" x-text="movementTypeLabel(m.movement_type)"></span></td>
+                      <td x-text="m.quantity + (m.products && m.products.unit_of_measure ? (' ' + m.products.unit_of_measure) : '')"></td>
+                      <td x-text="m.unit_cost !== null ? formatCurrency(m.unit_cost) : '—'"></td>
+                      <td x-text="m.reason || '—'"></td>
+                      <td x-text="m.users ? m.users.full_name : '—'"></td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+            <p class="text-xs text-soft" style="padding:12px 20px;" x-show="movements.length > 50">Mostrando as 50 movimentações mais recentes de <span x-text="movements.length"></span>.</p>
+          </div>
+        </div>
+
+        <!-- ===================== CUSTO POR PROCEDIMENTO ===================== -->
+        <div x-show="tab==='custo'" x-cloak>
+          <div class="card card-shadow" style="padding:0;">
+            <div x-show="services.length === 0" class="empty-note" style="margin:20px;">
+              Nenhum serviço cadastrado ainda.
+            </div>
+            <div class="table-wrap" x-show="services.length > 0">
+              <table class="table">
+                <thead><tr><th>Serviço</th><th>Preço</th><th>Custo de insumos</th><th>Margem estimada</th></tr></thead>
+                <tbody>
+                  <template x-for="s in services" :key="s.id">
+                    <tr>
+                      <td><strong x-text="s.name"></strong></td>
+                      <td x-text="s.price !== null ? formatCurrency(s.price) : '—'"></td>
+                      <td x-text="formatCurrency(serviceCostFor(s.id))"></td>
+                      <td x-text="s.price !== null ? formatCurrency(s.price - serviceCostFor(s.id)) : '—'"></td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+            <p class="text-xs text-soft" style="padding:12px 20px;">Os insumos usados por cada serviço são definidos na aba Insumos, dentro de Serviços.</p>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- modal novo/editar insumo -->
+      <div x-show="showProductForm" x-cloak class="modal-overlay" @click.self="showProductForm = false">
+        <div class="card card-shadow" style="margin:auto;width:100%;max-width:460px;max-height:88vh;overflow-y:auto;">
+          <div class="card-header">
+            <h3 x-text="editingProductId ? 'Editar insumo' : 'Novo insumo'"></h3>
+            <button class="btn btn-ghost btn-sm" type="button" @click="showProductForm = false">Fechar</button>
+          </div>
+          <form @submit.prevent="saveProduct()">
+            <div class="form-group">
+              <label class="label">Nome do insumo</label>
+              <input class="input" x-model="productForm.name" required placeholder="Ex.: Toxina botulínica 100U">
+            </div>
+            <div class="grid grid-2 gap-3">
+              <div class="form-group">
+                <label class="label">Custo unitário (R$)</label>
+                <input class="input" type="text" inputmode="decimal" x-model="productForm.unit_cost" @input="productForm.unit_cost = maskCurrencyInput($event.target.value)" placeholder="R$ 0,00">
+              </div>
+              <div class="form-group">
+                <label class="label">Unidade de medida</label>
+                <input class="input" x-model="productForm.unit_of_measure" placeholder="Ex.: ml, un, g">
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="label">Código de barras (opcional)</label>
+              <input class="input" x-model="productForm.barcode">
+            </div>
+
+            <hr class="divider">
+
+            <div class="form-group" x-show="!editingProductId">
+              <label class="label">Estoque inicial</label>
+              <input class="input" type="number" min="0" step="0.001" x-model="productForm.stock_quantity">
+            </div>
+            <p class="text-xs text-soft mb-3" x-show="editingProductId">
+              Estoque atual: <strong x-text="(editingProduct ? (editingProduct.stock_quantity || 0) : 0)"></strong><span x-text="editingProduct && editingProduct.unit_of_measure ? (' ' + editingProduct.unit_of_measure) : ''"></span>. Para alterar, use os botões "Entrada" ou "Saída" na listagem, para manter o histórico de movimentações coerente.
+            </p>
+
+            <div class="grid grid-2 gap-3">
+              <div class="form-group">
+                <label class="label">Estoque mínimo</label>
+                <input class="input" type="number" min="0" step="0.001" x-model="productForm.min_stock_quantity" placeholder="Opcional">
+              </div>
+              <div class="form-group">
+                <label class="label">Estoque máximo</label>
+                <input class="input" type="number" min="0" step="0.001" x-model="productForm.max_stock_quantity" placeholder="Opcional">
+              </div>
+            </div>
+            <p class="input-hint">Definir mínimo ativa o alerta de reposição no topo desta página.</p>
+
+            <button class="btn btn-primary btn-block mt-2" type="submit" :disabled="saving">
+              <span x-show="!saving">Salvar insumo</span>
+              <span x-show="saving" x-cloak>Salvando…</span>
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <!-- modal registrar entrada/saída -->
+      <div x-show="showMovementForm" x-cloak class="modal-overlay" @click.self="showMovementForm = false">
+        <div class="card card-shadow" style="margin:auto;width:100%;max-width:420px;">
+          <div class="card-header">
+            <h3 x-text="movementFormTitle"></h3>
+            <button class="btn btn-ghost btn-sm" type="button" @click="showMovementForm = false">Fechar</button>
+          </div>
+          <form @submit.prevent="saveMovement()">
+            <div class="form-group">
+              <label class="label">Insumo</label>
+              <select class="input" x-model="movementForm.product_id" required>
+                <option value="">Selecione o insumo</option>
+                <template x-for="p in products" :key="p.id">
+                  <option :value="p.id" x-text="p.name"></option>
+                </template>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="label">Quantidade</label>
+              <input class="input" type="number" min="0.001" step="0.001" x-model="movementForm.quantity" required>
+            </div>
+            <div class="form-group" x-show="movementType === 'entrada'">
+              <label class="label">Custo unitário desta entrada (R$)</label>
+              <input class="input" type="text" inputmode="decimal" x-model="movementForm.unit_cost" @input="movementForm.unit_cost = maskCurrencyInput($event.target.value)" placeholder="R$ 0,00">
+              <p class="input-hint">Se preenchido, atualiza o custo unitário de referência do insumo.</p>
+            </div>
+            <div class="form-group">
+              <label class="label" x-text="movementType === 'entrada' ? 'Observação (opcional)' : 'Motivo'"></label>
+              <input class="input" x-model="movementForm.reason" :placeholder="movementType === 'entrada' ? 'Ex.: nota fiscal, fornecedor' : 'Ex.: perda, vencimento, uso manual, ajuste de contagem'">
+            </div>
+            <button class="btn btn-primary btn-block mt-2" type="submit" :disabled="saving">
+              <span x-show="!saving">Registrar</span>
+              <span x-show="saving" x-cloak>Salvando…</span>
+            </button>
+          </form>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<script src="js/currency-mask.js"></script>
+<script>
+function estoqueApp() {
+  return {
+    loading: true,
+    saving: false,
+    clinicId: null,
+    currentUserId: null,
+    tab: 'insumos',
+    products: [],
+    movements: [],
+    services: [],
+    serviceProductsMap: {},
+    feedback: { type: '', message: '' },
+
+    showProductForm: false,
+    editingProductId: null,
+    productForm: { name: '', unit_cost: '', unit_of_measure: '', barcode: '', stock_quantity: '0', min_stock_quantity: '', max_stock_quantity: '' },
+
+    showMovementForm: false,
+    movementType: 'entrada',
+    movementForm: { product_id: '', quantity: '', unit_cost: '', reason: '' },
+
+    async init() {
+      await this.loadClinicId();
+      await Promise.all([this.loadProducts(), this.loadMovements(), this.loadServices(), this.loadServiceProductsMap()]);
+      this.loading = false;
+    },
+
+    async loadClinicId() {
+      const { data: { user } } = await supabaseClient.auth.getUser();
+      if (!user) return;
+      this.currentUserId = user.id;
+      const { data, error } = await supabaseClient.from('users').select('clinic_id').eq('id', user.id).single();
+      if (error) {
+        this.showFeedback('error', 'Erro ao identificar sua clínica: ' + error.message);
+        return;
+      }
+      this.clinicId = data ? data.clinic_id : null;
+    },
+
+    async loadProducts() {
+      const { data, error } = await supabaseClient
+        .from('products')
+        .select('id, name, unit_cost, unit_of_measure, barcode, stock_quantity, min_stock_quantity, max_stock_quantity')
+        .order('name');
+      this.products = error ? [] : (data || []);
+    },
+
+    async loadMovements() {
+      const { data, error } = await supabaseClient
+        .from('stock_movements')
+        .select('id, movement_type, quantity, unit_cost, reason, created_at, product_id, products ( name, unit_of_measure ), users ( full_name )')
+        .order('created_at', { ascending: false });
+      this.movements = error ? [] : (data || []);
+    },
+
+    async loadServices() {
+      const { data, error } = await supabaseClient.from('services').select('id, name, price').order('name');
+      this.services = error ? [] : (data || []);
+    },
+
+    async loadServiceProductsMap() {
+      const { data, error } = await supabaseClient.from('service_products').select('service_id, product_id, quantity_used');
+      const map = {};
+      (error ? [] : (data || [])).forEach(row => {
+        if (!map[row.service_id]) map[row.service_id] = [];
+        map[row.service_id].push(row);
+      });
+      this.serviceProductsMap = map;
+    },
+
+    serviceCostFor(serviceId) {
+      const rows = this.serviceProductsMap[serviceId] || [];
+      return rows.reduce((sum, row) => {
+        const p = this.products.find(pp => pp.id === row.product_id);
+        if (!p || p.unit_cost === null) return sum;
+        return sum + Number(p.unit_cost) * Number(row.quantity_used || 0);
+      }, 0);
+    },
+
+    get lowStockProducts() {
+      return this.products.filter(p => p.min_stock_quantity !== null && Number(p.stock_quantity || 0) <= Number(p.min_stock_quantity));
+    },
+
+    get currentStockValue() {
+      return this.products.reduce((sum, p) => sum + Number(p.stock_quantity || 0) * Number(p.unit_cost || 0), 0);
+    },
+
+    get totalInvested() {
+      return this.movements
+        .filter(m => m.movement_type === 'entrada')
+        .reduce((sum, m) => sum + Number(m.quantity || 0) * Number(m.unit_cost || 0), 0);
+    },
+
+    get recentMovements() {
+      return this.movements.slice(0, 50);
+    },
+
+    get editingProduct() {
+      return this.products.find(p => p.id === this.editingProductId) || null;
+    },
+
+    stockStatus(p) {
+      const qty = Number(p.stock_quantity || 0);
+      if (p.min_stock_quantity !== null && qty <= Number(p.min_stock_quantity)) {
+        return { label: 'Abaixo do mínimo', cls: 'badge-danger' };
+      }
+      if (p.max_stock_quantity !== null && qty >= Number(p.max_stock_quantity)) {
+        return { label: 'Acima do máximo', cls: 'badge-info' };
+      }
+      if (p.min_stock_quantity === null && p.max_stock_quantity === null) {
+        return { label: 'Sem limite definido', cls: 'badge-neutral' };
+      }
+      return { label: 'Normal', cls: 'badge-success' };
+    },
+
+    movementTypeLabel(type) {
+      return type === 'entrada' ? 'Entrada' : (type === 'saida' ? 'Saída' : 'Ajuste');
+    },
+
+    formatCurrency(value) {
+      return (Number(value) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    },
+
+    formatDateTime(value) {
+      const d = new Date(value);
+      return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) + ' às ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    },
+
+    openNewProductForm() {
+      this.editingProductId = null;
+      this.productForm = { name: '', unit_cost: '', unit_of_measure: '', barcode: '', stock_quantity: '0', min_stock_quantity: '', max_stock_quantity: '' };
+      this.showProductForm = true;
+    },
+
+    openEditProductForm(p) {
+      this.editingProductId = p.id;
+      this.productForm = {
+        name: p.name,
+        unit_cost: p.unit_cost !== null ? numberToCurrencyInput(p.unit_cost) : '',
+        unit_of_measure: p.unit_of_measure || '',
+        barcode: p.barcode || '',
+        stock_quantity: p.stock_quantity !== null ? String(p.stock_quantity) : '0',
+        min_stock_quantity: p.min_stock_quantity !== null ? String(p.min_stock_quantity) : '',
+        max_stock_quantity: p.max_stock_quantity !== null ? String(p.max_stock_quantity) : ''
+      };
+      this.showProductForm = true;
+    },
+
+    async saveProduct() {
+      if (!this.clinicId) return;
+      this.saving = true;
+      const payload = {
+        name: this.productForm.name,
+        unit_cost: parseCurrencyToNumber(this.productForm.unit_cost),
+        unit_of_measure: this.productForm.unit_of_measure || null,
+        barcode: this.productForm.barcode || null,
+        min_stock_quantity: this.productForm.min_stock_quantity === '' ? null : Number(this.productForm.min_stock_quantity),
+        max_stock_quantity: this.productForm.max_stock_quantity === '' ? null : Number(this.productForm.max_stock_quantity)
+      };
+      let error;
+      if (this.editingProductId) {
+        // Estoque atual não é editado direto aqui: passa sempre por uma
+        // movimentação (Entrada/Saída), para manter o histórico coerente.
+        ({ error } = await supabaseClient.from('products').update(payload).eq('id', this.editingProductId));
+      } else {
+        payload.stock_quantity = this.productForm.stock_quantity === '' ? 0 : Number(this.productForm.stock_quantity);
+        ({ error } = await supabaseClient.from('products').insert({ ...payload, clinic_id: this.clinicId }));
+      }
+      this.saving = false;
+      if (error) {
+        this.showFeedback('error', 'Erro ao salvar insumo: ' + error.message);
+        return;
+      }
+      this.showProductForm = false;
+      this.showFeedback('success', this.editingProductId ? 'Insumo atualizado.' : 'Insumo cadastrado.');
+      await this.loadProducts();
+    },
+
+    async removeProduct(p) {
+      if (!window.confirm('Remover o insumo "' + p.name + '"? O histórico de movimentações associado também será removido.')) return;
+      const { error } = await supabaseClient.from('products').delete().eq('id', p.id);
+      if (error) {
+        if (error.code === '23503') {
+          this.showFeedback('error', 'Não é possível remover: este insumo está vinculado a algum serviço.');
+        } else {
+          this.showFeedback('error', 'Erro ao remover insumo: ' + error.message);
+        }
+        return;
+      }
+      this.showFeedback('success', 'Insumo removido.');
+      await Promise.all([this.loadProducts(), this.loadMovements()]);
+    },
+
+    openMovementForm(type, product) {
+      this.movementType = type;
+      this.movementForm = {
+        product_id: product ? product.id : '',
+        quantity: '',
+        unit_cost: product && product.unit_cost !== null ? numberToCurrencyInput(product.unit_cost) : '',
+        reason: ''
+      };
+      this.showMovementForm = true;
+    },
+
+    get movementFormTitle() {
+      return this.movementType === 'entrada' ? 'Registrar entrada' : 'Registrar saída';
+    },
+
+    async saveMovement() {
+      if (!this.clinicId) return;
+      const product = this.products.find(p => p.id === this.movementForm.product_id);
+      if (!product) {
+        this.showFeedback('error', 'Selecione um insumo.');
+        return;
+      }
+      const qty = Number(this.movementForm.quantity);
+      if (!qty || qty <= 0) {
+        this.showFeedback('error', 'Informe uma quantidade válida.');
+        return;
+      }
+      this.saving = true;
+      const unitCost = this.movementForm.unit_cost ? parseCurrencyToNumber(this.movementForm.unit_cost) : null;
+
+      const { error: moveError } = await supabaseClient.from('stock_movements').insert({
+        clinic_id: this.clinicId,
+        product_id: product.id,
+        movement_type: this.movementType,
+        quantity: qty,
+        unit_cost: unitCost,
+        reason: this.movementForm.reason || null,
+        created_by: this.currentUserId
+      });
+      if (moveError) {
+        this.saving = false;
+        this.showFeedback('error', 'Erro ao registrar movimentação: ' + moveError.message);
+        return;
+      }
+
+      const delta = this.movementType === 'saida' ? -qty : qty;
+      const newStock = Number(product.stock_quantity || 0) + delta;
+      const productUpdate = { stock_quantity: newStock };
+      if (this.movementType === 'entrada' && unitCost !== null) {
+        productUpdate.unit_cost = unitCost;
+      }
+      const { error: updateError } = await supabaseClient.from('products').update(productUpdate).eq('id', product.id);
+
+      this.saving = false;
+      this.showMovementForm = false;
+      if (updateError) {
+        this.showFeedback('error', 'Movimentação registrada, mas houve erro ao atualizar o estoque: ' + updateError.message);
+      } else {
+        this.showFeedback('success', 'Movimentação registrada.');
+      }
+      await Promise.all([this.loadProducts(), this.loadMovements()]);
+    },
+
+    showFeedback(type, message) {
+      this.feedback = { type, message };
+      setTimeout(() => { this.feedback = { type: '', message: '' }; }, 5000);
+    }
+  };
+}
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="js/supabase-client.js"></script>
+<script src="js/auth-guard.js"></script>
+<script src="js/topbar.js"></script>
+<script src="js/include.js" defer></script>
+</body>
+</html>

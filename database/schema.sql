@@ -281,6 +281,8 @@ create table public.products (
   unit_of_measure text,
   barcode text,
   stock_quantity numeric(10, 2),
+  min_stock_quantity numeric(10, 2),
+  max_stock_quantity numeric(10, 2),
   created_at timestamptz not null default now()
 );
 
@@ -292,6 +294,24 @@ create table public.service_products (
   service_id uuid not null references public.services (id) on delete cascade,
   product_id uuid not null references public.products (id) on delete cascade,
   quantity_used numeric(10, 3) not null default 1,
+  created_at timestamptz not null default now()
+);
+
+-- ============================================================================
+-- 15.1 STOCK_MOVEMENTS (histórico de entradas, saídas e ajustes de estoque;
+-- saídas por atendimento são geradas automaticamente ao concluir um
+-- atendimento vinculado a um serviço com insumos cadastrados)
+-- ============================================================================
+create table public.stock_movements (
+  id uuid primary key default gen_random_uuid(),
+  clinic_id uuid not null references public.clinics (id) on delete cascade,
+  product_id uuid not null references public.products (id) on delete cascade,
+  movement_type text not null check (movement_type in ('entrada', 'saida', 'ajuste')),
+  quantity numeric(10, 3) not null,
+  unit_cost numeric(10, 2),
+  reason text,
+  appointment_id uuid references public.appointments (id) on delete set null,
+  created_by uuid references public.users (id) on delete set null,
   created_at timestamptz not null default now()
 );
 
@@ -434,6 +454,9 @@ create index idx_communications_patient on public.communications_log (patient_id
 create index idx_schedule_blocks_clinic_date on public.schedule_blocks (clinic_id, start_at);
 create index idx_service_products_service on public.service_products (service_id);
 create index idx_products_clinic on public.products (clinic_id);
+create index idx_stock_movements_product on public.stock_movements (product_id);
+create index idx_stock_movements_clinic on public.stock_movements (clinic_id);
+create index idx_stock_movements_created_at on public.stock_movements (created_at);
 create index idx_goals_clinic_period on public.goals (clinic_id, period_month);
 create index idx_goals_professional on public.goals (professional_id);
 alter table public.goals add constraint goals_unique_period unique (clinic_id, professional_id, period_month);
@@ -525,6 +548,7 @@ alter table public.communications_log enable row level security;
 alter table public.schedule_blocks enable row level security;
 alter table public.products enable row level security;
 alter table public.service_products enable row level security;
+alter table public.stock_movements enable row level security;
 alter table public.goals enable row level security;
 alter table public.payment_machines enable row level security;
 alter table public.sales enable row level security;
@@ -616,6 +640,10 @@ create policy "service_products_all" on public.service_products for all
     where s.id = service_products.service_id
       and (s.clinic_id = public.auth_clinic_id() or public.auth_is_prisma_team())
   ));
+
+create policy "stock_movements_all" on public.stock_movements for all
+  using (clinic_id = public.auth_clinic_id() or public.auth_is_prisma_team())
+  with check (clinic_id = public.auth_clinic_id() or public.auth_is_prisma_team());
 
 -- goals: leitura liberada para o próprio profissional (ou metas gerais da
 -- clínica, quando professional_id é nulo); escrita (criar/editar/remover)

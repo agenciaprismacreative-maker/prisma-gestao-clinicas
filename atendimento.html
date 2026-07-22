@@ -484,6 +484,43 @@ function atendimentoApp() {
           }
         }
 
+        // Consumo automático de insumos: se o serviço atendido tem insumos
+        // cadastrados (aba Insumos, em Serviços), gera uma saída de estoque
+        // por insumo e decrementa a quantidade em mão. Não bloqueia a
+        // conclusão do atendimento se falhar (rede, insumo removido etc.).
+        if (this.selectedAppt.service_id) {
+          try {
+            const { data: recipeRows, error: recipeError } = await supabaseClient
+              .from('service_products')
+              .select('product_id, quantity_used')
+              .eq('service_id', this.selectedAppt.service_id);
+            if (recipeError) throw recipeError;
+            for (const row of (recipeRows || [])) {
+              const { data: product, error: productError } = await supabaseClient
+                .from('products')
+                .select('stock_quantity')
+                .eq('id', row.product_id)
+                .single();
+              if (productError || !product) continue;
+              await supabaseClient.from('stock_movements').insert({
+                clinic_id: this.clinicId,
+                product_id: row.product_id,
+                movement_type: 'saida',
+                quantity: row.quantity_used,
+                reason: 'Consumo automático em atendimento',
+                appointment_id: this.selectedAppt.id,
+                created_by: user ? user.id : null
+              });
+              await supabaseClient
+                .from('products')
+                .update({ stock_quantity: Number(product.stock_quantity || 0) - Number(row.quantity_used) })
+                .eq('id', row.product_id);
+            }
+          } catch (stockErr) {
+            console.error('[atendimento] consumo automático de estoque falhou:', stockErr);
+          }
+        }
+
         // Tarefa automática de retorno: se o serviço tem intervalo de
         // retorno definido, cria uma tarefa de acompanhamento com o prazo
         // já calculado. Não bloqueia a conclusão do atendimento se falhar.

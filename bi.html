@@ -106,8 +106,23 @@
 
         <!-- ===================== ESTOQUE ===================== -->
         <div x-show="tab==='estoque'" x-cloak>
-          <div class="empty-note">
-            Módulo de estoque ainda não implementado. Quando estiver pronto, esta área vai reunir quantidade de insumos, valores investidos, estoque mínimo/máximo e custo por procedimento.
+          <div class="grid grid-4 mb-5">
+            <div class="stat-card"><div class="stat-label">Insumos cadastrados</div><div class="stat-value" x-text="products.length"></div></div>
+            <div class="stat-card">
+              <div class="stat-label">Abaixo do mínimo</div>
+              <div class="stat-value" :style="lowStockCount > 0 ? 'color:var(--color-danger);' : ''" x-text="lowStockCount"></div>
+            </div>
+            <div class="stat-card"><div class="stat-label">Valor em estoque atual</div><div class="stat-value" x-text="formatCurrency(currentStockValue)"></div></div>
+            <div class="stat-card"><div class="stat-label">Serviços com custo de insumo calculado</div><div class="stat-value" x-text="servicesWithCost"></div></div>
+          </div>
+          <div class="card card-shadow">
+            <div class="flex items-center justify-between">
+              <div>
+                <h3 style="font-size:15px;">Controle completo de estoque</h3>
+                <p class="text-sm text-muted">Cadastro de insumos, entradas e saídas, alertas de mínimo/máximo e custo por procedimento.</p>
+              </div>
+              <a href="estoque.html" class="btn btn-primary btn-sm">Abrir Estoque</a>
+            </div>
           </div>
         </div>
 
@@ -332,6 +347,9 @@ function biApp() {
     goals: [],
     goalInputs: {},
     savingGoal: false,
+    products: [],
+    serviceProductsMap: {},
+    services: [],
     currentUserId: null,
     currentUserRole: null,
     feedback: { type: '', message: '' },
@@ -341,7 +359,8 @@ function biApp() {
       await Promise.all([
         this.loadPatients(), this.loadAppointments(), this.loadTransactions(),
         this.loadPackages(), this.loadLeads(), this.loadCommunications(),
-        this.loadTasks(), this.loadUsers(), this.loadBlocks(), this.loadGoals()
+        this.loadTasks(), this.loadUsers(), this.loadBlocks(), this.loadGoals(),
+        this.loadProducts(), this.loadServices(), this.loadServiceProductsMap()
       ]);
       this.syncGoalInputs();
       this.loading = false;
@@ -464,6 +483,38 @@ function biApp() {
     async loadPatients() {
       const { data, error } = await supabaseClient.from('patients').select('id, full_name, lead_source, referred_by_user_id, created_at');
       this.patients = error ? [] : (data || []);
+    },
+
+    async loadProducts() {
+      const { data, error } = await supabaseClient.from('products').select('id, unit_cost, stock_quantity, min_stock_quantity');
+      this.products = error ? [] : (data || []);
+    },
+
+    async loadServices() {
+      const { data, error } = await supabaseClient.from('services').select('id, name').order('name');
+      this.services = error ? [] : (data || []);
+    },
+
+    async loadServiceProductsMap() {
+      const { data, error } = await supabaseClient.from('service_products').select('service_id, product_id, quantity_used');
+      const map = {};
+      (error ? [] : (data || [])).forEach(row => {
+        if (!map[row.service_id]) map[row.service_id] = [];
+        map[row.service_id].push(row);
+      });
+      this.serviceProductsMap = map;
+    },
+
+    get lowStockCount() {
+      return this.products.filter(p => p.min_stock_quantity !== null && Number(p.stock_quantity || 0) <= Number(p.min_stock_quantity)).length;
+    },
+
+    get currentStockValue() {
+      return this.products.reduce((sum, p) => sum + Number(p.stock_quantity || 0) * Number(p.unit_cost || 0), 0);
+    },
+
+    get servicesWithCost() {
+      return this.services.filter(s => (this.serviceProductsMap[s.id] || []).length > 0).length;
     },
 
     async loadGoals() {
