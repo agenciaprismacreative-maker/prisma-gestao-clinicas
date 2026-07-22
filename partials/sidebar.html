@@ -14,6 +14,8 @@
     </div>
 
     <nav class="sidebar-nav">
+      <div class="sidebar-group-label">Principal</div>
+
       <a href="dashboard.html" class="nav-item" data-page="dashboard" data-allowed-roles="administrador,esteticista,atendente">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/>
@@ -37,7 +39,7 @@
         <span>Agenda</span>
       </a>
 
-      <div class="sidebar-divider"></div>
+      <div class="sidebar-group-label">Operação</div>
 
       <a href="equipe.html" class="nav-item" data-page="equipe" data-allowed-roles="administrador">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -93,7 +95,7 @@
         <span>Estoque</span>
       </a>
 
-      <div class="sidebar-divider"></div>
+      <div class="sidebar-group-label">Gestão</div>
 
       <a href="bi.html" class="nav-item" data-page="bi" data-allowed-roles="administrador,esteticista,atendente">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -118,7 +120,7 @@
         <strong data-slot="user-name">Carregando…</strong>
         <span data-slot="clinic-name"></span>
       </div>
-      <button type="button" class="sidebar-logout" title="Sair" data-action="logout">
+      <button type="button" class="sidebar-logout" title="Sair" aria-label="Sair" data-action="logout">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/>
         </svg>
