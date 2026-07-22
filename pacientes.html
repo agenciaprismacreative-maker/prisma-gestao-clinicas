@@ -404,7 +404,7 @@
               <div class="grid grid-2 gap-3">
                 <div class="form-group">
                   <label class="label">RG</label>
-                  <input class="input" x-model="newPatient.rg">
+                  <input class="input" x-model="newPatient.rg" @input="newPatient.rg = maskRg($event.target.value)" placeholder="00.000.000-0" maxlength="12">
                 </div>
                 <div class="form-group">
                   <label class="label">Órgão emissor</label>
@@ -1427,6 +1427,7 @@ function pacientesApp() {
 <script src="js/supabase-client.js"></script>
 <script src="js/auth-guard.js"></script>
 <script src="js/topbar.js"></script>
+<script src="js/masks.js"></script>
 <script src="js/include.js" defer></script>
 </body>
 </html>

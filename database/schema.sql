@@ -461,6 +461,7 @@ create table public.clinic_settings (
   legal_name text,
   cnpj text,
   company_address text,
+  address_cep text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );

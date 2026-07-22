@@ -70,11 +70,23 @@
           <div class="grid grid-2 gap-3">
             <div class="form-group">
               <label class="label">CNPJ</label>
-              <input class="input" x-model="settings.cnpj" placeholder="00.000.000/0001-00">
+              <input class="input" x-model="settings.cnpj" @input="settings.cnpj = maskCnpj($event.target.value)" placeholder="00.000.000/0001-00" maxlength="18">
             </div>
             <div class="form-group">
-              <label class="label">Endereço</label>
-              <input class="input" x-model="settings.company_address" placeholder="Rua, número, bairro, cidade">
+              <label class="label">CEP</label>
+              <input class="input" x-model="settings.address_cep" @input="onCepInput($event)" @blur="lookupCep()" placeholder="00000-000" maxlength="9">
+              <p class="input-hint" x-show="cepLoading" x-cloak>Buscando endereço…</p>
+              <p class="input-hint" x-show="!cepLoading">Preenche o endereço completo automaticamente.</p>
+            </div>
+          </div>
+          <div class="grid grid-2 gap-3">
+            <div class="form-group">
+              <label class="label">Número</label>
+              <input class="input" x-model="addressNumber" @input="composeCompanyAddress()" placeholder="Ex.: 123" style="max-width:160px;">
+            </div>
+            <div class="form-group">
+              <label class="label">Endereço completo</label>
+              <input class="input" x-model="settings.company_address" placeholder="Preenchido automaticamente pelo CEP, ou digite manualmente">
             </div>
           </div>
         </div>
@@ -199,6 +211,7 @@
 <script src="js/supabase-client.js"></script>
 <script src="js/auth-guard.js"></script>
 <script src="js/topbar.js"></script>
+<script src="js/masks.js"></script>
 <script>
 function configuracoesApp() {
   return {
@@ -215,9 +228,12 @@ function configuracoesApp() {
       manager_password: '', manager_password_for_discount: false, manager_password_for_courtesy: false,
       show_performance_to_staff: true, manager_password_for_performance: false,
       primary_color: '#2F4A45', accent_color: '#B8912F', max_discount_percentage: '',
-      legal_name: '', cnpj: '', company_address: ''
+      legal_name: '', cnpj: '', company_address: '', address_cep: ''
     },
     settingsId: null,
+    addressNumber: '',
+    addressLookup: null,
+    cepLoading: false,
     feedback: { type: '', message: '' },
 
     async init() {
@@ -254,11 +270,46 @@ function configuracoesApp() {
             ? String(settingsRes.data.max_discount_percentage) : '',
           legal_name: settingsRes.data.legal_name || '',
           cnpj: settingsRes.data.cnpj || '',
-          company_address: settingsRes.data.company_address || ''
+          company_address: settingsRes.data.company_address || '',
+          address_cep: settingsRes.data.address_cep || ''
         };
       }
       this.loading = false;
       this.previewBrandColors();
+    },
+
+    onCepInput(e) {
+      this.settings.address_cep = maskCep(e.target.value);
+      const digits = this.settings.address_cep.replace(/\D/g, '');
+      if (digits.length === 8) this.lookupCep();
+    },
+
+    async lookupCep() {
+      const digits = (this.settings.address_cep || '').replace(/\D/g, '');
+      if (digits.length !== 8) return;
+      this.cepLoading = true;
+      const result = await fetchCepAddress(this.settings.address_cep);
+      this.cepLoading = false;
+      if (!result) {
+        this.showFeedback('error', 'CEP não encontrado. Preencha o endereço manualmente.');
+        return;
+      }
+      this.addressLookup = result;
+      this.composeCompanyAddress();
+    },
+
+    // Monta o endereço completo (1 linha, usado no comprovante em PDF) a
+    // partir do que o CEP retornou + o número digitado. O campo continua
+    // editável manualmente depois de preenchido.
+    composeCompanyAddress() {
+      if (!this.addressLookup) return;
+      const { street, neighborhood, city, state } = this.addressLookup;
+      const parts = [];
+      if (street) parts.push(street + (this.addressNumber ? ', ' + this.addressNumber : ''));
+      if (neighborhood) parts.push(neighborhood);
+      const cityState = [city, state].filter(Boolean).join(' - ');
+      if (cityState) parts.push(cityState);
+      this.settings.company_address = parts.join(', ');
     },
 
     previewTheme() {
