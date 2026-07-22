@@ -651,12 +651,17 @@ function dashboardApp() {
     },
 
     async loadNotes() {
+      // dashboard_notes tem 2 FKs para users (author_id e target_user_id),
+      // então o embed de users precisa ser desambiguado com o nome da FK
+      // (senão o PostgREST recusa a consulta por relacionamento ambíguo,
+      // e a lista de anotações fica sempre vazia).
       const { data, error } = await supabaseClient
         .from('dashboard_notes')
-        .select('id, content, created_at, author_id, target_user_id, users ( full_name )')
+        .select('id, content, created_at, author_id, target_user_id, users:users!dashboard_notes_author_id_fkey ( full_name )')
         .order('created_at', { ascending: false })
         .limit(20);
       this.notes = error ? [] : (data || []);
+      if (error) this.showFeedback('error', 'Erro ao carregar anotações: ' + error.message);
     },
 
     async addNote() {

@@ -7,8 +7,8 @@
       </svg>
     </button>
     <div class="topbar-title">
-      <h1 data-slot="page-title">Prisma</h1>
-      <span data-slot="page-subtitle" class="text-muted"></span>
+      <h1 x-text="greeting">Olá!</h1>
+      <span class="text-muted" x-text="todaySummary"></span>
     </div>
   </div>
 
@@ -51,6 +51,13 @@
         </template>
       </div>
     </div>
+
+    <a href="vendas.html?nova=1" class="btn btn-secondary btn-sm">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;">
+        <circle cx="9" cy="21" r="1.4"/><circle cx="18" cy="21" r="1.4"/><path d="M2.5 3h2.5l2.6 12.4a2 2 0 0 0 2 1.6h8a2 2 0 0 0 2-1.6L21.5 8H6"/>
+      </svg>
+      Nova venda
+    </a>
 
     <a href="pacientes.html?novo=1" class="btn btn-primary btn-sm">
       <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;">

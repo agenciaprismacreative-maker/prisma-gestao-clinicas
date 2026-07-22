@@ -29,6 +29,8 @@ create table public.users (
   role text not null check (
     role in ('esteticista', 'atendente', 'administrador', 'equipe_prisma')
   ),
+  job_function text,
+  is_active boolean not null default true,
   professional_register text,
   specialties text,
   bio text,
@@ -362,6 +364,7 @@ create table public.sales (
   clinic_id uuid not null references public.clinics (id) on delete cascade,
   patient_id uuid not null references public.patients (id) on delete cascade,
   status text not null default 'pendente' check (status in ('pendente', 'aprovada', 'cancelada')),
+  cancel_reason text,
   origin text,
   validity_months integer,
   discount_percentage numeric(5, 2) not null default 0,

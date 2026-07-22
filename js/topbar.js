@@ -8,6 +8,8 @@ function topbarApp() {
     clinicId: null,
     currentUserId: null,
     isAdmin: false,
+    firstName: '',
+    now: new Date(),
 
     query: '',
     results: [],
@@ -19,14 +21,30 @@ function topbarApp() {
     remindersLoading: false,
 
     async init() {
+      // relógio da saudação: atualiza sozinho, sem precisar recarregar a
+      // página, pra sempre mostrar a data e a hora certas.
+      setInterval(() => { this.now = new Date(); }, 30000);
+
       const { data: { user } } = await supabaseClient.auth.getUser();
       if (!user) return;
       this.currentUserId = user.id;
-      const { data } = await supabaseClient.from('users').select('clinic_id, role').eq('id', user.id).single();
+      const { data } = await supabaseClient.from('users').select('clinic_id, role, full_name').eq('id', user.id).single();
       if (!data) return;
       this.clinicId = data.clinic_id;
       this.isAdmin = data.role === 'administrador' || data.role === 'equipe_prisma';
+      this.firstName = (data.full_name || '').trim().split(/\s+/)[0] || '';
       await this.loadReminders();
+    },
+
+    get greeting() {
+      return this.firstName ? ('Olá, ' + this.firstName + '!') : 'Olá!';
+    },
+
+    get todaySummary() {
+      const dateLabel = this.now.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
+      const timeLabel = this.now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+      const capitalized = dateLabel.charAt(0).toUpperCase() + dateLabel.slice(1);
+      return 'Aqui estão os dados de hoje · ' + capitalized + ' · ' + timeLabel;
     },
 
     async onSearchInput() {

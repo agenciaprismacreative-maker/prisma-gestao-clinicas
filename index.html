@@ -16,7 +16,7 @@
       <p>Acesse o painel da sua clínica</p>
     </div>
 
-    <form x-data="loginForm()" @submit.prevent="submit()">
+    <form x-data="loginForm()" x-init="init()" @submit.prevent="submit()">
       <div class="form-group">
         <label class="label" for="email">E-mail</label>
         <input class="input" type="email" id="email" x-model="email" placeholder="voce@clinica.com.br" required>
@@ -55,6 +55,12 @@ function loginForm() {
     loading: false,
     showPass: false,
     errorMsg: '',
+    init() {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('desativado') === '1') {
+        this.errorMsg = 'Este acesso foi desativado. Fale com a administração da clínica.';
+      }
+    },
     async submit() {
       this.errorMsg = '';
       this.loading = true;
@@ -69,8 +75,24 @@ function loginForm() {
       }
       let role = null;
       if (data.user) {
-        const { data: profile } = await supabaseClient.from('users').select('role').eq('id', data.user.id).single();
+        // Tenta buscar o papel já com is_active; se a coluna ainda não
+        // existir nesse banco (migration 018 pendente), cai para buscar só
+        // o papel, pra login não parar de funcionar por causa disso.
+        let profile = null;
+        const withStatus = await supabaseClient.from('users').select('role, is_active').eq('id', data.user.id).single();
+        if (!withStatus.error) {
+          profile = withStatus.data;
+        } else {
+          const roleOnly = await supabaseClient.from('users').select('role').eq('id', data.user.id).single();
+          profile = roleOnly.data;
+        }
         role = profile ? profile.role : null;
+        if (profile && profile.is_active === false) {
+          await supabaseClient.auth.signOut();
+          this.errorMsg = 'Este acesso foi desativado. Fale com a administração da clínica.';
+          this.loading = false;
+          return;
+        }
       }
       window.location.href = window.homeForRole(role);
     }

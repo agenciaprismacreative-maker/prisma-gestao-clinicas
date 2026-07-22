@@ -118,16 +118,24 @@
         <div class="card card-shadow" style="padding:0;">
           <div class="table-wrap">
             <table class="table">
-              <thead><tr><th>Nome</th><th>E-mail</th><th>Papel</th><th>Especialidades</th><th>Salário</th><th></th></tr></thead>
+              <thead><tr><th>Nome</th><th>E-mail</th><th>Função</th><th>Especialidades</th><th>Salário</th><th></th></tr></thead>
               <tbody>
                 <template x-for="u in users" :key="u.id">
-                  <tr>
+                  <tr :style="u.is_active === false ? 'opacity:.55;' : ''">
                     <td><div class="row-name"><div class="avatar" x-text="initials(u.full_name)"></div><strong x-text="u.full_name"></strong></div></td>
                     <td x-text="u.email || '—'"></td>
-                    <td><span class="badge badge-neutral" x-text="roleLabel(u.role)"></span></td>
+                    <td>
+                      <span class="badge badge-neutral" x-text="jobFunctionLabel(u)"></span>
+                      <span class="badge badge-success" x-show="u.role === 'administrador'" style="margin-left:4px;">Administrador</span>
+                      <span class="badge badge-neutral" x-show="u.is_active === false" style="margin-left:4px;">Inativo</span>
+                    </td>
                     <td x-text="u.specialties || '—'"></td>
                     <td x-text="u.salary !== null && u.salary !== undefined ? formatCurrency(u.salary) : '—'"></td>
-                    <td><button class="btn btn-ghost btn-sm" type="button" @click="openEditUser(u)">Editar</button></td>
+                    <td class="flex gap-2">
+                      <button class="btn btn-ghost btn-sm" type="button" @click="openEditUser(u)">Editar</button>
+                      <button class="btn btn-ghost btn-sm" type="button" x-show="u.id !== currentUserId && u.is_active !== false" @click="toggleActive(u)">Remover</button>
+                      <button class="btn btn-ghost btn-sm" type="button" x-show="u.id !== currentUserId && u.is_active === false" @click="toggleActive(u)">Reativar</button>
+                    </td>
                   </tr>
                 </template>
               </tbody>
@@ -211,13 +219,16 @@
               <p class="input-hint">Combine essa senha com o integrante para o primeiro acesso.</p>
             </div>
             <div class="form-group">
-              <label class="label">Papel</label>
-              <select class="input" x-model="newMember.role" required>
+              <label class="label">Função</label>
+              <select class="input" x-model="newMember.job_function" required>
                 <option value="esteticista">Esteticista</option>
                 <option value="atendente">Atendente</option>
-                <option value="administrador">Administrador</option>
               </select>
-              <p class="input-hint">Administrador acessa o sistema inteiro. Esteticista vê só a própria Agenda e a própria fila de Atendimento. Atendente vê a Agenda completa e Pacientes.</p>
+              <p class="input-hint">Esteticista vê só a própria Agenda e a própria fila de Atendimento. Atendente vê a Agenda completa e Pacientes.</p>
+            </div>
+            <div class="form-group">
+              <label class="text-sm flex items-center gap-2"><input type="checkbox" x-model="newMember.grant_admin" style="width:auto;"> Conceder acesso de administrador a este usuário</label>
+              <p class="input-hint">Administrador acessa o sistema inteiro, independentemente da função escolhida acima.</p>
             </div>
 
             <hr class="divider">
@@ -261,12 +272,16 @@
               <input class="input" x-model="editingUser.full_name" required>
             </div>
             <div class="form-group">
-              <label class="label">Papel</label>
-              <select class="input" x-model="editingUser.role" required>
+              <label class="label">Função</label>
+              <select class="input" x-model="editingUser.job_function" required>
                 <option value="esteticista">Esteticista</option>
                 <option value="atendente">Atendente</option>
-                <option value="administrador">Administrador</option>
               </select>
+              <p class="input-hint">Esteticista vê só a própria Agenda e a própria fila de Atendimento. Atendente vê a Agenda completa e Pacientes.</p>
+            </div>
+            <div class="form-group" x-show="editingUser && editingUser.role !== 'equipe_prisma'">
+              <label class="text-sm flex items-center gap-2"><input type="checkbox" x-model="editingUser.grant_admin" style="width:auto;"> Conceder acesso de administrador a este usuário</label>
+              <p class="input-hint">Administrador acessa o sistema inteiro, independentemente da função escolhida acima.</p>
             </div>
 
             <hr class="divider">
@@ -332,8 +347,9 @@ function equipeApp() {
     newTask: { title: '', description: '', assigned_to: '', due_date: '', patient_id: '' },
     taskPatientSearch: '',
     taskPatientDropdownOpen: false,
-    newMember: { full_name: '', email: '', password: '', role: 'esteticista', professional_register: '', specialties: '', bio: '', salary: '' },
+    newMember: { full_name: '', email: '', password: '', job_function: 'esteticista', grant_admin: false, professional_register: '', specialties: '', bio: '', salary: '' },
     feedback: { type: '', message: '' },
+    currentUserId: null,
 
     async init() {
       await this.loadClinicId();
@@ -344,6 +360,7 @@ function equipeApp() {
     async loadClinicId() {
       const { data: { user } } = await supabaseClient.auth.getUser();
       if (!user) return;
+      this.currentUserId = user.id;
       const { data, error } = await supabaseClient.from('users').select('clinic_id').eq('id', user.id).single();
       if (error) {
         this.showFeedback('error', 'Erro ao identificar sua clínica: ' + error.message);
@@ -353,8 +370,17 @@ function equipeApp() {
     },
 
     async loadUsers() {
-      const { data, error } = await supabaseClient.from('users').select('id, full_name, email, role, professional_register, specialties, bio, salary').order('full_name');
-      this.users = error ? [] : (data || []);
+      // job_function/is_active só existem depois da migration 018: se a
+      // consulta falhar por causa disso, cai para os campos antigos, pra
+      // não deixar a lista inteira de integrantes vazia por causa de 2
+      // colunas novas.
+      const full = await supabaseClient.from('users').select('id, full_name, email, role, job_function, is_active, professional_register, specialties, bio, salary').order('full_name');
+      if (!full.error) {
+        this.users = full.data || [];
+        return;
+      }
+      const fallback = await supabaseClient.from('users').select('id, full_name, email, role, professional_register, specialties, bio, salary').order('full_name');
+      this.users = fallback.error ? [] : (fallback.data || []);
     },
 
     async loadTasks() {
@@ -409,6 +435,16 @@ function equipeApp() {
     roleLabel(role) {
       const map = { esteticista: 'Esteticista', atendente: 'Atendente', administrador: 'Administrador', equipe_prisma: 'Equipe Prisma' };
       return map[role] || role;
+    },
+
+    // Função (cargo do dia a dia) é separada do papel de acesso: um
+    // administrador continua sendo, na essência, esteticista ou atendente.
+    // Usa job_function quando já preenchido; se ainda não tiver rodado a
+    // migration 018 ou for um cadastro antigo, cai para o próprio role.
+    jobFunctionLabel(u) {
+      const base = u.job_function || (u.role === 'administrador' ? 'atendente' : u.role);
+      const map = { esteticista: 'Esteticista', atendente: 'Atendente' };
+      return map[base] || this.roleLabel(u.role);
     },
 
     formatCurrency(value) {
@@ -481,24 +517,32 @@ function equipeApp() {
         return;
       }
 
-      const { error } = await supabaseClient.from('users').insert({
+      const role = this.newMember.grant_admin ? 'administrador' : this.newMember.job_function;
+      const basePayload = {
         id: newUserId,
         clinic_id: this.clinicId,
         full_name: this.newMember.full_name,
         email: this.newMember.email,
-        role: this.newMember.role,
+        role: role,
         professional_register: this.newMember.professional_register || null,
         specialties: this.newMember.specialties || null,
         bio: this.newMember.bio || null,
         salary: this.newMember.salary ? parseCurrencyToNumber(this.newMember.salary) : null
-      });
+      };
+      // job_function só existe depois da migration 018: tenta com o campo
+      // e, se a coluna ainda não existir nesse banco, tenta de novo sem
+      // ele — pra não deixar o acesso já criado sem o cadastro na clínica.
+      let { error } = await supabaseClient.from('users').insert({ ...basePayload, job_function: this.newMember.job_function });
+      if (error && /job_function/.test(error.message || '')) {
+        ({ error } = await supabaseClient.from('users').insert(basePayload));
+      }
       this.saving = false;
       if (error) {
         this.showFeedback('error', 'Conta criada, mas houve erro ao vincular à clínica: ' + error.message);
         return;
       }
       this.showNewMemberForm = false;
-      this.newMember = { full_name: '', email: '', password: '', role: 'esteticista', professional_register: '', specialties: '', bio: '', salary: '' };
+      this.newMember = { full_name: '', email: '', password: '', job_function: 'esteticista', grant_admin: false, professional_register: '', specialties: '', bio: '', salary: '' };
       this.showFeedback('success', 'Integrante cadastrado com sucesso. Se a confirmação de e-mail estiver ativa no Supabase, ele(a) precisa confirmar o e-mail antes do primeiro login.');
       await this.loadUsers();
     },
@@ -506,6 +550,8 @@ function equipeApp() {
     openEditUser(u) {
       this.editingUser = {
         id: u.id, full_name: u.full_name, role: u.role,
+        job_function: u.job_function || (u.role === 'administrador' ? 'atendente' : u.role),
+        grant_admin: u.role === 'administrador',
         professional_register: u.professional_register || '',
         specialties: u.specialties || '',
         bio: u.bio || '',
@@ -516,17 +562,22 @@ function equipeApp() {
 
     async saveEditUser() {
       this.saving = true;
-      const { error } = await supabaseClient
+      const role = this.editingUser.grant_admin ? 'administrador' : this.editingUser.job_function;
+      const basePayload = {
+        full_name: this.editingUser.full_name,
+        role: role,
+        professional_register: this.editingUser.professional_register || null,
+        specialties: this.editingUser.specialties || null,
+        bio: this.editingUser.bio || null,
+        salary: this.editingUser.salary ? parseCurrencyToNumber(this.editingUser.salary) : null
+      };
+      let { error } = await supabaseClient
         .from('users')
-        .update({
-          full_name: this.editingUser.full_name,
-          role: this.editingUser.role,
-          professional_register: this.editingUser.professional_register || null,
-          specialties: this.editingUser.specialties || null,
-          bio: this.editingUser.bio || null,
-          salary: this.editingUser.salary ? parseCurrencyToNumber(this.editingUser.salary) : null
-        })
+        .update({ ...basePayload, job_function: this.editingUser.job_function })
         .eq('id', this.editingUser.id);
+      if (error && /job_function/.test(error.message || '')) {
+        ({ error } = await supabaseClient.from('users').update(basePayload).eq('id', this.editingUser.id));
+      }
       this.saving = false;
       if (error) {
         this.showFeedback('error', 'Erro ao salvar: ' + error.message);
@@ -534,6 +585,22 @@ function equipeApp() {
       }
       this.showEditUserForm = false;
       this.showFeedback('success', 'Integrante atualizado.');
+      await this.loadUsers();
+    },
+
+    async toggleActive(u) {
+      const activating = u.is_active === false;
+      const ok = await confirmDialog(
+        activating ? ('Reativar o acesso de ' + u.full_name + '?') : ('Remover o acesso de ' + u.full_name + '? A pessoa não conseguirá mais entrar no sistema, mas o histórico dela é mantido.'),
+        { confirmLabel: activating ? 'Reativar' : 'Remover', danger: !activating }
+      );
+      if (!ok) return;
+      const { error } = await supabaseClient.from('users').update({ is_active: activating }).eq('id', u.id);
+      if (error) {
+        this.showFeedback('error', 'Erro ao ' + (activating ? 'reativar' : 'remover') + ' acesso: ' + error.message);
+        return;
+      }
+      this.showFeedback('success', activating ? 'Acesso reativado.' : 'Acesso removido.');
       await this.loadUsers();
     },
 
@@ -550,6 +617,7 @@ function equipeApp() {
 <script src="js/auth-guard.js"></script>
 <script src="js/topbar.js"></script>
 <script src="js/currency-mask.js"></script>
+<script src="js/confirm-dialog.js"></script>
 <script src="js/include.js" defer></script>
 </body>
 </html>

@@ -916,8 +916,18 @@ function biApp() {
     },
 
     async loadUsers() {
-      const { data, error } = await supabaseClient.from('users').select('id, full_name, salary');
-      this.users = error ? [] : (data || []);
+      // salary só existe depois da migration 015: se a coluna ainda não
+      // existir nesse banco, cai para buscar sem ela — assim o ranking, as
+      // metas e a tabela de atendimentos por profissional continuam
+      // funcionando mesmo antes da migration rodar (só a folha em si fica
+      // indisponível até lá).
+      const full = await supabaseClient.from('users').select('id, full_name, salary');
+      if (!full.error) {
+        this.users = full.data || [];
+        return;
+      }
+      const fallback = await supabaseClient.from('users').select('id, full_name');
+      this.users = fallback.error ? [] : (fallback.data || []);
     },
 
     async loadExpenses() {

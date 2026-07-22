@@ -74,7 +74,7 @@
                   <td class="flex gap-2">
                     <button class="btn btn-ghost btn-sm" type="button" @click="viewSale(s)">Ver</button>
                     <button class="btn btn-secondary btn-sm" type="button" x-show="s.status === 'pendente'" @click="approveSale(s)" :disabled="approving">Aprovar</button>
-                    <button class="btn btn-ghost btn-sm" type="button" x-show="s.status === 'pendente'" @click="cancelSale(s)">Cancelar</button>
+                    <button class="btn btn-ghost btn-sm" type="button" x-show="s.status === 'pendente'" @click="openCancelForm(s)">Cancelar</button>
                     <button class="btn btn-ghost btn-sm" type="button" x-show="s.status === 'aprovada'" @click="openReceiptPreview(s)">Comprovante</button>
                   </td>
                 </tr>
@@ -113,6 +113,7 @@
               <p class="text-sm"><strong>Total: </strong><span x-text="formatCurrency(viewingSale.total_amount)"></span></p>
               <p class="text-xs text-muted mt-1" x-show="viewingSale.origin">Origem: <span x-text="viewingSale.origin"></span></p>
               <p class="text-xs text-muted" x-show="viewingSale.approved_at">Aprovada em <span x-text="formatDate(viewingSale.approved_at)"></span></p>
+              <p class="text-xs text-muted" x-show="viewingSale.status === 'cancelada' && viewingSale.cancel_reason">Motivo do cancelamento: <span x-text="viewingSale.cancel_reason"></span></p>
               <button class="btn btn-secondary btn-sm mt-3" type="button" x-show="viewingSale.status === 'aprovada'" @click="openReceiptPreview(viewingSale)">Ver comprovante</button>
             </div>
           </template>
@@ -132,6 +133,28 @@
           <div class="flex justify-end gap-2" style="padding:16px 20px;">
             <button class="btn btn-ghost btn-sm" type="button" @click="closeReceiptPreview()">Fechar</button>
             <button class="btn btn-primary btn-sm" type="button" @click="downloadReceiptFromPreview()">Baixar PDF</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- modal de cancelamento de venda (com motivo obrigatório) -->
+      <div x-show="showCancelForm" x-cloak class="modal-overlay" @click.self="closeCancelForm()">
+        <div class="card card-shadow" style="margin:auto;width:100%;max-width:440px;">
+          <div class="card-header">
+            <h3>Cancelar venda</h3>
+            <button class="btn btn-ghost btn-sm" @click="closeCancelForm()">Fechar</button>
+          </div>
+          <p class="text-sm text-muted mb-3">
+            <span x-text="cancelingSale ? ((cancelingSale.patients ? cancelingSale.patients.full_name : 'Paciente')) : ''"></span> ·
+            <span x-text="cancelingSale ? formatCurrency(cancelingSale.total_amount) : ''"></span>
+          </p>
+          <div class="form-group">
+            <label class="label">Motivo do cancelamento</label>
+            <textarea class="input" rows="3" x-model="cancelReasonInput" placeholder="Descreva por que essa venda está sendo cancelada"></textarea>
+          </div>
+          <div class="flex justify-end gap-2 mt-2">
+            <button class="btn btn-secondary btn-sm" type="button" @click="closeCancelForm()">Manter venda</button>
+            <button class="btn btn-sm" type="button" style="background:var(--color-danger);border-color:var(--color-danger);color:#fff;" @click="confirmCancelSale()" :disabled="cancelingSaving">Cancelar venda</button>
           </div>
         </div>
       </div>
@@ -400,6 +423,10 @@ function vendasApp() {
     viewingSale: null,
     showReceiptPreview: false,
     receiptPreview: { url: '', doc: null, sale: null },
+    showCancelForm: false,
+    cancelingSale: null,
+    cancelReasonInput: '',
+    cancelingSaving: false,
     newSale: {
       patient_id: '', origin: '', validity_months: '',
       referred_by_patient_id: '', referred_by_user_id: '', referral_commission_percentage: 10,
@@ -415,6 +442,8 @@ function vendasApp() {
       await this.loadClinicId();
       await Promise.all([this.loadSales(), this.loadPatients(), this.loadServices(), this.loadProducts(), this.loadUsers(), this.loadPaymentMachines(), this.loadAllSaleItems(), this.loadPlanTemplates()]);
       this.loading = false;
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('nova') === '1') this.openNewSale();
     },
 
     async loadProducts() {
@@ -774,6 +803,13 @@ function vendasApp() {
     async viewSale(sale) {
       this.viewingSale = sale;
       await this.loadSaleItems(sale.id);
+      // busca isolada e tolerante a falha: se a migration que cria
+      // cancel_reason ainda não rodou nesse banco, essa consulta erra
+      // sozinha sem derrubar o carregamento do resto da venda.
+      if (sale.status === 'cancelada' && sale.cancel_reason === undefined) {
+        const { data, error } = await supabaseClient.from('sales').select('cancel_reason').eq('id', sale.id).maybeSingle();
+        if (!error && data) sale.cancel_reason = data.cancel_reason;
+      }
     },
 
     get viewingSaleItems() {
@@ -1062,14 +1098,36 @@ function vendasApp() {
       this.receiptPreview.doc.save('comprovante-' + this.receiptPreview.sale.id.slice(0, 8) + '.pdf');
     },
 
-    async cancelSale(sale) {
-      if (!(await confirmDialog('Tem certeza que deseja cancelar esta venda pendente?', { confirmLabel: 'Cancelar venda' }))) return;
-      const { error } = await supabaseClient.from('sales').update({ status: 'cancelada' }).eq('id', sale.id);
+    openCancelForm(sale) {
+      this.cancelingSale = sale;
+      this.cancelReasonInput = '';
+      this.showCancelForm = true;
+    },
+
+    closeCancelForm() {
+      this.showCancelForm = false;
+      this.cancelingSale = null;
+      this.cancelReasonInput = '';
+    },
+
+    async confirmCancelSale() {
+      if (!this.cancelingSale) return;
+      if (!this.cancelReasonInput.trim()) {
+        this.showFeedback('error', 'Descreva o motivo do cancelamento.');
+        return;
+      }
+      this.cancelingSaving = true;
+      const { error } = await supabaseClient
+        .from('sales')
+        .update({ status: 'cancelada', cancel_reason: this.cancelReasonInput.trim() })
+        .eq('id', this.cancelingSale.id);
+      this.cancelingSaving = false;
       if (error) {
         this.showFeedback('error', 'Erro ao cancelar venda: ' + error.message);
         return;
       }
       this.showFeedback('success', 'Venda cancelada.');
+      this.closeCancelForm();
       await this.loadSales();
     },
 

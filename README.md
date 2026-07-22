@@ -22,9 +22,19 @@ Depois acesse `http://localhost:8000` e entre com um usuário já cadastrado em 
 
 O arquivo `database/schema.sql` é sempre a fonte da verdade do estado final esperado do banco, mas ele **não roda sozinho** no Supabase de produção: cada migration em `database/migrations/` precisa ser colada e executada manualmente no SQL Editor do painel do Supabase, em ordem numérica, uma vez cada. Todas são idempotentes (seguro rodar mais de uma vez), então na dúvida é sempre seguro rodar de novo. Se uma tela der erro do tipo "column ... does not exist", "table ... not found in schema cache" ou "more than one relationship was found", quase sempre é uma migration que ainda não rodou nesse banco, não um bug de código.
 
-Para reduzir o número de arquivos para rodar, as migrations 011 a 014 (que ainda podem estar pendentes) foram juntadas em **`database/migrations/011_a_014_consolidado.sql`** — basta colar esse arquivo único no SQL Editor e rodar uma vez. Depois dele, roda-se a **015** (`015_marca_produtos.sql`), que adiciona marca/descrição em produtos, dados fiscais da clínica (razão social, CNPJ, endereço) e a base do módulo de custos e folha (despesas fixas + salário por funcionário). Por fim, roda-se a **016** (`016_faixas_comissao.sql`), que cria a tabela de faixas de comissão por atingimento de meta usada na aba Metas da equipe do BI.
+Para reduzir o número de arquivos para rodar, tudo o que está pendente foi agrupado em só 2 arquivos, nesta ordem:
 
-Os erros "Could not find the 'accent_color' column of 'clinic_settings'" e "Could not find the table 'public.clinic_expenses'" são exatamente esse caso: as migrations 011-014 e 015 ainda não foram rodadas nesse banco. Rodando as três (011_a_014_consolidado, depois 015, depois 016) na ordem, ambos os erros somem.
+1. **`database/migrations/011_a_014_consolidado.sql`**
+2. **`database/migrations/015_a_018_consolidado.sql`**
+
+Basta abrir o SQL Editor do Supabase, colar o conteúdo inteiro do arquivo 1, rodar, depois colar o conteúdo inteiro do arquivo 2 e rodar. Os erros abaixo (todos já reportados em algum momento) são exatamente a mesma causa — essas duas migrations ainda não rodaram nesse banco — e todos somem ao rodar os 2 arquivos acima:
+
+- "Could not find the 'accent_color' column of 'clinic_settings'"
+- "Could not find the table 'public.clinic_expenses'"
+- "Could not find the 'appointment_id' column of 'patient_photos'"
+- Metas, ranking e "Atendimentos por profissional" aparecendo vazios ou como "Sem profissional" no BI
+- Lista de integrantes sumindo em Equipe
+- "Erro ao criar acesso: For security purposes, you can only request this after X seconds" é diferente: não é migration, é o próprio Supabase limitando a criação de contas muito seguidas (proteção contra abuso). Some sozinho depois de esperar o tempo indicado.
 
 Regra geral daqui para frente: só é preciso rodar um novo arquivo SQL quando uma mudança de tela também mexe no banco (nova coluna, nova tabela) — isso é sinalizado explicitamente na entrega. Mudanças de layout, texto ou comportamento de interface não exigem nada no Supabase.
 
@@ -49,7 +59,7 @@ pacientes.html          ficha completa de pacientes: documentos, contato, endere
 agenda.html            agenda com visão dia / semana / mês, menu de clique direito, bloqueio de horário, vínculo a pacote e ficha rápida do agendamento
 atendimento.html        fila de atendimento (por profissional), prontuário, fotos de evolução, remanejamento de horário e tarefa automática de retorno
 equipe.html            equipe da clínica, qualificação profissional e quadro de tarefas com detalhe por clique (administrador)
-vendas.html            venda de planos: carrinho com múltiplos serviços, desconto e cortesia por item, fluxo pendente → aprovada/cancelada (administrador, atendente)
+vendas.html            venda de planos: carrinho com múltiplos serviços, desconto e cortesia por item, fluxo pendente → aprovada/cancelada com motivo (administrador, atendente, esteticista)
 financeiro.html         transações, comissão com percentual, pacotes (com margem sobre insumos), maquininhas e parcelamento (administrador)
 reativacao.html         pacientes elegíveis à reativação e histórico de contatos (administrador)
 servicos.html           cadastro de serviços e de insumos, com cálculo de custo e margem (administrador)
@@ -61,7 +71,7 @@ css/styles.css          folha de estilos única do sistema
 js/supabase-client.js    conexão com o projeto Supabase e definição dos papéis e da tela inicial de cada um
 js/auth-guard.js        exige sessão ativa e redireciona quem tenta acessar página fora do próprio papel
 js/include.js            injeta os fragmentos HTML, popula usuário/clínica no menu, aplica as configurações da clínica (logotipo, tema, visibilidade do BI) e esconde itens fora do papel do usuário
-js/topbar.js            busca de paciente, central de lembretes e atalho de novo paciente no cabeçalho
+js/topbar.js            saudação com nome + data/hora (em vez do título repetido da página), busca de paciente, central de lembretes e atalhos de nova venda/novo paciente no cabeçalho
 js/currency-mask.js      máscara de valor em reais (com casas decimais) usada nos campos de preço, custo e venda
 js/confirm-dialog.js    modal de confirmação estilizado (confirmDialog), substitui o window.confirm() nativo em toda ação de remover/aprovar/cancelar
 database/schema.sql      schema completo com RLS por clínica (fonte da verdade, já reflete todas as migrations)
@@ -81,9 +91,9 @@ Agenda com visão diária (colunas por profissional), semanal e mensal, navegaç
 
 Atendimento e prontuário, com fila do dia (filtrada por profissional para a visão Esteticista), registro de evolução por sessão, upload de fotos para o Supabase Storage com nome de arquivo sanitizado, opção de remover foto antes de concluir, remanejamento de horário direto da fila, vínculo (ou correção do vínculo) a um pacote de sessões no momento da conclusão, consumo automático de sessão de pacote e de insumos do estoque ao concluir um atendimento, e criação automática de uma tarefa de retorno quando o serviço atendido tem intervalo de retorno definido.
 
-Equipe com cadastro de novos integrantes direto na plataforma (nome, e-mail e senha geram a conta e o acesso na hora), edição de papel e qualificação profissional (registro profissional, especialidades, biografia), busca de paciente digitando o nome ao criar uma tarefa vinculada, e um quadro de tarefas em três colunas com detalhe completo ao clicar em qualquer card.
+Equipe com cadastro de novos integrantes direto na plataforma (nome, e-mail e senha geram a conta e o acesso na hora), função (Esteticista/Atendente) separada do acesso de administrador — que agora é concedido por uma caixinha própria, "Conceder acesso de administrador", em vez de virar um papel à parte — remoção/reativação de acesso sem apagar o histórico da pessoa (vendas, comissões e atendimentos continuam intactos), salário e qualificação profissional (registro profissional, especialidades, biografia), busca de paciente digitando o nome ao criar uma tarefa vinculada, e um quadro de tarefas em três colunas com detalhe completo ao clicar em qualquer card.
 
-Vendas com carrinho de vários serviços na mesma venda (ou preenchido de uma vez a partir de um modelo de pacote cadastrado no Financeiro), quantidade de sessões e desconto (ou cortesia) por item, desconto percentual sobre o total do plano, até duas formas de pagamento combinadas na mesma venda com parcelamento e maquininha, origem da venda estruturada (indicação de paciente ou de funcionário, com percentual de comissão), e comprovante em PDF gerado na aprovação. A venda entra como pendente e só depois de aprovada é que gera os pacotes de sessão no cadastro do paciente, o lançamento no financeiro e, quando indicada por um funcionário, o lançamento automático da comissão.
+Vendas com carrinho de vários serviços na mesma venda (ou preenchido de uma vez a partir de um modelo de pacote cadastrado no Financeiro), quantidade de sessões e desconto (ou cortesia) por item, desconto percentual sobre o total do plano, até duas formas de pagamento combinadas na mesma venda com parcelamento e maquininha, origem da venda estruturada (indicação de paciente ou de funcionário, com percentual de comissão), e um comprovante em PDF com layout mais organizado (cabeçalho com a cor da marca, dados fiscais, vendedor) que abre em pré-visualização antes de baixar. A venda entra como pendente e só depois de aprovada é que gera os pacotes de sessão no cadastro do paciente, o lançamento no financeiro (já atribuído a quem criou a venda, para fins de meta e comissão) e, quando indicada por um funcionário, o lançamento automático da comissão. Cancelamento de uma venda pendente exige descrever o motivo. Esteticista também pode criar vendas (com atalho na tela de Atendimento), que seguem para aprovação do administrador como qualquer outra.
 
 Serviços com cadastro de procedimentos (nome, duração, preço, intervalo de retorno) e de insumos (custo unitário, unidade de medida, código de barras), vínculo de insumos a cada serviço com quantidade usada, e cálculo automático do custo estimado e da margem.
 
