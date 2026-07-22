@@ -487,19 +487,22 @@ function atendimentoApp() {
       // avisa quem recebeu o paciente, pelo mesmo mecanismo das anotações
       // direcionadas (aparece no sino de lembretes da pessoa). Melhor
       // esforço: se essa notificação falhar, não desfaz nem trava o
-      // remanejamento em si, que já foi salvo com sucesso.
+      // remanejamento em si, que já foi salvo com sucesso, só ajusta a
+      // mensagem final pra não afirmar que o lembrete foi enviado se não foi.
+      let noticeSent = false;
       if (wasReassigning && newProfessionalId) {
         const dateLabel = newScheduledAt.toLocaleDateString('pt-BR') + ' às ' + newScheduledAt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-        await supabaseClient.from('dashboard_notes').insert({
+        const { error: noticeError } = await supabaseClient.from('dashboard_notes').insert({
           clinic_id: this.clinicId,
           author_id: this.currentUserId,
           target_user_id: newProfessionalId,
           content: 'Atendimento remanejado para você: ' + patientName + ', ' + dateLabel + '. Motivo: ' + reason
         });
+        noticeSent = !noticeError;
       }
       this.showRescheduleForm = false;
       this.reschedulingAppt = null;
-      this.showFeedback('success', 'Horário remanejado com sucesso.');
+      this.showFeedback('success', 'Horário remanejado com sucesso.' + (noticeSent ? ' Lembrete enviado para o profissional que recebeu o paciente.' : ''));
       await this.loadQueue();
     },
 
