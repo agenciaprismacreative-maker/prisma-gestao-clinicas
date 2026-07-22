@@ -53,7 +53,7 @@
       <div x-show="tab==='transacoes'">
         <div class="page-header" style="margin-bottom:20px;">
           <div><p class="text-sm text-muted" x-text="transactions.length + ' lançamento(s)'"></p></div>
-          <button class="btn btn-primary btn-sm" type="button" @click="showNewTransactionForm = true">Novo lançamento</button>
+          <button class="btn btn-primary btn-sm" type="button" @click="showNewTransactionForm = true">Nova comissão manual</button>
         </div>
 
         <div x-show="loading" class="text-sm text-muted">Carregando…</div>
@@ -196,6 +196,42 @@
           <button class="btn btn-primary btn-sm" type="button" @click="openNewExpenseForm()">Nova despesa</button>
         </div>
 
+        <!-- "fatura" do mês: mesma lógica de expenseAppliesToMonth usada nos
+             totais, só que navegável mês a mês (inclusive pra frente), pra dar
+             a mesma sensação de "próximas faturas" de um cartão de crédito. -->
+        <div class="card card-shadow mb-5" style="padding:20px;">
+          <div class="flex items-center justify-between mb-3">
+            <button class="btn btn-ghost btn-sm" type="button" @click="prevExpensesMonth()">‹ Anterior</button>
+            <div style="text-align:center;">
+              <h3 style="text-transform:capitalize;" x-text="expensesInvoiceLabel"></h3>
+              <p class="text-xs text-muted" x-show="expensesInvoiceOffset === 0">Mês atual</p>
+              <p class="text-xs text-muted" x-show="expensesInvoiceOffset > 0">Previsão · ainda não lançado</p>
+            </div>
+            <button class="btn btn-ghost btn-sm" type="button" @click="nextExpensesMonth()">Próximo ›</button>
+          </div>
+
+          <div x-show="expensesInvoiceItems.length === 0" class="empty-note">Nenhuma despesa prevista para este mês.</div>
+
+          <div x-show="expensesInvoiceItems.length > 0">
+            <template x-for="item in expensesInvoiceItems" :key="item.id">
+              <div class="flex items-center justify-between" style="padding:10px 0;border-bottom:1px solid var(--color-border);">
+                <div>
+                  <strong x-text="item.description"></strong>
+                  <div class="text-xs text-muted">
+                    <span x-text="categoryLabel(item.category)"></span>
+                    <span x-show="item.installmentLabel"> · <span x-text="item.installmentLabel"></span></span>
+                  </div>
+                </div>
+                <strong x-text="formatCurrency(item.amount)"></strong>
+              </div>
+            </template>
+            <div class="flex items-center justify-between mt-3" style="padding-top:12px;border-top:2px solid var(--color-border);">
+              <strong>Total previsto do mês</strong>
+              <strong class="text-lg" x-text="formatCurrency(expensesInvoiceTotal)"></strong>
+            </div>
+          </div>
+        </div>
+
         <div class="card card-shadow" style="padding:0;">
           <div x-show="expenses.length === 0" class="empty-note" style="margin:20px;">Nenhuma despesa cadastrada ainda.</div>
           <div class="table-wrap" x-show="expenses.length > 0">
@@ -305,16 +341,9 @@
       <!-- modal novo lançamento -->
       <div x-show="showNewTransactionForm" x-cloak class="modal-overlay" @click.self="showNewTransactionForm=false">
         <div class="card card-shadow" style="margin:auto;width:100%;max-width:480px;max-height:88vh;overflow-y:auto;">
-          <div class="card-header"><h3>Novo lançamento</h3><button class="btn btn-ghost btn-sm" @click="showNewTransactionForm=false">Fechar</button></div>
+          <div class="card-header"><h3>Nova comissão manual</h3><button class="btn btn-ghost btn-sm" @click="showNewTransactionForm=false">Fechar</button></div>
+          <p class="input-hint mb-3">Pagamentos de procedimento e vendas de pacote são lançados automaticamente ao aprovar a venda em Vendas — não precisam ser lançados aqui de novo. Use este formulário só para uma comissão avulsa (ajuste, bônus ou indicação registrada fora do fluxo de vendas).</p>
           <form @submit.prevent="createTransaction()">
-            <div class="form-group">
-              <label class="label">Tipo</label>
-              <select class="input" x-model="newTransaction.type" required>
-                <option value="pagamento_procedimento">Pagamento de procedimento</option>
-                <option value="venda_pacote">Venda de pacote</option>
-                <option value="comissao_profissional">Comissão de profissional</option>
-              </select>
-            </div>
             <div class="form-group" style="position:relative;">
               <label class="label">Paciente (opcional)</label>
               <input class="input" type="text" x-model="transactionPatientSearch" @focus="transactionPatientDropdownOpen = true" @input="transactionPatientDropdownOpen = true; newTransaction.patient_id = ''" placeholder="Digite o nome do paciente" autocomplete="off">
@@ -374,67 +403,6 @@
                   <option value="Cartão de crédito">Cartão de crédito</option>
                   <option value="Transferência">Transferência</option>
                 </select>
-              </div>
-            </template>
-
-            <!-- pagamento/venda: data + uma ou mais formas de pagamento -->
-            <template x-if="newTransaction.type !== 'comissao_profissional'">
-              <div class="form-group">
-                <label class="label">Data</label>
-                <input class="input" type="date" x-model="newTransaction.transaction_date" required>
-              </div>
-            </template>
-
-            <template x-if="newTransaction.type !== 'comissao_profissional'">
-              <div>
-                <template x-for="(line, idx) in newTransaction.paymentLines" :key="idx">
-                  <div class="card" style="padding:12px 14px;margin-bottom:10px;background:var(--color-surface-alt);">
-                    <div class="flex items-center justify-between mb-2">
-                      <strong class="text-xs text-muted" x-text="'Forma de pagamento ' + (idx + 1)"></strong>
-                      <button type="button" class="btn btn-ghost btn-sm" x-show="newTransaction.paymentLines.length > 1" @click="newTransaction.paymentLines.splice(idx, 1)">Remover</button>
-                    </div>
-                    <div class="grid grid-2 gap-3">
-                      <div class="form-group">
-                        <label class="label">Forma</label>
-                        <select class="input" x-model="line.payment_method">
-                          <option value="Dinheiro">Dinheiro</option>
-                          <option value="Pix">Pix</option>
-                          <option value="Cartão de débito">Cartão de débito</option>
-                          <option value="Cartão de crédito">Cartão de crédito</option>
-                          <option value="Transferência">Transferência</option>
-                        </select>
-                      </div>
-                      <div class="form-group">
-                        <label class="label">Valor (R$)</label>
-                        <input class="input" type="text" inputmode="decimal" x-model="line.amount" @input="line.amount = maskCurrencyInput($event.target.value)" placeholder="R$ 0,00" required>
-                      </div>
-                    </div>
-                    <div class="grid grid-2 gap-3" x-show="line.payment_method === 'Cartão de crédito'" x-cloak>
-                      <div class="form-group">
-                        <label class="label">Maquininha</label>
-                        <select class="input" x-model="line.payment_machine_id">
-                          <option value="">Não informado</option>
-                          <template x-for="m in paymentMachines" :key="m.id">
-                            <option :value="m.id" x-text="m.name"></option>
-                          </template>
-                        </select>
-                      </div>
-                      <div class="form-group">
-                        <label class="label">Parcelas</label>
-                        <select class="input" x-model.number="line.installments">
-                          <template x-for="n in 12" :key="n">
-                            <option :value="n" x-text="n + 'x'"></option>
-                          </template>
-                        </select>
-                      </div>
-                    </div>
-                    <p class="input-hint" x-show="line.payment_method === 'Cartão de crédito' && line.payment_machine_id">
-                      Valor líquido estimado: <strong x-text="formatCurrency(netAmountFor(line))"></strong>
-                    </p>
-                  </div>
-                </template>
-                <button type="button" class="btn btn-secondary btn-sm mb-3" x-show="newTransaction.paymentLines.length < 2" @click="newTransaction.paymentLines.push(emptyPaymentLine())">+ Adicionar forma de pagamento</button>
-                <p class="text-sm mb-3">Total do lançamento: <strong x-text="formatCurrency(paymentLinesTotal(newTransaction.paymentLines))"></strong></p>
               </div>
             </template>
 
@@ -519,13 +487,14 @@ function financeiroApp() {
     showMachineForm: false,
     editingMachineId: null,
     machineForm: { name: '', rates: {} },
-    newTransaction: { type: 'pagamento_procedimento', patient_id: '', professional_id: '', amount: '', base_amount: '', commission_percentage: '', payment_method: '', transaction_date: new Date().toISOString().slice(0,10), paymentLines: [] },
+    newTransaction: { type: 'comissao_profissional', patient_id: '', professional_id: '', amount: '', base_amount: '', commission_percentage: '', payment_method: '', transaction_date: new Date().toISOString().slice(0,10) },
     planTemplates: [],
     planTemplateItems: {},
     showNewTemplateForm: false,
     editingTemplateId: null,
     templateForm: { name: '', description: '', items: [{ service_id: '', quantity: 1 }] },
     expenses: [],
+    expensesInvoiceOffset: 0,
     showExpenseForm: false,
     editingExpenseId: null,
     expenseForm: { description: '', category: 'outros', amount: '', is_recurring: false, duration_months: '', expense_date: new Date().toISOString().slice(0, 10), notes: '' },
@@ -534,7 +503,6 @@ function financeiroApp() {
     async init() {
       await this.loadClinicId();
       await Promise.all([this.loadTransactions(), this.loadPackages(), this.loadPatients(), this.loadServices(), this.loadUsers(), this.loadProducts(), this.loadServiceProductsMap(), this.loadPaymentMachines(), this.loadPlanTemplates(), this.loadExpenses()]);
-      this.newTransaction.paymentLines = [this.emptyPaymentLine()];
       this.loading = false;
     },
 
@@ -559,6 +527,50 @@ function financeiroApp() {
       return this.expenses
         .filter(e => this.expenseAppliesToMonth(e, now.getFullYear(), now.getMonth()))
         .reduce((sum, e) => sum + Number(e.amount || 0), 0);
+    },
+
+    prevExpensesMonth() {
+      this.expensesInvoiceOffset -= 1;
+    },
+
+    nextExpensesMonth() {
+      this.expensesInvoiceOffset += 1;
+    },
+
+    get expensesInvoiceDate() {
+      const now = new Date();
+      return new Date(now.getFullYear(), now.getMonth() + this.expensesInvoiceOffset, 1);
+    },
+
+    get expensesInvoiceLabel() {
+      const label = this.expensesInvoiceDate.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+      return label.charAt(0).toUpperCase() + label.slice(1);
+    },
+
+    // mesma despesa pode "aparecer" em vários meses (recorrente); aqui, além
+    // de filtrar quem se aplica ao mês navegado, calcula a parcela (ex.:
+    // "5/12") pra dar a mesma leitura de uma fatura de cartão.
+    get expensesInvoiceItems() {
+      const d = this.expensesInvoiceDate;
+      const year = d.getFullYear();
+      const month = d.getMonth();
+      const targetKey = year * 12 + month;
+      return this.expenses
+        .filter(e => this.expenseAppliesToMonth(e, year, month))
+        .map(e => {
+          const start = new Date(e.expense_date);
+          const startKey = start.getFullYear() * 12 + start.getMonth();
+          const installmentNumber = targetKey - startKey + 1;
+          let installmentLabel = '';
+          if (e.is_recurring && e.duration_months) installmentLabel = installmentNumber + '/' + e.duration_months;
+          else if (e.is_recurring) installmentLabel = 'recorrente';
+          return Object.assign({}, e, { installmentLabel });
+        })
+        .sort((a, b) => Number(b.amount || 0) - Number(a.amount || 0));
+    },
+
+    get expensesInvoiceTotal() {
+      return this.expensesInvoiceItems.reduce((sum, e) => sum + Number(e.amount || 0), 0);
     },
 
     get totalPayroll() {
@@ -848,10 +860,6 @@ function financeiroApp() {
       }
     },
 
-    emptyPaymentLine() {
-      return { payment_method: 'Dinheiro', amount: '', installments: 1, payment_machine_id: '' };
-    },
-
     feeRateFor(machineId, installments) {
       const machine = this.paymentMachines.find(m => m.id === machineId);
       if (!machine || !machine.fee_rates) return 0;
@@ -944,64 +952,35 @@ function financeiroApp() {
       return isNaN(d) ? '—' : d.toLocaleDateString('pt-BR');
     },
 
-    newSaleGroupId() {
-      return (window.crypto && window.crypto.randomUUID) ? window.crypto.randomUUID() : (Date.now() + '-' + Math.random().toString(16).slice(2));
-    },
-
+    // única finalidade restante deste formulário manual: lançar uma comissão
+    // avulsa. Pagamento de procedimento e venda de pacote saíram daqui porque
+    // já são lançados automaticamente ao aprovar a venda em vendas.html —
+    // manter esse caminho manual em paralelo arriscava lançar o mesmo
+    // recebimento duas vezes (ou lançar um "venda_pacote" sem o pacote real
+    // por trás, sem sessões geradas pro paciente).
     async createTransaction() {
       if (!this.clinicId) return;
-      const isCommission = this.newTransaction.type === 'comissao_profissional';
       this.saving = true;
-
-      if (isCommission) {
-        const payload = {
-          clinic_id: this.clinicId,
-          type: this.newTransaction.type,
-          patient_id: this.newTransaction.patient_id || null,
-          professional_id: this.newTransaction.professional_id || null,
-          amount: parseCurrencyToNumber(this.newTransaction.amount),
-          commission_percentage: this.newTransaction.commission_percentage || null,
-          base_amount: parseCurrencyToNumber(this.newTransaction.base_amount),
-          payment_method: this.newTransaction.payment_method || null,
-          transaction_date: this.newTransaction.transaction_date
-        };
-        const { error } = await supabaseClient.from('transactions').insert(payload);
-        this.saving = false;
-        if (error) {
-          this.showFeedback('error', 'Erro ao salvar lançamento: ' + error.message);
-          return;
-        }
-      } else {
-        const lines = this.newTransaction.paymentLines.filter(l => (parseCurrencyToNumber(l.amount) || 0) > 0);
-        if (lines.length === 0) {
-          this.saving = false;
-          this.showFeedback('error', 'Informe ao menos um valor de pagamento.');
-          return;
-        }
-        const saleGroupId = lines.length > 1 ? this.newSaleGroupId() : null;
-        const payload = lines.map(line => ({
-          clinic_id: this.clinicId,
-          type: this.newTransaction.type,
-          patient_id: this.newTransaction.patient_id || null,
-          professional_id: this.newTransaction.professional_id || null,
-          amount: parseCurrencyToNumber(line.amount),
-          payment_method: line.payment_method || null,
-          installments: line.payment_method === 'Cartão de crédito' ? (line.installments || 1) : 1,
-          payment_machine_id: line.payment_method === 'Cartão de crédito' ? (line.payment_machine_id || null) : null,
-          net_amount: this.netAmountFor(line),
-          sale_group_id: saleGroupId,
-          transaction_date: this.newTransaction.transaction_date
-        }));
-        const { error } = await supabaseClient.from('transactions').insert(payload);
-        this.saving = false;
-        if (error) {
-          this.showFeedback('error', 'Erro ao salvar lançamento: ' + error.message);
-          return;
-        }
+      const payload = {
+        clinic_id: this.clinicId,
+        type: 'comissao_profissional',
+        patient_id: this.newTransaction.patient_id || null,
+        professional_id: this.newTransaction.professional_id || null,
+        amount: parseCurrencyToNumber(this.newTransaction.amount),
+        commission_percentage: this.newTransaction.commission_percentage || null,
+        base_amount: parseCurrencyToNumber(this.newTransaction.base_amount),
+        payment_method: this.newTransaction.payment_method || null,
+        transaction_date: this.newTransaction.transaction_date
+      };
+      const { error } = await supabaseClient.from('transactions').insert(payload);
+      this.saving = false;
+      if (error) {
+        this.showFeedback('error', 'Erro ao salvar lançamento: ' + error.message);
+        return;
       }
 
       this.showNewTransactionForm = false;
-      this.newTransaction = { type: 'pagamento_procedimento', patient_id: '', professional_id: '', amount: '', base_amount: '', commission_percentage: '', payment_method: '', transaction_date: new Date().toISOString().slice(0,10), paymentLines: [this.emptyPaymentLine()] };
+      this.newTransaction = { type: 'comissao_profissional', patient_id: '', professional_id: '', amount: '', base_amount: '', commission_percentage: '', payment_method: '', transaction_date: new Date().toISOString().slice(0,10) };
       this.transactionPatientSearch = '';
       this.showFeedback('success', 'Lançamento registrado.');
       await this.loadTransactions();
