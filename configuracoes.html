@@ -70,6 +70,24 @@
             </div>
             <p class="input-hint">Vale para todo mundo que acessa o sistema dessa clínica.</p>
           </div>
+          <div class="grid grid-2 gap-3 mt-3">
+            <div class="form-group">
+              <label class="label">Cor primária</label>
+              <div class="flex items-center gap-2">
+                <input type="color" x-model="settings.primary_color" @input="previewBrandColors()" style="width:44px;height:36px;padding:2px;">
+                <input class="input" type="text" x-model="settings.primary_color" @input="previewBrandColors()" placeholder="#2F4A45">
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="label">Cor de destaque</label>
+              <div class="flex items-center gap-2">
+                <input type="color" x-model="settings.accent_color" @input="previewBrandColors()" style="width:44px;height:36px;padding:2px;">
+                <input class="input" type="text" x-model="settings.accent_color" @input="previewBrandColors()" placeholder="#B8912F">
+              </div>
+            </div>
+          </div>
+          <button type="button" class="btn btn-ghost btn-sm mt-2" @click="resetBrandColors()">Restaurar cores padrão</button>
+          <p class="input-hint">Usadas em botões, destaques, gráficos e no ranking de metas. Tons mais claros e mais escuros são calculados automaticamente a partir dessas duas cores.</p>
         </div>
       </div>
 
@@ -111,6 +129,14 @@
             <input type="checkbox" x-model="settings.manager_password_for_courtesy" id="pwcourt" style="width:auto;">
             <label for="pwcourt" class="text-sm" style="margin:0;">Exigir senha do gerente para marcar um item como cortesia</label>
           </div>
+
+          <hr class="divider">
+
+          <div class="form-group">
+            <label class="label">Desconto máximo permitido (%)</label>
+            <input class="input" type="number" min="0" max="100" step="0.1" x-model="settings.max_discount_percentage" placeholder="Sem limite" style="max-width:160px;">
+            <p class="input-hint">Teto rígido: ninguém consegue aplicar um desconto acima desse percentual em Vendas, nem com a senha do gerente. Deixe em branco para não limitar.</p>
+          </div>
         </div>
       </div>
 
@@ -122,7 +148,15 @@
             <input type="checkbox" x-model="settings.show_performance_to_staff" id="showperf" style="width:auto;">
             <label for="showperf" class="text-sm" style="margin:0;">Atendente e Esteticista podem ver a aba Desempenho (a própria meta, comissão e o ranking da equipe)</label>
           </div>
-          <p class="input-hint">Se desmarcar, só o Administrador enxerga o Desempenho. Cada funcionário sempre vê só os próprios números — nunca os dos colegas.</p>
+          <p class="input-hint">Se desmarcar, só o Administrador enxerga o Desempenho. Cada funcionário sempre vê só os próprios números, nunca os dos colegas.</p>
+
+          <hr class="divider">
+
+          <div class="form-group flex items-center gap-2">
+            <input type="checkbox" x-model="settings.manager_password_for_performance" id="pwperf" style="width:auto;">
+            <label for="pwperf" class="text-sm" style="margin:0;">Exigir a senha do gerente para Atendente/Esteticista abrirem a aba Desempenho</label>
+          </div>
+          <p class="input-hint">Some ao critério acima: mesmo com a visibilidade liberada, a pessoa precisa digitar a senha do gerente toda vez que abrir a página. O Administrador nunca precisa dessa senha.</p>
         </div>
       </div>
 
@@ -143,10 +177,13 @@ function configuracoesApp() {
     clinicId: null,
     clinicName: '',
     tab: 'geral',
+    defaultPrimaryColor: '#2F4A45',
+    defaultAccentColor: '#B8912F',
     settings: {
       logo_url: '', theme: 'claro', prevent_double_booking: true, agenda_name_format: 'completo',
       manager_password: '', manager_password_for_discount: false, manager_password_for_courtesy: false,
-      show_performance_to_staff: true
+      show_performance_to_staff: true, manager_password_for_performance: false,
+      primary_color: '#2F4A45', accent_color: '#B8912F', max_discount_percentage: ''
     },
     settingsId: null,
     feedback: { type: '', message: '' },
@@ -177,14 +214,30 @@ function configuracoesApp() {
           manager_password: settingsRes.data.manager_password || '',
           manager_password_for_discount: settingsRes.data.manager_password_for_discount,
           manager_password_for_courtesy: settingsRes.data.manager_password_for_courtesy,
-          show_performance_to_staff: settingsRes.data.show_performance_to_staff
+          show_performance_to_staff: settingsRes.data.show_performance_to_staff,
+          manager_password_for_performance: settingsRes.data.manager_password_for_performance,
+          primary_color: settingsRes.data.primary_color || this.defaultPrimaryColor,
+          accent_color: settingsRes.data.accent_color || this.defaultAccentColor,
+          max_discount_percentage: settingsRes.data.max_discount_percentage !== null && settingsRes.data.max_discount_percentage !== undefined
+            ? String(settingsRes.data.max_discount_percentage) : ''
         };
       }
       this.loading = false;
+      this.previewBrandColors();
     },
 
     previewTheme() {
       document.documentElement.setAttribute('data-theme', this.settings.theme === 'escuro' ? 'escuro' : 'claro');
+    },
+
+    previewBrandColors() {
+      if (window.applyBrandColors) window.applyBrandColors(this.settings.primary_color, this.settings.accent_color);
+    },
+
+    resetBrandColors() {
+      this.settings.primary_color = this.defaultPrimaryColor;
+      this.settings.accent_color = this.defaultAccentColor;
+      this.previewBrandColors();
     },
 
     async onLogoSelected(event) {

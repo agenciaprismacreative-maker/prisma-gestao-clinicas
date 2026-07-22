@@ -88,18 +88,19 @@
               <form @submit.prevent="concludeAttendance()">
                 <div class="form-group">
                   <label class="label">Pacote vinculado (opcional)</label>
-                  <select class="input" x-model="linkedPackageId">
+                  <select class="input" x-model="linkedPackageId" @change="onLinkedPackageChange()">
                     <option value="">Sessão avulsa (não desconta de pacote)</option>
                     <template x-for="pk in openPackages" :key="pk.id">
-                      <option :value="pk.id" x-text="(pk.services ? pk.services.name : 'Pacote') + ' · ' + pk.used_sessions + ' de ' + pk.total_sessions + ' usadas'"></option>
+                      <option :value="pk.id" x-text="(pk.services ? pk.services.name : 'Pacote') + ' · ' + pk.used_sessions + ' de ' + pk.total_sessions + ' usadas' + (pk.purchased_at ? ' (comprado em ' + formatDate(pk.purchased_at) + ')' : '')"></option>
                     </template>
                   </select>
                   <p class="input-hint" x-show="openPackages.length === 0">Este paciente não tem pacote em aberto.</p>
-                  <p class="input-hint" x-show="openPackages.length > 0">Ao concluir, desconta uma sessão do pacote selecionado.</p>
+                  <p class="input-hint" x-show="openPackages.length > 0">Ao concluir, desconta uma sessão do pacote selecionado. Se o paciente tiver mais de um pacote do mesmo serviço, a data da compra ajuda a diferenciar qual usar.</p>
                 </div>
                 <div class="form-group">
                   <label class="label">Protocolo aplicado</label>
-                  <input class="input" x-model="form.protocol">
+                  <input class="input" x-model="form.protocol" :readonly="!!linkedPackageId" :style="linkedPackageId ? 'background:var(--color-surface-alt);color:var(--color-text-muted);' : ''">
+                  <p class="input-hint" x-show="linkedPackageId">Definido automaticamente pelo serviço do pacote vinculado acima.</p>
                 </div>
                 <div class="form-group">
                   <label class="label">Evolução da sessão</label>
@@ -334,19 +335,44 @@ function atendimentoApp() {
           .order('created_at', { ascending: false }),
         supabaseClient
           .from('packages')
-          .select('id, total_sessions, used_sessions, services ( name )')
+          .select('id, service_id, total_sessions, used_sessions, purchased_at, services ( name )')
           .eq('patient_id', appt.patient_id)
       ]);
       if (!recordsRes.error) this.history = recordsRes.data || [];
       this.historyLoading = false;
       if (!packagesRes.error) {
-        this.openPackages = (packagesRes.data || []).filter(pk => pk.used_sessions < pk.total_sessions);
+        const allPkgs = packagesRes.data || [];
+        this.openPackages = allPkgs.filter(pk => pk.used_sessions < pk.total_sessions);
         // se o agendamento já tinha um pacote vinculado mas ele não está mais
         // em aberto (ex.: já foi totalmente usado), mantém a opção visível
         if (appt.package_id && !this.openPackages.some(pk => pk.id === appt.package_id)) {
-          const linked = (packagesRes.data || []).find(pk => pk.id === appt.package_id);
+          const linked = allPkgs.find(pk => pk.id === appt.package_id);
           if (linked) this.openPackages.push(linked);
         }
+        // Pacotes do mesmo serviço agendado aparecem primeiro; entre pacotes
+        // do mesmo serviço, o mais antigo (comprado há mais tempo) primeiro,
+        // para orientar qual usar quando o paciente tem mais de um em aberto.
+        this.openPackages.sort((a, b) => {
+          const aMatch = a.service_id === appt.service_id ? 0 : 1;
+          const bMatch = b.service_id === appt.service_id ? 0 : 1;
+          if (aMatch !== bMatch) return aMatch - bMatch;
+          return new Date(a.purchased_at) - new Date(b.purchased_at);
+        });
+        // Se o agendamento não veio com pacote vinculado, sugere automaticamente
+        // o pacote em aberto do mesmo serviço agendado (evita ficar em "sessão
+        // avulsa" por padrão quando existe um pacote óbvio a consumir).
+        if (!this.linkedPackageId) {
+          const suggestion = this.openPackages.find(pk => pk.service_id === appt.service_id);
+          if (suggestion) this.linkedPackageId = suggestion.id;
+        }
+      }
+      this.onLinkedPackageChange();
+    },
+
+    onLinkedPackageChange() {
+      const pkg = this.openPackages.find(pk => pk.id === this.linkedPackageId);
+      if (pkg && pkg.services) {
+        this.form.protocol = pkg.services.name;
       }
     },
 

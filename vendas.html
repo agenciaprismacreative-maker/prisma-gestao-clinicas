@@ -504,7 +504,19 @@ function vendasApp() {
       return s ? s.name : '—';
     },
 
+    enforceDiscountCap(value) {
+      const settings = window.__prismaClinicSettings;
+      const cap = settings && settings.max_discount_percentage !== null && settings.max_discount_percentage !== undefined
+        ? Number(settings.max_discount_percentage) : null;
+      if (cap !== null && Number(value) > cap) {
+        this.showFeedback('error', 'Desconto máximo permitido nesta clínica é ' + cap + '%. Valor ajustado.');
+        return cap;
+      }
+      return value;
+    },
+
     authorizeDiscount() {
+      this.draftItem.discount_percentage = this.enforceDiscountCap(this.draftItem.discount_percentage);
       const settings = window.__prismaClinicSettings;
       if (!settings || !settings.manager_password_for_discount || !settings.manager_password) return;
       if (!(Number(this.draftItem.discount_percentage) > 0)) return;
@@ -516,6 +528,7 @@ function vendasApp() {
     },
 
     authorizeSaleDiscount() {
+      this.newSale.discount_percentage = this.enforceDiscountCap(this.newSale.discount_percentage);
       const settings = window.__prismaClinicSettings;
       if (!settings || !settings.manager_password_for_discount || !settings.manager_password) return;
       if (!(Number(this.newSale.discount_percentage) > 0)) return;

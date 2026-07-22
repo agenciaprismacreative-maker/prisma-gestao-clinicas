@@ -106,18 +106,52 @@ async function fillUserInfo() {
   }
 }
 
+function shadeColor(hex, percent) {
+  if (!hex) return hex;
+  const clean = hex.replace('#', '');
+  if (clean.length !== 6) return hex;
+  const num = parseInt(clean, 16);
+  if (Number.isNaN(num)) return hex;
+  let r = (num >> 16) + Math.round(255 * percent);
+  let g = ((num >> 8) & 0x00FF) + Math.round(255 * percent);
+  let b = (num & 0x0000FF) + Math.round(255 * percent);
+  r = Math.max(0, Math.min(255, r));
+  g = Math.max(0, Math.min(255, g));
+  b = Math.max(0, Math.min(255, b));
+  return '#' + (0x1000000 + r * 0x10000 + g * 0x100 + b).toString(16).slice(1);
+}
+
+function applyBrandColors(primary, accent) {
+  const root = document.documentElement.style;
+  if (primary) {
+    root.setProperty('--color-primary', primary);
+    root.setProperty('--color-primary-dark', shadeColor(primary, -0.22));
+    root.setProperty('--color-primary-light', shadeColor(primary, 0.86));
+  }
+  if (accent) {
+    root.setProperty('--color-accent', accent);
+    root.setProperty('--color-accent-light', shadeColor(accent, 0.86));
+  }
+}
+window.shadeColor = shadeColor;
+window.applyBrandColors = applyBrandColors;
+
 async function applyClinicSettings(clinicId, role) {
   if (!clinicId) return;
   try {
     const { data: settings } = await supabaseClient
       .from('clinic_settings')
-      .select('logo_url, theme, prevent_double_booking, agenda_name_format, manager_password, manager_password_for_discount, manager_password_for_courtesy, show_performance_to_staff')
+      .select('logo_url, theme, prevent_double_booking, agenda_name_format, manager_password, manager_password_for_discount, manager_password_for_courtesy, show_performance_to_staff, manager_password_for_performance, primary_color, accent_color, max_discount_percentage')
       .eq('clinic_id', clinicId)
       .maybeSingle();
 
     window.__prismaClinicSettings = settings || {};
 
     document.documentElement.setAttribute('data-theme', settings && settings.theme === 'escuro' ? 'escuro' : 'claro');
+
+    if (settings && (settings.primary_color || settings.accent_color)) {
+      applyBrandColors(settings.primary_color, settings.accent_color);
+    }
 
     if (settings && settings.logo_url) {
       const logoImg = document.querySelector('[data-slot="clinic-logo"]');
@@ -131,6 +165,16 @@ async function applyClinicSettings(clinicId, role) {
       document.querySelectorAll('.nav-item[data-page="bi"]').forEach((el) => { el.style.display = 'none'; });
       if (document.body.getAttribute('data-page') === 'bi') {
         window.location.href = 'dashboard.html';
+        return;
+      }
+    }
+
+    if (settings && settings.manager_password_for_performance && !isAdmin && document.body.getAttribute('data-page') === 'bi') {
+      const attempt = window.prompt('Esta área exige a senha do gerente. Digite a senha para continuar:');
+      if (!settings.manager_password || attempt !== settings.manager_password) {
+        window.alert('Senha incorreta. Você será redirecionado ao Dashboard.');
+        window.location.href = 'dashboard.html';
+        return;
       }
     }
   } catch (err) {

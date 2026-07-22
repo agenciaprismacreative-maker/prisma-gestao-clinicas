@@ -174,6 +174,7 @@ create table public.patient_photos (
   session_date date not null default current_date,
   storage_path text not null,
   marketing_consent boolean not null default false,
+  appointment_id uuid references public.appointments (id) on delete set null,
   created_at timestamptz not null default now()
 );
 
@@ -437,6 +438,10 @@ create table public.clinic_settings (
   manager_password_for_discount boolean not null default false,
   manager_password_for_courtesy boolean not null default false,
   show_performance_to_staff boolean not null default true,
+  manager_password_for_performance boolean not null default false,
+  primary_color text,
+  accent_color text,
+  max_discount_percentage numeric(5, 2),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -457,6 +462,7 @@ create index idx_products_clinic on public.products (clinic_id);
 create index idx_stock_movements_product on public.stock_movements (product_id);
 create index idx_stock_movements_clinic on public.stock_movements (clinic_id);
 create index idx_stock_movements_created_at on public.stock_movements (created_at);
+create index idx_patient_photos_appointment on public.patient_photos (appointment_id);
 create index idx_goals_clinic_period on public.goals (clinic_id, period_month);
 create index idx_goals_professional on public.goals (professional_id);
 alter table public.goals add constraint goals_unique_period unique (clinic_id, professional_id, period_month);

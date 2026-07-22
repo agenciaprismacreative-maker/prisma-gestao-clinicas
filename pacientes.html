@@ -23,7 +23,7 @@
         </div>
         <div class="flex gap-3">
           <input type="file" accept=".csv" x-ref="csvInput" @change="importCsv($event)" style="display:none;">
-          <button class="btn btn-secondary" type="button" @click="$refs.csvInput.click()" title="Aceita CSV com colunas como nome, telefone, e-mail, nascimento e CPF, em qualquer ordem, com vírgula ou ponto e vírgula.">Importar CSV</button>
+          <button class="btn btn-secondary" type="button" @click="$refs.csvInput.click()" title="Aceita CSV com colunas como nome, telefone, e-mail, nascimento e CPF, em qualquer ordem, com vírgula ou ponto e vírgula.">Importar lista de clientes</button>
           <button class="btn btn-primary" type="button" @click="openNewForm()">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
             Novo paciente
@@ -47,7 +47,7 @@
         <div class="card card-shadow" style="padding:0;">
           <div x-show="loading" class="text-sm text-muted" style="padding:24px;">Carregando pacientes…</div>
           <div x-show="!loading && patients.length === 0" class="empty-note" style="margin:20px;">
-            Nenhum paciente cadastrado ainda. Use "Novo paciente" ou "Importar CSV" para começar.
+            Nenhum paciente cadastrado ainda. Use "Novo paciente" ou "Importar lista de clientes" para começar.
           </div>
           <div class="table-wrap" x-show="!loading && patients.length > 0">
             <table class="table">
@@ -107,6 +107,8 @@
                     <span class="badge-dot"></span>
                     <span x-text="selected && selected.lgpd_consent_at ? 'LGPD assinado' : 'LGPD pendente'"></span>
                   </span>
+                  <button type="button" class="btn btn-ghost btn-sm" x-show="selected && !selected.lgpd_consent_at" @click="confirmLgpdConsent()" title="Use quando o paciente assinar o termo pessoalmente depois do cadastro (ex.: importado por lista de clientes)">Confirmar LGPD</button>
+                  <button type="button" class="btn btn-secondary btn-sm" @click="openEditPatientForm(selected)">Editar paciente</button>
                   <a class="btn btn-primary btn-sm" :href="selected ? ('agenda.html?novo_agendamento=1&patient_id=' + selected.id) : '#'">Agendar</a>
                 </div>
               </div>
@@ -308,7 +310,7 @@
       <div x-show="showNewForm" x-cloak class="modal-overlay" @click.self="showNewForm = false">
         <div class="card card-shadow" style="margin:auto;width:100%;max-width:640px;max-height:88vh;overflow-y:auto;">
           <div class="card-header">
-            <h3>Novo paciente</h3>
+            <h3 x-text="formMode === 'edit' ? 'Editar paciente' : 'Novo paciente'"></h3>
             <button class="btn btn-ghost btn-sm" type="button" @click="showNewForm = false">Fechar</button>
           </div>
 
@@ -323,9 +325,10 @@
               </div>
             </template>
           </div>
-          <p class="text-xs text-soft mb-4">Etapa <span x-text="currentStepIndex + 1"></span> de <span x-text="wizardSteps.length"></span> · campos obrigatórios: nome, CPF, telefone e e-mail.</p>
+          <p class="text-xs text-soft mb-4" x-show="formMode === 'create'">Etapa <span x-text="currentStepIndex + 1"></span> de <span x-text="wizardSteps.length"></span> · campos obrigatórios: nome, CPF, telefone e e-mail.</p>
+          <p class="text-xs text-soft mb-4" x-show="formMode === 'edit'">Navegue livremente entre as seções para corrigir o que for preciso.</p>
 
-          <form @submit.prevent="currentStepIndex === wizardSteps.length - 1 ? createPatient() : nextStep()">
+          <form @submit.prevent="formMode === 'edit' ? updatePatient() : (currentStepIndex === wizardSteps.length - 1 ? createPatient() : nextStep())">
 
             <!-- GERAIS -->
             <div x-show="formTab==='gerais'">
@@ -611,11 +614,11 @@
             </div>
 
             <div class="flex items-center justify-between mt-4" style="gap:10px;">
-              <button type="button" class="btn btn-secondary" @click="prevStep()" x-show="currentStepIndex > 0">Voltar</button>
-              <span x-show="currentStepIndex === 0"></span>
-              <button type="button" class="btn btn-primary" @click="nextStep()" x-show="currentStepIndex < wizardSteps.length - 1">Avançar</button>
-              <button class="btn btn-primary" type="submit" :disabled="saving" x-show="currentStepIndex === wizardSteps.length - 1">
-                <span x-show="!saving">Salvar paciente</span>
+              <button type="button" class="btn btn-secondary" @click="prevStep()" x-show="formMode === 'create' && currentStepIndex > 0">Voltar</button>
+              <span x-show="!(formMode === 'create' && currentStepIndex > 0)"></span>
+              <button type="button" class="btn btn-primary" @click="nextStep()" x-show="formMode === 'create' && currentStepIndex < wizardSteps.length - 1">Avançar</button>
+              <button class="btn btn-primary" type="submit" :disabled="saving" x-show="formMode === 'edit' || currentStepIndex === wizardSteps.length - 1">
+                <span x-show="!saving" x-text="formMode === 'edit' ? 'Salvar alterações' : 'Salvar paciente'"></span>
                 <span x-show="saving" x-cloak>Salvando…</span>
               </button>
             </div>
@@ -720,6 +723,7 @@ function pacientesApp() {
     users: [],
     clinicId: null,
     showNewForm: false,
+    formMode: 'create',
     formTab: 'gerais',
     maxStepReached: 0,
     wizardSteps: [
@@ -864,10 +868,166 @@ function pacientesApp() {
     },
 
     openNewForm() {
+      this.formMode = 'create';
       this.newPatient = emptyNewPatient();
       this.formTab = 'gerais';
       this.maxStepReached = 0;
       this.showNewForm = true;
+    },
+
+    openEditPatientForm(p) {
+      if (!p) return;
+      this.formMode = 'edit';
+      this.newPatient = {
+        full_name: p.full_name || '',
+        cpf: p.cpf || '',
+        phone: p.phone || '',
+        email: p.email || '',
+        birth_date: p.birth_date || '',
+        gender: p.gender || '',
+        marital_status: p.marital_status || '',
+        client_type: p.client_type || 'particular',
+        rg: p.rg || '',
+        rg_orgao_emissor: p.rg_orgao_emissor || '',
+        rg_data_emissao: p.rg_data_emissao || '',
+        phone2: p.phone2 || '',
+        landline: p.landline || '',
+        instagram: p.instagram || '',
+        facebook: p.facebook || '',
+        address_cep: p.address_cep || '',
+        address_street: p.address_street || '',
+        address_number: p.address_number || '',
+        address_neighborhood: p.address_neighborhood || '',
+        address_complement: p.address_complement || '',
+        address_city: p.address_city || '',
+        address_state: p.address_state || '',
+        lead_source: p.lead_source || '',
+        referred_by_patient_id: p.referred_by_patient_id || '',
+        referred_by_name: p.referred_by_name || '',
+        referred_by_user_id: p.referred_by_user_id || '',
+        legal_guardian_name: p.legal_guardian_name || '',
+        legal_guardian_cpf: p.legal_guardian_cpf || '',
+        legal_guardian_notes: p.legal_guardian_notes || '',
+        naturality: p.naturality || '',
+        father_name: p.father_name || '',
+        mother_name: p.mother_name || '',
+        profession: p.profession || '',
+        workplace: p.workplace || '',
+        record_number: p.record_number || '',
+        anamnesis: p.anamnesis || '',
+        allergies: p.allergies || '',
+        lgpd_consent: !!p.lgpd_consent_at,
+        anamnesis_answers: Object.assign(emptyAnamnesisAnswers(), p.anamnesis_answers || {})
+      };
+      this.formTab = 'gerais';
+      this.maxStepReached = this.wizardSteps.length - 1;
+      this.showNewForm = true;
+    },
+
+    async updatePatient() {
+      if (!this.selected) return;
+      if (this.newPatient.email && !isValidEmail(this.newPatient.email)) {
+        this.showFeedback('error', 'Corrija o e-mail antes de salvar.');
+        this.formTab = 'gerais';
+        return;
+      }
+      if (this.newPatient.cpf && !isValidCpf(this.newPatient.cpf)) {
+        this.showFeedback('error', 'Corrija o CPF antes de salvar.');
+        this.formTab = 'gerais';
+        return;
+      }
+      this.saving = true;
+      const payload = {
+        full_name: this.newPatient.full_name,
+        cpf: this.newPatient.cpf || null,
+        phone: this.newPatient.phone || null,
+        email: this.newPatient.email || null,
+        birth_date: this.newPatient.birth_date || null,
+        gender: this.newPatient.gender || null,
+        marital_status: this.newPatient.marital_status || null,
+        client_type: this.newPatient.client_type || 'particular',
+        rg: this.newPatient.rg || null,
+        rg_orgao_emissor: this.newPatient.rg_orgao_emissor || null,
+        rg_data_emissao: this.newPatient.rg_data_emissao || null,
+        phone2: this.newPatient.phone2 || null,
+        landline: this.newPatient.landline || null,
+        instagram: this.newPatient.instagram || null,
+        facebook: this.newPatient.facebook || null,
+        address_cep: this.newPatient.address_cep || null,
+        address_street: this.newPatient.address_street || null,
+        address_number: this.newPatient.address_number || null,
+        address_neighborhood: this.newPatient.address_neighborhood || null,
+        address_complement: this.newPatient.address_complement || null,
+        address_city: this.newPatient.address_city || null,
+        address_state: this.newPatient.address_state || null,
+        lead_source: this.newPatient.lead_source || null,
+        referred_by_patient_id: this.newPatient.referred_by_patient_id || null,
+        referred_by_name: this.newPatient.referred_by_name || null,
+        referred_by_user_id: this.newPatient.referred_by_user_id || null,
+        legal_guardian_name: this.newPatient.legal_guardian_name || null,
+        legal_guardian_cpf: this.newPatient.legal_guardian_cpf || null,
+        legal_guardian_notes: this.newPatient.legal_guardian_notes || null,
+        naturality: this.newPatient.naturality || null,
+        father_name: this.newPatient.father_name || null,
+        mother_name: this.newPatient.mother_name || null,
+        profession: this.newPatient.profession || null,
+        workplace: this.newPatient.workplace || null,
+        record_number: this.newPatient.record_number || null,
+        anamnesis: this.newPatient.anamnesis || null,
+        anamnesis_answers: this.newPatient.anamnesis_answers,
+        allergies: this.newPatient.allergies || null
+      };
+
+      // LGPD: só mexe no timestamp quando o estado do checkbox realmente
+      // muda, para não sobrescrever a data original de quem já tinha
+      // assinado, e para permitir confirmar depois quem ficou pendente
+      // (por exemplo, importado por CSV sem coleta de consentimento).
+      const wasSigned = !!this.selected.lgpd_consent_at;
+      if (this.newPatient.lgpd_consent && !wasSigned) {
+        payload.lgpd_consent_at = new Date().toISOString();
+        payload.lgpd_consent_text = 'Consentimento para tratamento de dados de saúde confirmado na edição do cadastro.';
+      } else if (!this.newPatient.lgpd_consent && wasSigned) {
+        payload.lgpd_consent_at = null;
+        payload.lgpd_consent_text = null;
+      }
+
+      const { data: updated, error } = await supabaseClient
+        .from('patients')
+        .update(payload)
+        .eq('id', this.selected.id)
+        .select()
+        .single();
+      this.saving = false;
+      if (error) {
+        this.showFeedback('error', 'Erro ao salvar alterações: ' + error.message);
+        return;
+      }
+      this.showNewForm = false;
+      this.showFeedback('success', 'Cadastro atualizado.');
+      this.selected = updated;
+      const idx = this.patients.findIndex(pp => pp.id === updated.id);
+      if (idx !== -1) this.patients[idx] = updated;
+    },
+
+    async confirmLgpdConsent() {
+      if (!this.selected || this.selected.lgpd_consent_at) return;
+      const { data: updated, error } = await supabaseClient
+        .from('patients')
+        .update({
+          lgpd_consent_at: new Date().toISOString(),
+          lgpd_consent_text: 'Consentimento para tratamento de dados de saúde confirmado manualmente na ficha do paciente.'
+        })
+        .eq('id', this.selected.id)
+        .select()
+        .single();
+      if (error) {
+        this.showFeedback('error', 'Erro ao confirmar LGPD: ' + error.message);
+        return;
+      }
+      this.selected = updated;
+      const idx = this.patients.findIndex(pp => pp.id === updated.id);
+      if (idx !== -1) this.patients[idx] = updated;
+      this.showFeedback('success', 'Consentimento LGPD confirmado.');
     },
 
     get currentStepIndex() {
