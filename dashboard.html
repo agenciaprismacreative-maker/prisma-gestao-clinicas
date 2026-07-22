@@ -187,6 +187,29 @@
         </div>
       </div>
 
+      <div class="card card-shadow mb-5" x-show="!loading">
+        <div class="card-header">
+          <div><h3>Últimos atendimentos</h3><p>Quem estava atendendo — 5 mais recentes</p></div>
+          <a href="bi.html" class="btn btn-ghost btn-sm">Ver mais</a>
+        </div>
+        <div x-show="recentAttendances.length === 0" class="empty-note" style="margin:20px;">Nenhum atendimento concluído ainda.</div>
+        <div class="table-wrap" x-show="recentAttendances.length > 0">
+          <table class="table">
+            <thead><tr><th>Data</th><th>Paciente</th><th>Profissional</th><th>Procedimento</th></tr></thead>
+            <tbody>
+              <template x-for="a in recentAttendances" :key="a.id">
+                <tr>
+                  <td x-text="formatDateTime(a.scheduled_at)"></td>
+                  <td x-text="a.patients ? a.patients.full_name : '—'"></td>
+                  <td x-text="professionalName(a.professional_id)"></td>
+                  <td x-text="a.services ? a.services.name : '—'"></td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       <div class="card card-shadow mb-5" x-show="!loading && dashboardLeaderboard.length > 0">
         <div class="card-header">
           <div>
@@ -246,6 +269,20 @@
             </table>
           </div>
           <p class="text-xs text-muted" style="padding:10px 20px 4px;margin:0;" x-show="myAppointmentsTodayRemaining > 0" x-text="'+ ' + myAppointmentsTodayRemaining + ' agendamento(s) pendente(s) além destes — veja sua agenda completa.'"></p>
+        </div>
+
+        <div class="card card-shadow mb-5">
+          <div class="card-header">
+            <div><h3>Meus atendimentos</h3><p>Concluídos x cancelados/faltas</p></div>
+            <div class="flex gap-1">
+              <button type="button" class="btn btn-sm" :class="myAttendanceChartPeriodDays === 7 ? 'btn-primary' : 'btn-secondary'" @click="setMyAttendanceChartPeriod(7)">7d</button>
+              <button type="button" class="btn btn-sm" :class="myAttendanceChartPeriodDays === 30 ? 'btn-primary' : 'btn-secondary'" @click="setMyAttendanceChartPeriod(30)">30d</button>
+              <button type="button" class="btn btn-sm" :class="myAttendanceChartPeriodDays === 90 ? 'btn-primary' : 'btn-secondary'" @click="setMyAttendanceChartPeriod(90)">3 meses</button>
+            </div>
+          </div>
+          <div style="position:relative;height:220px;padding:4px 12px 12px;">
+            <canvas id="dashMyAttendanceChart"></canvas>
+          </div>
         </div>
 
         <div class="grid grid-2 gap-3">
@@ -467,6 +504,7 @@
 <script>
 let dashRevenueChartInstance = null;
 let dashStatusChartInstance = null;
+let dashMyAttendanceChartInstance = null;
 
 function cssVar(name, fallback) {
   const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -563,6 +601,74 @@ function renderDashStatusChart(app) {
   });
 }
 
+function renderDashMyAttendanceChart(app) {
+  const canvas = document.getElementById('dashMyAttendanceChart');
+  if (!canvas || !window.Chart) return;
+  const periodDays = app.myAttendanceChartPeriodDays || 30;
+  const dayKey = (iso) => new Date(iso).toISOString().slice(0, 10);
+  const done = app.myAttendanceHistory.filter(a => a.status === 'concluido');
+  const missed = app.myAttendanceHistory.filter(a => a.status === 'cancelado' || a.status === 'faltou');
+  const c1 = cssVar('--chart-1', '#2F4A45');
+  const c3 = cssVar('--chart-3', '#B85C38');
+  let labels, doneValues, missedValues;
+
+  if (periodDays <= 30) {
+    // períodos curtos: 1 barra por dia (mesma lógica do gráfico de faturamento)
+    const days = [];
+    const now = new Date();
+    for (let i = periodDays - 1; i >= 0; i--) {
+      const d = new Date(now);
+      d.setDate(d.getDate() - i);
+      days.push(d.toISOString().slice(0, 10));
+    }
+    const doneSums = {};
+    done.forEach(a => { const k = dayKey(a.scheduled_at); doneSums[k] = (doneSums[k] || 0) + 1; });
+    const missedSums = {};
+    missed.forEach(a => { const k = dayKey(a.scheduled_at); missedSums[k] = (missedSums[k] || 0) + 1; });
+    doneValues = days.map(d => doneSums[d] || 0);
+    missedValues = days.map(d => missedSums[d] || 0);
+    labels = days.map(d => { const parts = d.split('-'); return parts[2] + '/' + parts[1]; });
+  } else {
+    // "últimos 3 meses": agrega por semana, senão viraria ~90 barras ilegíveis
+    const weeks = Math.ceil(periodDays / 7);
+    const now = new Date();
+    const buckets = [];
+    for (let w = weeks - 1; w >= 0; w--) {
+      const end = new Date(now);
+      end.setDate(end.getDate() - (w * 7));
+      const start = new Date(end);
+      start.setDate(start.getDate() - 6);
+      buckets.push({ startKey: start.toISOString().slice(0, 10), endKey: end.toISOString().slice(0, 10) });
+    }
+    doneValues = buckets.map(b => done.filter(a => { const k = dayKey(a.scheduled_at); return k >= b.startKey && k <= b.endKey; }).length);
+    missedValues = buckets.map(b => missed.filter(a => { const k = dayKey(a.scheduled_at); return k >= b.startKey && k <= b.endKey; }).length);
+    labels = buckets.map(b => { const parts = b.startKey.split('-'); return parts[2] + '/' + parts[1]; });
+  }
+
+  if (dashMyAttendanceChartInstance) dashMyAttendanceChartInstance.destroy();
+  dashMyAttendanceChartInstance = new Chart(canvas.getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Concluídos', data: doneValues, backgroundColor: c1, borderRadius: 5, maxBarThickness: 22 },
+        { label: 'Cancelados/faltas', data: missedValues, backgroundColor: c3, borderRadius: 5, maxBarThickness: 22 }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'bottom', labels: { boxWidth: 10, padding: 12, font: { size: 11 } } }
+      },
+      scales: {
+        y: { beginAtZero: true, ticks: { precision: 0 } },
+        x: { grid: { display: false } }
+      }
+    }
+  });
+}
+
 function dashboardApp() {
   return {
     loading: true,
@@ -573,6 +679,9 @@ function dashboardApp() {
     transactions30d: [],
     transactionsForChart: [],
     revenueChartPeriodDays: 14,
+    myAttendanceHistory: [],
+    myAttendanceChartPeriodDays: 30,
+    recentAttendances: [],
     upcoming48h: [],
     reactivationCandidates: [],
     birthdayPatients: [],
@@ -604,6 +713,11 @@ function dashboardApp() {
       this.$nextTick(() => renderDashRevenueChart(this));
     },
 
+    setMyAttendanceChartPeriod(days) {
+      this.myAttendanceChartPeriodDays = days;
+      this.$nextTick(() => renderDashMyAttendanceChart(this));
+    },
+
     async init() {
       await this.loadClinicId();
       await Promise.all([
@@ -612,6 +726,8 @@ function dashboardApp() {
         this.loadMonthAppointments(),
         this.loadTransactions30d(),
         this.loadTransactionsForChart(),
+        this.loadMyAttendanceHistory(),
+        this.loadRecentAttendances(),
         this.loadUpcoming48h(),
         this.loadReactivationCandidates(),
         this.loadBirthdays(),
@@ -622,7 +738,30 @@ function dashboardApp() {
       this.$nextTick(() => {
         renderDashRevenueChart(this);
         renderDashStatusChart(this);
+        renderDashMyAttendanceChart(this);
       });
+    },
+
+    async loadMyAttendanceHistory() {
+      if (!this.currentUserId) return;
+      const since = new Date();
+      since.setDate(since.getDate() - 95);
+      const { data, error } = await supabaseClient
+        .from('appointments')
+        .select('scheduled_at, status')
+        .eq('professional_id', this.currentUserId)
+        .gte('scheduled_at', since.toISOString());
+      this.myAttendanceHistory = error ? [] : (data || []);
+    },
+
+    async loadRecentAttendances() {
+      const { data, error } = await supabaseClient
+        .from('appointments')
+        .select('id, scheduled_at, professional_id, patients ( full_name ), services ( name )')
+        .eq('status', 'concluido')
+        .order('scheduled_at', { ascending: false })
+        .limit(5);
+      this.recentAttendances = error ? [] : (data || []);
     },
 
     async loadTransactionsForChart() {

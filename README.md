@@ -22,12 +22,13 @@ Depois acesse `http://localhost:8000` e entre com um usuário já cadastrado em 
 
 O arquivo `database/schema.sql` é sempre a fonte da verdade do estado final esperado do banco, mas ele **não roda sozinho** no Supabase de produção: cada migration em `database/migrations/` precisa ser colada e executada manualmente no SQL Editor do painel do Supabase, em ordem numérica, uma vez cada. Todas são idempotentes (seguro rodar mais de uma vez), então na dúvida é sempre seguro rodar de novo. Se uma tela der erro do tipo "column ... does not exist", "table ... not found in schema cache" ou "more than one relationship was found", quase sempre é uma migration que ainda não rodou nesse banco, não um bug de código.
 
-Para reduzir o número de arquivos para rodar, tudo o que está pendente foi agrupado em só 2 arquivos, nesta ordem:
+Para reduzir o número de arquivos para rodar, tudo o que está pendente foi agrupado em 3 arquivos, nesta ordem:
 
 1. **`database/migrations/011_a_014_consolidado.sql`**
 2. **`database/migrations/015_a_019_consolidado.sql`** (o arquivo `015_a_018_consolidado.sql` antigo ainda existe na pasta, mas está substituído por este — use o `015_a_019`)
+3. **`database/migrations/020_backfill_professional_id_vendas.sql`**
 
-Basta abrir o SQL Editor do Supabase, colar o conteúdo inteiro do arquivo 1, rodar, depois colar o conteúdo inteiro do arquivo 2 e rodar. Os erros abaixo (todos já reportados em algum momento) são exatamente a mesma causa — essas duas migrations ainda não rodaram nesse banco — e todos somem ao rodar os 2 arquivos acima:
+Basta abrir o SQL Editor do Supabase, colar o conteúdo inteiro do arquivo 1, rodar, depois o arquivo 2, rodar, depois o arquivo 3, rodar. Os erros abaixo (todos já reportados em algum momento) são exatamente a mesma causa — essas migrations ainda não rodaram nesse banco — e todos somem ao rodar os 3 arquivos acima:
 
 - "Could not find the 'accent_color' column of 'clinic_settings'"
 - "Could not find the table 'public.clinic_expenses'"
@@ -35,6 +36,8 @@ Basta abrir o SQL Editor do Supabase, colar o conteúdo inteiro do arquivo 1, ro
 - Metas, ranking e "Atendimentos por profissional" aparecendo vazios ou como "Sem profissional" no BI
 - Lista de integrantes sumindo em Equipe
 - "Erro ao criar acesso: For security purposes, you can only request this after X seconds" é diferente: não é migration, é o próprio Supabase limitando a criação de contas muito seguidas (proteção contra abuso). Some sozinho depois de esperar o tempo indicado.
+
+O arquivo 3 (`020_backfill_professional_id_vendas.sql`) resolve especificamente o ranking/pódio aparecendo com nomes certos mas R$ 0,00 e 0 vendas para todo mundo: antes de uma correção anterior, toda venda aprovada gerava o lançamento financeiro sem gravar quem vendeu, então nenhuma venda aprovada antes dessa correção nunca contou para meta, ranking ou comissão de ninguém. A correção em si só vale para vendas aprovadas dali para frente; esta migration conserta retroativamente as vendas já aprovadas antes, recuperando o vendedor a partir da própria venda. Depois de rodar, o ranking e as metas passam a refletir o histórico completo, não só vendas novas.
 
 Regra geral daqui para frente: só é preciso rodar um novo arquivo SQL quando uma mudança de tela também mexe no banco (nova coluna, nova tabela) — isso é sinalizado explicitamente na entrega. Mudanças de layout, texto ou comportamento de interface não exigem nada no Supabase.
 
@@ -101,7 +104,7 @@ Estoque com cadastro de insumos (quantidade em mão, mínimo e máximo), alerta 
 
 Financeiro com lançamentos de pagamento, venda de pacote e comissão (com percentual, valor base e cálculo automático do valor da comissão), modelos de pacote reutilizáveis (nome, descrição e serviços com quantidade, para preencher o carrinho de Vendas rapidamente), cadastro de maquininhas com taxa por parcela, parcelamento no cartão de crédito com estimativa de valor líquido recebido, busca de paciente digitando o nome, e pagamento dividido em mais de uma forma na mesma venda.
 
-Dashboard com indicadores reais (ocupação da agenda, taxa de comparecimento, ticket médio, agendamentos sem confirmação), faturamento estimado do dia comparando o previsto (agendado) com o realizado (lançado no financeiro), ranking do mês (pódio de quem está liderando em vendas), agenda do dia, menu rápido de atalhos, bloco de anotações públicas ou direcionadas a um funcionário específico, e aniversariantes do dia (ou os próximos, quando não há nenhum hoje).
+Dashboard com indicadores reais (ocupação da agenda, taxa de comparecimento, ticket médio, agendamentos sem confirmação), gráfico de faturamento com seletor de período (últimos 7, 14, 30 dias ou 3 meses, comparando o previsto agendado com o realizado no financeiro), card "Últimos atendimentos" com os 5 mais recentes e qual profissional atendeu cada um, ranking do mês (pódio de quem está liderando em vendas), agenda do dia, menu rápido de atalhos, bloco de anotações públicas ou direcionadas a um funcionário específico (que também vira lembrete no sino do funcionário destinatário), e aniversariantes do dia (ou os próximos, quando não há nenhum hoje). Para Atendente e Esteticista, o dashboard básico traz ainda um gráfico dos próprios atendimentos (concluídos x cancelados/faltas) com o mesmo seletor de período.
 
 Pós-venda e reativação, calculando quem já passou do intervalo de retorno esperado por procedimento e permitindo registrar contato manual enquanto a integração automática não existe.
 
