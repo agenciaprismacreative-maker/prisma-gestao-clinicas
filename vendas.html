@@ -111,7 +111,24 @@
                 </tbody>
               </table>
               <p class="text-sm"><strong>Total: </strong><span x-text="formatCurrency(viewingSale.total_amount)"></span></p>
+
+              <hr class="divider">
+              <h4 class="text-xs text-muted mb-2" style="text-transform:uppercase;letter-spacing:.04em;">Pagamento</h4>
+              <template x-for="(line, idx) in viewingSalePaymentLines" :key="idx">
+                <p class="text-sm flex justify-between" style="margin-bottom:4px;">
+                  <span x-text="(line.payment_method || 'Não informado') + (line.installments > 1 ? (' em ' + line.installments + 'x') : '') + (line.payment_machine_id ? (' · ' + paymentMachineName(line.payment_machine_id)) : '')"></span>
+                  <strong x-text="formatCurrency(line.amount)"></strong>
+                </p>
+              </template>
+
+              <hr class="divider">
               <p class="text-xs text-muted mt-1" x-show="viewingSale.origin">Origem: <span x-text="viewingSale.origin"></span></p>
+              <p class="text-xs text-muted" x-show="viewingSale.origin === 'Indicação de paciente' && viewingSale.referred_by_patient_id">
+                Indicado pelo paciente: <span x-text="referralPatientName(viewingSale.referred_by_patient_id)"></span>
+              </p>
+              <p class="text-xs text-muted" x-show="viewingSale.origin === 'Indicação de funcionário' && viewingSale.referred_by_user_id">
+                Indicado por: <span x-text="referralStaffName(viewingSale.referred_by_user_id)"></span><span x-show="viewingSale.referral_commission_percentage"> · comissão de <span x-text="viewingSale.referral_commission_percentage"></span>%</span>
+              </p>
               <p class="text-xs text-muted" x-show="viewingSale.approved_at">Aprovada em <span x-text="formatDate(viewingSale.approved_at)"></span></p>
               <p class="text-xs text-muted" x-show="viewingSale.status === 'cancelada' && viewingSale.cancel_reason">Motivo do cancelamento: <span x-text="viewingSale.cancel_reason"></span></p>
               <button class="btn btn-secondary btn-sm mt-3" type="button" x-show="viewingSale.status === 'aprovada'" @click="openReceiptPreview(viewingSale)">Ver comprovante</button>
@@ -164,6 +181,8 @@
         <div class="card card-shadow" style="margin:auto;width:100%;max-width:620px;max-height:90vh;overflow-y:auto;">
           <div class="card-header"><h3>Nova venda de plano</h3><button class="btn btn-ghost btn-sm" @click="showNewSaleForm=false">Fechar</button></div>
 
+          <p class="text-sm mb-3" x-show="feedback.message" x-cloak x-text="feedback.message" :style="'color:' + (feedback.type==='error' ? 'var(--color-danger)' : 'var(--color-success)')"></p>
+
           <div class="form-group" style="position:relative;">
             <label class="label">Paciente</label>
             <input class="input" type="text" x-model="patientSearch" @focus="patientDropdownOpen = true" @input="patientDropdownOpen = true; newSale.patient_id = ''" placeholder="Digite o nome do paciente" autocomplete="off">
@@ -209,7 +228,7 @@
           <div class="grid grid-2 gap-3" x-show="newSale.origin === 'Indicação de funcionário'" x-cloak>
             <div class="form-group">
               <label class="label">Funcionário que indicou</label>
-              <select class="input" x-model="newSale.referred_by_user_id">
+              <select class="input" x-model="newSale.referred_by_user_id" @change="onReferralUserChange()">
                 <option value="">Selecione</option>
                 <template x-for="u in users" :key="u.id">
                   <option :value="u.id" x-text="u.full_name"></option>
@@ -222,7 +241,7 @@
             </div>
           </div>
           <p class="input-hint mb-3" x-show="newSale.origin === 'Indicação de funcionário'" x-cloak>
-            Ao aprovar a venda, gera automaticamente um lançamento de comissão para este funcionário.
+            Preenchida automaticamente com o padrão definido pelo administrador para este funcionário (ajustável se necessário). Ao aprovar a venda, gera automaticamente um lançamento de comissão para este funcionário.
           </p>
 
           <hr class="divider">
@@ -281,13 +300,14 @@
                 <select class="input" x-model="draftProductItem.product_id" @change="onDraftProductChange()">
                   <option value="">Selecione</option>
                   <template x-for="p in products" :key="p.id">
-                    <option :value="p.id" x-text="p.name + (Number(p.stock_quantity || 0) <= 0 ? ' (sem estoque)' : '')"></option>
+                    <option :value="p.id" :disabled="Number(p.stock_quantity || 0) <= 0" :style="'color:' + stockStatusColor(stockStatus(p))" x-text="p.name + stockStatusLabel(p)"></option>
                   </template>
                 </select>
               </div>
               <div class="form-group">
                 <label class="label">Quantidade</label>
-                <input class="input" type="number" min="1" x-model="draftProductItem.quantity">
+                <input class="input" type="number" min="1" :max="selectedDraftProduct ? selectedDraftProduct.stock_quantity : null" x-model="draftProductItem.quantity">
+                <p class="input-hint" x-show="selectedDraftProduct" x-text="'Disponível em estoque: ' + (selectedDraftProduct ? (selectedDraftProduct.stock_quantity || 0) : 0)"></p>
               </div>
             </div>
             <div class="form-group" style="max-width:220px;">
@@ -397,6 +417,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="js/currency-mask.js"></script>
 <script src="js/confirm-dialog.js"></script>
+<script src="js/stock-status.js"></script>
 <script>
 function vendasApp() {
   return {
@@ -449,14 +470,14 @@ function vendasApp() {
     async loadProducts() {
       const { data, error } = await supabaseClient
         .from('products')
-        .select('id, name, sale_price, stock_quantity')
+        .select('id, name, sale_price, stock_quantity, min_stock_quantity')
         .eq('product_type', 'revenda')
         .order('name');
       this.products = error ? [] : (data || []);
     },
 
     async loadUsers() {
-      const { data } = await supabaseClient.from('users').select('id, full_name').order('full_name');
+      const { data } = await supabaseClient.from('users').select('id, full_name, default_referral_commission_percentage').order('full_name');
       this.users = data || [];
     },
 
@@ -687,16 +708,42 @@ function vendasApp() {
       this.draftProductItem.unit_price = p && p.sale_price !== null && p.sale_price !== undefined ? numberToCurrencyInput(p.sale_price) : '';
     },
 
+    get selectedDraftProduct() {
+      return this.products.find(pp => pp.id === this.draftProductItem.product_id) || null;
+    },
+
     addDraftProductItem() {
       if (!this.draftProductItem.product_id) return;
+      const p = this.selectedDraftProduct;
+      const stock = Number((p && p.stock_quantity) || 0);
+      const qty = Number(this.draftProductItem.quantity) || 1;
+      if (!p || stock <= 0) {
+        this.showFeedback('error', 'Este produto está sem estoque disponível. Não é possível adicioná-lo à venda.');
+        return;
+      }
+      if (qty > stock) {
+        this.showFeedback('error', 'Estoque insuficiente para ' + p.name + ': disponível ' + stock + ', solicitado ' + qty + '.');
+        return;
+      }
       this.cart.push({
         product_id: this.draftProductItem.product_id,
-        quantity: this.draftProductItem.quantity || 1,
+        quantity: qty,
         unit_price: this.draftProductItem.unit_price,
         discount_percentage: 0,
         is_courtesy: false
       });
       this.draftProductItem = { product_id: '', quantity: 1, unit_price: '' };
+    },
+
+    // preenche a comissão de indicação automaticamente com o padrão que o
+    // administrador definiu para o funcionário escolhido (equipe.html); se
+    // esse funcionário não tem um padrão configurado, mantém 10% de base,
+    // igual ao comportamento anterior. O campo continua editável para casos
+    // em que essa venda específica precise de um valor diferente.
+    onReferralUserChange() {
+      const u = this.users.find(uu => uu.id === this.newSale.referred_by_user_id);
+      const hasDefault = u && u.default_referral_commission_percentage !== null && u.default_referral_commission_percentage !== undefined;
+      this.newSale.referral_commission_percentage = hasDefault ? Number(u.default_referral_commission_percentage) : 10;
     },
 
     cartItemTotal(item) {
@@ -810,6 +857,29 @@ function vendasApp() {
         const { data, error } = await supabaseClient.from('sales').select('cancel_reason').eq('id', sale.id).maybeSingle();
         if (!error && data) sale.cancel_reason = data.cancel_reason;
       }
+    },
+
+    get viewingSalePaymentLines() {
+      if (!this.viewingSale) return [];
+      const sale = this.viewingSale;
+      return (sale.payment_lines && sale.payment_lines.length > 0)
+        ? sale.payment_lines
+        : [{ payment_method: sale.payment_method, amount: sale.total_amount, installments: sale.installments, payment_machine_id: sale.payment_machine_id }];
+    },
+
+    referralPatientName(id) {
+      const p = this.patients.find(pp => pp.id === id);
+      return p ? p.full_name : '—';
+    },
+
+    referralStaffName(id) {
+      const u = this.users.find(uu => uu.id === id);
+      return u ? u.full_name : '—';
+    },
+
+    paymentMachineName(id) {
+      const m = this.paymentMachines.find(mm => mm.id === id);
+      return m ? m.name : '';
     },
 
     get viewingSaleItems() {
