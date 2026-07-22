@@ -99,7 +99,7 @@
                   <div class="agenda-col-header" style="cursor:pointer;" :title="professionalFilter === prof.id ? 'Ver todos os profissionais' : 'Ver só a agenda de ' + prof.full_name" @click="setProfessionalFilter(prof.id)" x-text="prof.full_name + (professionalFilter === prof.id ? ' ✕' : '')"></div>
                   <div class="agenda-col-body" style="height:792px;" @contextmenu.prevent="onContextMenu($event, prof.id)">
                     <template x-for="appt in apptsFor(prof.id)" :key="appt.id">
-                      <div class="agenda-event" :class="statusClass(appt.status)" :style="'cursor:pointer; top:' + topFor(appt.scheduled_at) + 'px; height:' + heightFor(appt.duration_minutes) + 'px;'" @click.stop="showApptDetail(appt)">
+                      <div class="agenda-event" :class="statusClass(appt.status)" :style="'cursor:pointer; top:' + topFor(appt.scheduled_at) + 'px; height:' + heightFor(appt.duration_minutes) + 'px;'" @click.stop="showApptDetail(appt)" @contextmenu.prevent.stop="onApptContextMenu($event, appt)">
                         <strong x-text="appt.patients ? displayPatientName(appt.patients.full_name) : 'Paciente'"></strong>
                         <span x-text="(appt.services ? appt.services.name + ' · ' : '') + formatTime(appt.scheduled_at) + ' · ' + statusLabel(appt.status)"></span>
                       </div>
@@ -125,7 +125,7 @@
                 <div class="agenda-week-day-body" @contextmenu.prevent="onContextMenuWeek($event, day)">
                   <div x-show="apptsForDay(day).length === 0 && blocksForDay(day).length === 0" class="text-xs text-soft">Livre</div>
                   <template x-for="appt in apptsForDay(day)" :key="appt.id">
-                    <div class="agenda-week-item" :class="statusClass(appt.status)" style="cursor:pointer;" @click.stop="showApptDetail(appt)">
+                    <div class="agenda-week-item" :class="statusClass(appt.status)" style="cursor:pointer;" @click.stop="showApptDetail(appt)" @contextmenu.prevent.stop="onApptContextMenu($event, appt)">
                       <strong x-text="formatTime(appt.scheduled_at)"></strong>
                       <span x-text="(appt.patients ? displayPatientName(appt.patients.full_name) : 'Paciente') + ' · ' + professionalName(appt.professional_id)"></span>
                     </div>
@@ -167,6 +167,15 @@
         <button type="button" x-show="contextMenu.showViewDay" @click="ctxVerDia()">Ver agenda do dia</button>
         <button type="button" @click="ctxGerenciarBloqueios()">Gerenciar bloqueios</button>
         <button type="button" @click="ctxImprimir()">Imprimir</button>
+      </div>
+
+      <!-- menu de contexto (clique direito num agendamento existente): ações
+           rápidas sem precisar abrir a ficha completa -->
+      <div x-show="apptContextMenu.show" x-cloak @click.away="apptContextMenu.show = false" class="context-menu" :style="'top:' + apptContextMenu.y + 'px; left:' + apptContextMenu.x + 'px;'">
+        <button type="button" x-show="apptContextMenu.appt && apptContextMenu.appt.status === 'agendado'" @click="ctxConfirmAppt()">Confirmar</button>
+        <button type="button" x-show="apptContextMenu.appt && !['concluido', 'cancelado', 'faltou'].includes(apptContextMenu.appt.status)" @click="ctxMarkNoShow()">Marcar falta</button>
+        <button type="button" x-show="apptContextMenu.appt && !['concluido', 'cancelado'].includes(apptContextMenu.appt.status)" @click="ctxReschedule()">Remarcar</button>
+        <button type="button" @click="ctxViewDetails()">Ver detalhes</button>
       </div>
 
       <!-- ficha breve ao clicar num agendamento existente -->
@@ -398,6 +407,7 @@ function agendaApp() {
     lastUsedServiceId: '',
     newBlock: { professional_id: '', date: '', start_time: '09:00', end_time: '10:00', reason: '' },
     contextMenu: { show: false, x: 0, y: 0, professionalId: null, time: '09:00', date: null, showViewDay: false },
+    apptContextMenu: { show: false, x: 0, y: 0, appt: null },
     apptDetail: { show: false, appt: null, mode: 'view', rescheduleDate: '', rescheduleTime: '', cancelReason: '' },
     savingDetail: false,
     feedback: { type: '', message: '' },
@@ -761,6 +771,55 @@ function agendaApp() {
 
     closeApptDetail() {
       this.apptDetail = { show: false, appt: null, mode: 'view', rescheduleDate: '', rescheduleTime: '', cancelReason: '' };
+    },
+
+    // menu de contexto de ações rápidas num agendamento existente (clique
+    // direito): confirmar, marcar falta ou remarcar sem precisar abrir a
+    // ficha completa primeiro.
+    onApptContextMenu(event, appt) {
+      this.contextMenu.show = false;
+      this.apptContextMenu = { show: true, x: event.clientX, y: event.clientY, appt };
+    },
+
+    async ctxConfirmAppt() {
+      const appt = this.apptContextMenu.appt;
+      this.apptContextMenu.show = false;
+      if (!appt) return;
+      const { error } = await supabaseClient.from('appointments').update({ status: 'confirmado' }).eq('id', appt.id);
+      if (error) {
+        this.showFeedback('error', 'Erro ao confirmar: ' + error.message);
+        return;
+      }
+      this.showFeedback('success', 'Agendamento confirmado.');
+      await this.loadAppointments();
+    },
+
+    async ctxMarkNoShow() {
+      const appt = this.apptContextMenu.appt;
+      this.apptContextMenu.show = false;
+      if (!appt) return;
+      const { error } = await supabaseClient.from('appointments').update({ status: 'faltou' }).eq('id', appt.id);
+      if (error) {
+        this.showFeedback('error', 'Erro ao marcar falta: ' + error.message);
+        return;
+      }
+      this.showFeedback('success', 'Falta registrada.');
+      await this.loadAppointments();
+    },
+
+    ctxReschedule() {
+      const appt = this.apptContextMenu.appt;
+      this.apptContextMenu.show = false;
+      if (!appt) return;
+      this.showApptDetail(appt);
+      this.startDetailReschedule();
+    },
+
+    ctxViewDetails() {
+      const appt = this.apptContextMenu.appt;
+      this.apptContextMenu.show = false;
+      if (!appt) return;
+      this.showApptDetail(appt);
     },
 
     startDetailReschedule() {
