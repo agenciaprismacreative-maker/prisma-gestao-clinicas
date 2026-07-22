@@ -102,8 +102,30 @@ async function fillUserInfo() {
     window.__prismaUserRole = profile.role;
     applyRoleVisibility(profile.role);
     await applyClinicSettings(profile.clinic_id, profile.role);
+    await applyPendingSalesIndicator(profile.clinic_id, profile.role);
   } catch (err) {
     console.error('[include.js] fillUserInfo:', err);
+  }
+}
+
+// pontinho amarelo no item "Vendas" do menu lateral quando há venda parada
+// aguardando aprovação — mesmo critério do lembrete "Venda pendente" do sino
+// (topbar.js), só que visível direto no menu, sem precisar abrir o sino.
+// Só para administrador, que é quem aprova a venda.
+async function applyPendingSalesIndicator(clinicId, role) {
+  if (!clinicId || !window.supabaseClient) return;
+  if (!(window.isAdminRole && window.isAdminRole(role))) return;
+  try {
+    const { count, error } = await supabaseClient
+      .from('sales')
+      .select('id', { count: 'exact', head: true })
+      .eq('clinic_id', clinicId)
+      .eq('status', 'pendente');
+    if (error) return;
+    const dot = document.querySelector('[data-slot="vendas-pending-dot"]');
+    if (dot) dot.style.display = (count && count > 0) ? 'block' : 'none';
+  } catch (err) {
+    console.error('[include.js] applyPendingSalesIndicator:', err);
   }
 }
 

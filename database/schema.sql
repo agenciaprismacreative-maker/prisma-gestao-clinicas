@@ -35,6 +35,7 @@ create table public.users (
   specialties text,
   bio text,
   salary numeric(10, 2),
+  default_referral_commission_percentage numeric(5, 2),
   created_at timestamptz not null default now()
 );
 

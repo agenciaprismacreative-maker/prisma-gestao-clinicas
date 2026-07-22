@@ -238,6 +238,11 @@
               <input class="input" type="text" inputmode="decimal" x-model="newMember.salary" @input="newMember.salary = maskCurrencyInput($event.target.value)" placeholder="R$ 0,00">
               <p class="input-hint">Usado para compor a folha de pagamento no dashboard de custos. Visível só para administradores.</p>
             </div>
+            <div class="form-group">
+              <label class="label">Comissão padrão de indicação (%)</label>
+              <input class="input" type="number" min="0" max="100" step="0.1" x-model="newMember.default_referral_commission_percentage" placeholder="Ex.: 10">
+              <p class="input-hint">Preenche automaticamente o campo de comissão em Vendas quando este funcionário é escolhido como quem indicou a venda. Deixe em branco para usar o padrão do sistema (10%).</p>
+            </div>
 
             <hr class="divider">
             <h4 class="text-xs text-muted mb-2" style="text-transform:uppercase;letter-spacing:.04em;">Qualificação profissional (opcional)</h4>
@@ -290,6 +295,11 @@
               <label class="label">Salário (opcional)</label>
               <input class="input" type="text" inputmode="decimal" x-model="editingUser.salary" @input="editingUser.salary = maskCurrencyInput($event.target.value)" placeholder="R$ 0,00">
               <p class="input-hint">Usado para compor a folha de pagamento no dashboard de custos. Visível só para administradores.</p>
+            </div>
+            <div class="form-group">
+              <label class="label">Comissão padrão de indicação (%)</label>
+              <input class="input" type="number" min="0" max="100" step="0.1" x-model="editingUser.default_referral_commission_percentage" placeholder="Ex.: 10">
+              <p class="input-hint">Preenche automaticamente o campo de comissão em Vendas quando este funcionário é escolhido como quem indicou a venda. Deixe em branco para usar o padrão do sistema (10%).</p>
             </div>
 
             <hr class="divider">
@@ -347,7 +357,7 @@ function equipeApp() {
     newTask: { title: '', description: '', assigned_to: '', due_date: '', patient_id: '' },
     taskPatientSearch: '',
     taskPatientDropdownOpen: false,
-    newMember: { full_name: '', email: '', password: '', job_function: 'esteticista', grant_admin: false, professional_register: '', specialties: '', bio: '', salary: '' },
+    newMember: { full_name: '', email: '', password: '', job_function: 'esteticista', grant_admin: false, professional_register: '', specialties: '', bio: '', salary: '', default_referral_commission_percentage: '' },
     feedback: { type: '', message: '' },
     currentUserId: null,
 
@@ -374,12 +384,12 @@ function equipeApp() {
       // consulta falhar por causa disso, cai para os campos antigos, pra
       // não deixar a lista inteira de integrantes vazia por causa de 2
       // colunas novas.
-      const full = await supabaseClient.from('users').select('id, full_name, email, role, job_function, is_active, professional_register, specialties, bio, salary').order('full_name');
+      const full = await supabaseClient.from('users').select('id, full_name, email, role, job_function, is_active, professional_register, specialties, bio, salary, default_referral_commission_percentage').order('full_name');
       if (!full.error) {
         this.users = full.data || [];
         return;
       }
-      const fallback = await supabaseClient.from('users').select('id, full_name, email, role, professional_register, specialties, bio, salary').order('full_name');
+      const fallback = await supabaseClient.from('users').select('id, full_name, email, role, professional_register, specialties, bio, salary, default_referral_commission_percentage').order('full_name');
       this.users = fallback.error ? [] : (fallback.data || []);
     },
 
@@ -527,7 +537,8 @@ function equipeApp() {
         professional_register: this.newMember.professional_register || null,
         specialties: this.newMember.specialties || null,
         bio: this.newMember.bio || null,
-        salary: this.newMember.salary ? parseCurrencyToNumber(this.newMember.salary) : null
+        salary: this.newMember.salary ? parseCurrencyToNumber(this.newMember.salary) : null,
+        default_referral_commission_percentage: (this.newMember.default_referral_commission_percentage !== '' && this.newMember.default_referral_commission_percentage !== null && this.newMember.default_referral_commission_percentage !== undefined) ? Number(this.newMember.default_referral_commission_percentage) : null
       };
       // job_function só existe depois da migration 018: tenta com o campo
       // e, se a coluna ainda não existir nesse banco, tenta de novo sem
@@ -555,7 +566,8 @@ function equipeApp() {
         professional_register: u.professional_register || '',
         specialties: u.specialties || '',
         bio: u.bio || '',
-        salary: (u.salary !== null && u.salary !== undefined) ? numberToCurrencyInput(u.salary) : ''
+        salary: (u.salary !== null && u.salary !== undefined) ? numberToCurrencyInput(u.salary) : '',
+        default_referral_commission_percentage: (u.default_referral_commission_percentage !== null && u.default_referral_commission_percentage !== undefined) ? u.default_referral_commission_percentage : ''
       };
       this.showEditUserForm = true;
     },
@@ -569,7 +581,8 @@ function equipeApp() {
         professional_register: this.editingUser.professional_register || null,
         specialties: this.editingUser.specialties || null,
         bio: this.editingUser.bio || null,
-        salary: this.editingUser.salary ? parseCurrencyToNumber(this.editingUser.salary) : null
+        salary: this.editingUser.salary ? parseCurrencyToNumber(this.editingUser.salary) : null,
+        default_referral_commission_percentage: (this.editingUser.default_referral_commission_percentage !== '' && this.editingUser.default_referral_commission_percentage !== null && this.editingUser.default_referral_commission_percentage !== undefined) ? Number(this.editingUser.default_referral_commission_percentage) : null
       };
       let { error } = await supabaseClient
         .from('users')
