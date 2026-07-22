@@ -135,7 +135,7 @@
                 <select class="input" x-model="row.product_id" style="flex:1;">
                   <option value="">Selecione o insumo</option>
                   <template x-for="p in products" :key="p.id">
-                    <option :value="p.id" x-text="p.name + (p.unit_cost !== null ? ' (' + formatCurrency(p.unit_cost) + (p.unit_of_measure ? '/' + p.unit_of_measure : '') + ')' : '')"></option>
+                    <option :value="p.id" :style="'color:' + stockStatusColor(stockStatus(p))" x-text="p.name + (p.unit_cost !== null ? ' (' + formatCurrency(p.unit_cost) + (p.unit_of_measure ? '/' + p.unit_of_measure : '') + ')' : '') + stockStatusLabel(p)"></option>
                   </template>
                 </select>
                 <input class="input" type="number" min="0" step="0.001" x-model="row.quantity_used" placeholder="Qtd." style="width:90px;">
@@ -199,6 +199,7 @@
 
 <script src="js/currency-mask.js"></script>
 <script src="js/confirm-dialog.js"></script>
+<script src="js/stock-status.js"></script>
 <script>
 function servicosApp() {
   return {
@@ -248,7 +249,7 @@ function servicosApp() {
     },
 
     async loadProducts() {
-      const { data, error } = await supabaseClient.from('products').select('id, name, unit_cost, unit_of_measure, barcode').eq('product_type', 'insumo').order('name');
+      const { data, error } = await supabaseClient.from('products').select('id, name, unit_cost, unit_of_measure, barcode, stock_quantity, min_stock_quantity').eq('product_type', 'insumo').order('name');
       this.products = error ? [] : (data || []);
     },
 

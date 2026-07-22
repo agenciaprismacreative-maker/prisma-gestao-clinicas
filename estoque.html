@@ -205,6 +205,19 @@
 
         <!-- ===================== MOVIMENTAÇÕES ===================== -->
         <div x-show="tab==='movimentacoes'" x-cloak>
+          <div class="card card-shadow mb-5" style="padding:20px;" x-show="topSellingProducts.length > 0">
+            <h3 class="mb-3">Produtos mais vendidos</h3>
+            <template x-for="(p, idx) in topSellingProducts" :key="p.product_id">
+              <div class="flex items-center justify-between" style="padding:8px 0;border-bottom:1px solid var(--color-border);">
+                <div class="flex items-center gap-2">
+                  <span class="badge badge-neutral" x-text="'#' + (idx + 1)"></span>
+                  <strong x-text="p.name"></strong>
+                </div>
+                <span class="text-sm text-muted" x-text="p.quantity + (p.unit ? (' ' + p.unit) : ' un.') + ' vendido(s)'"></span>
+              </div>
+            </template>
+          </div>
+
           <div class="card card-shadow" style="padding:0;">
             <div x-show="movements.length === 0" class="empty-note" style="margin:20px;">
               Nenhuma movimentação registrada ainda.
@@ -361,7 +374,7 @@
               <select class="input" x-model="movementForm.product_id" required>
                 <option value="">Selecione o item</option>
                 <template x-for="p in products" :key="p.id">
-                  <option :value="p.id" x-text="p.name + (p.product_type === 'revenda' ? ' (produto)' : ' (insumo)')"></option>
+                  <option :value="p.id" :style="'color:' + stockStatusColor(stockStatus(p))" x-text="p.name + (p.product_type === 'revenda' ? ' (produto)' : ' (insumo)') + stockStatusLabel(p)"></option>
                 </template>
               </select>
             </div>
@@ -393,6 +406,7 @@
 
 <script src="js/currency-mask.js"></script>
 <script src="js/confirm-dialog.js"></script>
+<script src="js/stock-status.js"></script>
 <script>
 function estoqueApp() {
   return {
@@ -450,9 +464,31 @@ function estoqueApp() {
     async loadMovements() {
       const { data, error } = await supabaseClient
         .from('stock_movements')
-        .select('id, movement_type, quantity, unit_cost, reason, created_at, product_id, products ( name, unit_of_measure ), users ( full_name )')
+        .select('id, movement_type, quantity, unit_cost, reason, created_at, product_id, sale_id, products ( name, unit_of_measure ), users ( full_name )')
         .order('created_at', { ascending: false });
       this.movements = error ? [] : (data || []);
+    },
+
+    // ranking de produtos mais vendidos: soma a quantidade de saídas gerada
+    // por venda (sale_id preenchido, sempre que approveSale() em vendas.html
+    // dá baixa no estoque de um produto de revenda), agrupado por produto.
+    // Saídas manuais (perda, ajuste, uso interno) não entram na contagem,
+    // porque não representam venda.
+    get topSellingProducts() {
+      const totals = {};
+      this.movements.forEach(m => {
+        if (m.movement_type !== 'saida' || !m.sale_id) return;
+        if (!totals[m.product_id]) {
+          totals[m.product_id] = {
+            product_id: m.product_id,
+            name: m.products ? m.products.name : 'Produto removido',
+            unit: (m.products && m.products.unit_of_measure) || '',
+            quantity: 0
+          };
+        }
+        totals[m.product_id].quantity += Number(m.quantity || 0);
+      });
+      return Object.values(totals).sort((a, b) => b.quantity - a.quantity).slice(0, 10);
     },
 
     async loadServices() {
