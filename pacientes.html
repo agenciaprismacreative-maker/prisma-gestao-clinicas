@@ -278,7 +278,7 @@
               <div x-show="historyLoading" class="text-sm text-muted">Carregando histórico…</div>
               <div x-show="!historyLoading && history.length === 0" class="text-sm text-muted">Nenhum atendimento registrado ainda.</div>
               <template x-for="(h, i) in history" :key="i">
-                <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center justify-between mb-3" style="cursor:pointer;" @click="openHistoryDetail(h)" title="Clique para ver os detalhes desse atendimento">
                   <div>
                     <strong class="text-sm" x-text="h.protocol || 'Atendimento'"></strong>
                     <div class="text-xs text-muted" x-text="formatDate(h.created_at)"></div>
@@ -307,6 +307,37 @@
             <button class="btn btn-ghost btn-sm" type="button" @click="closePhotoLightbox()" style="color:#fff;">Fechar</button>
           </div>
           <img :src="photoLightbox.photo && photoLightbox.photo.url" style="max-width:100%;max-height:78vh;border-radius:var(--radius-md);display:block;">
+        </div>
+      </div>
+
+      <!-- detalhe de um item do histórico de atendimentos -->
+      <div x-show="historyDetail.show" x-cloak class="modal-overlay" @click.self="closeHistoryDetail()">
+        <div class="card card-shadow" style="margin:auto;width:100%;max-width:480px;max-height:88vh;overflow-y:auto;">
+          <div class="card-header">
+            <h3 x-text="historyDetail.item ? (historyDetail.item.protocol || 'Atendimento') : ''"></h3>
+            <button class="btn btn-ghost btn-sm" type="button" @click="closeHistoryDetail()">Fechar</button>
+          </div>
+          <template x-if="historyDetail.item">
+            <div style="display:flex;flex-direction:column;gap:14px;font-size:13.5px;">
+              <div class="flex gap-2" style="flex-wrap:wrap;">
+                <span class="badge badge-neutral" x-text="formatDate(historyDetail.item.created_at)"></span>
+                <span class="badge badge-neutral" x-text="(historyDetail.item.users && historyDetail.item.users.full_name) || 'Profissional não informado'"></span>
+                <span class="badge badge-neutral" x-show="historyItemServiceName(historyDetail.item)" x-text="historyItemServiceName(historyDetail.item)"></span>
+              </div>
+              <div>
+                <span class="text-xs text-muted">Evolução registrada</span>
+                <p class="text-sm mt-1" style="white-space:pre-wrap;" x-text="historyDetail.item.notes || 'Nenhuma anotação registrada nesse atendimento.'"></p>
+              </div>
+              <div x-show="historyItemPhotos(historyDetail.item).length > 0">
+                <span class="text-xs text-muted">Fotos desse atendimento</span>
+                <div class="grid grid-3 gap-2 mt-2">
+                  <template x-for="photo in historyItemPhotos(historyDetail.item)" :key="photo.id">
+                    <img :src="photo.url" style="width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:var(--radius-md);border:1px solid var(--color-border);cursor:pointer;" @click="openPhotoLightbox(photo)">
+                  </template>
+                </div>
+              </div>
+            </div>
+          </template>
         </div>
       </div>
 
@@ -735,6 +766,7 @@ function pacientesApp() {
     patientPhotos: [],
     photosLoading: false,
     photoLightbox: { show: false, photo: null },
+    historyDetail: { show: false, item: null },
     referredFriends: [],
     feedback: { type: '', message: '' },
     cepLoading: false,
@@ -1098,7 +1130,7 @@ function pacientesApp() {
       this.history = [];
       const historyPromise = supabaseClient
         .from('medical_records')
-        .select('protocol, notes, created_at, users ( full_name )')
+        .select('id, protocol, notes, created_at, appointment_id, users ( full_name ), appointments ( status, services ( name ) )')
         .eq('patient_id', p.id)
         .order('created_at', { ascending: false });
 
@@ -1151,6 +1183,23 @@ function pacientesApp() {
 
     closePhotoLightbox() {
       this.photoLightbox = { show: false, photo: null };
+    },
+
+    openHistoryDetail(h) {
+      this.historyDetail = { show: true, item: h };
+    },
+
+    closeHistoryDetail() {
+      this.historyDetail = { show: false, item: null };
+    },
+
+    historyItemServiceName(h) {
+      return (h && h.appointments && h.appointments.services && h.appointments.services.name) || '';
+    },
+
+    historyItemPhotos(h) {
+      if (!h || !h.appointment_id) return [];
+      return this.patientPhotos.filter(p => p.appointment_id === h.appointment_id);
     },
 
     photoLightboxProcedureName(photo) {
