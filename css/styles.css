@@ -546,11 +546,12 @@ textarea.input { resize: vertical; min-height: 80px; }
 .procedure-rank-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--color-border); font-size: 13px; }
 .procedure-rank-row:last-child { border-bottom: none; }
 
-/* ---------- seção de metas: rótulo, barra de progresso e faixas ---------- */
-.section-eyebrow { display: flex; align-items: center; gap: 8px; margin: var(--space-2) 0 var(--space-3); }
-.section-eyebrow .bar { width: 4px; height: 18px; border-radius: 2px; background: var(--color-primary); flex-shrink: 0; }
-.section-eyebrow h3 { font-size: 16px; margin: 0; }
-.section-eyebrow .badge { margin-left: 2px; }
+/* ---------- seção de metas: agrupamento por trilha, progresso e faixas ---------- */
+.goal-section { background: var(--color-surface-alt); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: 20px; margin-bottom: var(--space-5); }
+.goal-section-head { display: flex; align-items: center; gap: 10px; margin-bottom: var(--space-4); flex-wrap: wrap; }
+.goal-section-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--color-primary); flex-shrink: 0; }
+.goal-section.is-collective .goal-section-dot { background: var(--color-accent); }
+.goal-section-head h3 { font-size: 17px; margin: 0; }
 
 .goal-meter-stats { display: flex; gap: 18px; flex-wrap: wrap; margin-bottom: 14px; }
 .goal-meter-stat { flex: 1; min-width: 130px; }

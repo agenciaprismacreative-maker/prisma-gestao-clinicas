@@ -386,28 +386,32 @@
 
         <!-- ===================== METAS DA EQUIPE ===================== -->
         <div x-show="tab==='metas'" x-cloak>
-          <p class="text-sm text-muted mb-4">Duas trilhas de meta totalmente independentes — <strong>individual</strong> (uma meta por profissional) e <strong>coletiva</strong> (uma meta só para a unidade) —, nunca somadas nem misturadas entre si. Cada uma tem seu próprio valor-alvo e sua própria régua de comissão por atingimento.</p>
+          <p class="text-sm text-muted mb-4">Duas trilhas de meta totalmente independentes: <strong>individual</strong> (uma meta por profissional) e <strong>coletiva</strong> (uma meta só para a unidade). Elas nunca se somam nem se misturam, cada uma tem seu próprio valor-alvo e sua própria régua de comissão.</p>
 
           <div class="card card-shadow mb-5">
             <h3 class="mb-2" style="font-size:15px;">Trilhas de meta</h3>
-            <p class="text-xs text-soft mb-3">Ligue uma, a outra, ou as duas ao mesmo tempo. Desligar uma trilha só esconde os cards dela (aqui e na visão da equipe) — nenhum valor é apagado, e tudo volta a aparecer se você ligar de novo.</p>
+            <p class="text-xs text-soft mb-3">Ligue uma, a outra, ou as duas ao mesmo tempo. Desligar uma trilha só esconde os cards dela, aqui e na visão da equipe: nenhum valor é apagado, e tudo volta a aparecer se você ligar de novo.</p>
             <div class="flex" style="flex-direction:column;gap:10px;">
               <label class="text-sm flex items-center gap-2">
                 <input type="checkbox" x-model="goalScopeSettings.enable_individual_goal" style="width:auto;" @change="saveGoalScopeSettings()">
-                Meta individual — cada profissional com meta e comissão próprias
+                Meta individual: cada profissional com meta e comissão próprias
               </label>
               <label class="text-sm flex items-center gap-2">
                 <input type="checkbox" x-model="goalScopeSettings.enable_collective_goal" style="width:auto;" @change="saveGoalScopeSettings()">
-                Meta coletiva — um único alvo de faturamento para a unidade inteira
+                Meta coletiva: um único alvo de faturamento para a unidade inteira
               </label>
             </div>
           </div>
 
           <template x-if="goalScopeSettings.enable_individual_goal">
-          <div>
-            <div class="section-eyebrow mt-2"><span class="bar"></span><h3>Meta individual</h3></div>
+          <div class="goal-section">
+            <div class="goal-section-head">
+              <span class="goal-section-dot"></span>
+              <h3>Meta individual</h3>
+              <span class="text-xs text-muted">cada profissional com meta e comissão próprias</span>
+            </div>
 
-            <div class="card card-shadow mb-5">
+            <div class="card card-shadow mb-4">
               <h3 class="mb-1" style="font-size:15px;">Progresso da equipe em <span x-text="currentMonthLabel"></span></h3>
               <p class="text-xs text-soft mb-3">Soma da meta de cada integrante contra o que a equipe já faturou no mês (pagamentos e vendas de pacote lançados no nome de cada pessoa, ao aprovar uma venda em Vendas ou concluir um atendimento).</p>
               <div class="goal-meter-stats">
@@ -431,12 +435,12 @@
                   <div class="goal-track-goal-line" :style="'left:' + individualGoalMeter.goalLinePct + '%'"></div>
                 </div>
               </div>
-              <p class="text-xs text-muted" x-show="individualGoalMeter.target <= 0">Ainda sem meta definida para nenhum integrante — defina abaixo para começar a acompanhar o progresso aqui.</p>
+              <p class="text-xs text-muted" x-show="individualGoalMeter.target <= 0">Ainda sem meta definida para nenhum integrante. Defina abaixo para começar a acompanhar o progresso aqui.</p>
             </div>
 
-            <div class="card card-shadow mb-5">
+            <div class="card card-shadow mb-4">
               <h3 class="mb-2" style="font-size:15px;">Definir a meta de cada integrante</h3>
-              <p class="text-xs text-soft mb-3">Informe o faturamento total esperado da equipe (ex.: R$ 120.000) para dividir igualmente entre todos, ou preencha direto o valor de cada pessoa na tabela mais abaixo. Depois de dividir, ajuste manualmente quem precisar de uma meta diferente — por exemplo, alguém com desempenho historicamente maior — e clique em salvar.</p>
+              <p class="text-xs text-soft mb-3">Informe o faturamento total esperado da equipe (ex.: R$ 120.000) para dividir igualmente entre todos, ou preencha direto o valor de cada pessoa na tabela mais abaixo. Depois de dividir, ajuste manualmente quem precisar de uma meta diferente (por exemplo, alguém com desempenho historicamente maior) e clique em salvar.</p>
               <div class="flex items-end gap-2" style="flex-wrap:wrap;">
                 <div class="form-group" style="margin:0;">
                   <label class="label">Meta geral do mês (R$)</label>
@@ -448,17 +452,18 @@
               <p class="text-xs text-muted mt-2" x-show="users.length > 0">Soma das metas preenchidas nos campos agora (antes de salvar): <strong x-text="formatCurrency(sumOfIndividualGoals)"></strong> (<span x-text="users.length"></span> integrante(s))</p>
             </div>
 
-            <div class="card card-shadow mb-5">
+            <div class="card card-shadow mb-4">
               <h3 class="mb-1" style="font-size:15px;">Régua de comissão</h3>
-              <p class="text-xs text-soft mb-3">A partir de tal % da própria meta batida, a pessoa passa a receber tal % de comissão sobre o que ela mesma faturou no mês — vale sempre a faixa mais alta que ela já alcançou. A faixa destacada abaixo é a que estaria valendo agora para o total da equipe.</p>
+              <p class="text-xs text-soft mb-2">Cada pessoa é avaliada pela própria meta, não pela da equipe. Exemplo: se a meta de Maria é R$ 15.000,00 e a primeira faixa começa em 100%, assim que ela faturar R$ 15.000,00 no mês, toda a comissão dela passa a valer o percentual dessa faixa sobre tudo o que ela vendeu. Se ela avançar para a faixa seguinte, o percentual sobe para o novo valor. Antes de bater a primeira faixa, ainda não há comissão.</p>
+              <p class="text-xs text-muted mb-3">O número ao lado de cada faixa mostra quantos integrantes da equipe estão nela agora.</p>
 
-              <div x-show="commissionTiers.length === 0" class="text-sm text-muted mb-3">Nenhuma faixa cadastrada ainda — sem faixas, a comissão sugerida fica vazia para todo mundo.</div>
+              <div x-show="commissionTiers.length === 0" class="text-sm text-muted mb-3">Nenhuma faixa cadastrada ainda. Sem faixas, a comissão sugerida fica vazia para todo mundo.</div>
               <div class="flex" style="flex-direction:column;gap:8px;margin-bottom:14px;" x-show="commissionTiers.length > 0">
                 <template x-for="(tier, idx) in commissionTiers" :key="tier.id">
-                  <div class="tier-row" :class="tier.id === activeTierId(commissionTiers, individualGoalMeter.pct) ? 'is-active' : ''">
+                  <div class="tier-row" :class="countUsersInTier(tier.id) > 0 ? 'is-active' : ''">
                     <span class="tier-step" x-text="idx + 1"></span>
                     <span class="tier-row-text">A partir de <strong x-text="tier.min_achievement_pct + '%'"></strong> da meta → <strong x-text="tier.commission_percentage + '%'"></strong> de comissão</span>
-                    <span class="tier-row-active-tag" x-show="tier.id === activeTierId(commissionTiers, individualGoalMeter.pct)">valendo agora</span>
+                    <span class="tier-row-active-tag" x-show="countUsersInTier(tier.id) > 0" x-text="countUsersInTier(tier.id) + (countUsersInTier(tier.id) === 1 ? ' pessoa aqui' : ' pessoas aqui')"></span>
                     <a href="#" class="text-xs" @click.prevent="removeCommissionTier(tier)">remover</a>
                   </div>
                 </template>
@@ -477,7 +482,7 @@
               </div>
             </div>
 
-            <div class="card card-shadow mb-5" x-show="leaderboard.length > 0">
+            <div class="card card-shadow mb-4" x-show="leaderboard.length > 0">
               <h3 class="mb-2" style="font-size:15px;">🏆 Ranking do mês · quem está liderando</h3>
               <p class="text-xs text-soft mb-3">Ordenado pelo valor realizado em <span x-text="currentMonthLabel"></span>. Serve como referência de competitividade, não substitui a avaliação de qualidade do atendimento.</p>
 
@@ -509,7 +514,7 @@
               </div>
             </div>
 
-            <div class="card card-shadow mb-5" style="padding:0;">
+            <div class="card card-shadow" style="padding:0;">
               <div style="padding:20px 20px 0;"><h3 style="font-size:15px;">Metas e realizado por integrante</h3></div>
               <div class="table-wrap">
                 <table class="table">
@@ -546,12 +551,16 @@
           </template>
 
           <template x-if="goalScopeSettings.enable_collective_goal">
-          <div>
-            <div class="section-eyebrow mt-2"><span class="bar"></span><h3>Meta coletiva</h3></div>
+          <div class="goal-section is-collective">
+            <div class="goal-section-head">
+              <span class="goal-section-dot"></span>
+              <h3>Meta coletiva</h3>
+              <span class="text-xs text-muted">um único alvo de faturamento para a unidade inteira</span>
+            </div>
 
-            <div class="card card-shadow mb-5">
+            <div class="card card-shadow mb-4">
               <h3 class="mb-1" style="font-size:15px;">Progresso da unidade em <span x-text="currentMonthLabel"></span></h3>
-              <p class="text-xs text-soft mb-3">Um único alvo para a clínica inteira, contra o faturamento de toda a equipe somado — não importa quem atendeu ou vendeu.</p>
+              <p class="text-xs text-soft mb-3">Um único alvo para a clínica inteira, contra o faturamento de toda a equipe somado. Não importa quem atendeu ou vendeu.</p>
               <div class="goal-meter-stats">
                 <div class="goal-meter-stat">
                   <div class="label">Meta coletiva do mês</div>
@@ -575,12 +584,12 @@
               </div>
               <p class="text-xs text-muted mb-2" x-show="collectiveGoalMeter.target > 0" x-text="suggestedCollectiveCommission !== null ? ('Comissão coletiva sugerida agora: ' + formatCurrency(suggestedCollectiveCommission)) : 'Ainda fora de qualquer faixa de comissão coletiva.'"></p>
               <button class="btn btn-primary btn-sm" type="button" x-show="suggestedCollectiveCommission > 0" @click="launchCollectiveCommission()" :disabled="savingCollectiveGoal">Lançar comissão coletiva</button>
-              <p class="text-xs text-muted" x-show="collectiveGoalMeter.target <= 0">Ainda sem meta coletiva definida — defina abaixo para começar a acompanhar o progresso aqui.</p>
+              <p class="text-xs text-muted" x-show="collectiveGoalMeter.target <= 0">Ainda sem meta coletiva definida. Defina abaixo para começar a acompanhar o progresso aqui.</p>
             </div>
 
-            <div class="card card-shadow mb-5">
+            <div class="card card-shadow mb-4">
               <h3 class="mb-2" style="font-size:15px;">Definir a meta coletiva</h3>
-              <p class="text-xs text-soft mb-3">Diferente da individual, aqui é um valor só para a clínica inteira no mês — não é dividido entre ninguém.</p>
+              <p class="text-xs text-soft mb-3">Diferente da individual, aqui é um valor só para a clínica inteira no mês. Não é dividido entre ninguém.</p>
               <div class="flex items-end gap-2" style="flex-wrap:wrap;">
                 <div class="form-group" style="margin:0;">
                   <label class="label">Meta coletiva do mês (R$)</label>
@@ -590,9 +599,9 @@
               </div>
             </div>
 
-            <div class="card card-shadow mb-5">
+            <div class="card card-shadow">
               <h3 class="mb-1" style="font-size:15px;">Régua de comissão coletiva</h3>
-              <p class="text-xs text-soft mb-3">A partir de tal % da meta coletiva batida, a unidade passa a gerar tal % de comissão sobre o faturamento total da equipe no mês. Independente da régua individual — nunca somadas.</p>
+              <p class="text-xs text-soft mb-3">Aqui o número é um só: o faturamento de toda a equipe somado. Assim que esse total bate uma faixa da meta coletiva, o percentual dela passa a valer sobre o faturamento inteiro do mês, e não sobre a venda de uma pessoa. Essa régua nunca se soma com a individual, elas funcionam em paralelo. A faixa destacada abaixo é a que está valendo agora.</p>
 
               <div x-show="collectiveCommissionTiers.length === 0" class="text-sm text-muted mb-3">Nenhuma faixa cadastrada ainda para a meta coletiva.</div>
               <div class="flex" style="flex-direction:column;gap:8px;margin-bottom:14px;" x-show="collectiveCommissionTiers.length > 0">
@@ -1191,6 +1200,15 @@ function biApp() {
         .filter(t => pct >= Number(t.min_achievement_pct))
         .sort((a, b) => Number(b.min_achievement_pct) - Number(a.min_achievement_pct));
       return applicable.length > 0 ? applicable[0].id : null;
+    },
+
+    // quantos integrantes têm essa faixa (individual) como a sua própria
+    // faixa ativa agora, cada um avaliado pela própria meta. Usado na régua
+    // de comissão individual em vez de destacar uma única faixa "ativa"
+    // pela média da equipe, o que não corresponde a como a comissão de cada
+    // pessoa é calculada de fato.
+    countUsersInTier(tierId) {
+      return (this.users || []).filter(u => this.activeTierId(this.commissionTiers, this.goalPctFor(u.id)) === tierId).length;
     },
 
     suggestedCommissionFor(userId) {
