@@ -96,7 +96,16 @@ function topbarApp() {
           .eq('clinic_id', this.clinicId)
           .eq('status', 'agendado')
           .gte('scheduled_at', now.toISOString())
-          .lte('scheduled_at', in48h.toISOString())
+          .lte('scheduled_at', in48h.toISOString()),
+        // anotações do dashboard direcionadas a mim: além de aparecerem lá,
+        // também viram lembrete no sino, pra não depender de a pessoa abrir
+        // o dashboard pra saber que recebeu um recado.
+        this.currentUserId
+          ? supabaseClient
+              .from('dashboard_notes')
+              .select('id, content, created_at')
+              .eq('target_user_id', this.currentUserId)
+          : Promise.resolve({ data: [] })
       ];
 
       // Fontes extras, só para administrador: estoque baixo/vencendo e
@@ -118,8 +127,18 @@ function topbarApp() {
         );
       }
 
-      const [tasksRes, apptRes, productsRes, salesRes] = await Promise.all(queries);
+      const [tasksRes, apptRes, notesRes, productsRes, salesRes] = await Promise.all(queries);
       const items = [];
+
+      (notesRes.data || []).forEach((n) => {
+        const preview = n.content.length > 60 ? n.content.slice(0, 60) + '…' : n.content;
+        items.push({
+          label: 'Anotação para você: ' + preview,
+          sublabel: 'Recebida em ' + new Date(n.created_at).toLocaleDateString('pt-BR'),
+          severity: 'warning',
+          href: 'dashboard.html'
+        });
+      });
 
       // Tarefas: só entram no sino as atrasadas ou que vencem nos próximos
       // 3 dias. Mostrar toda tarefa aberta (sem olhar prazo) é o que deixava

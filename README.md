@@ -25,7 +25,7 @@ O arquivo `database/schema.sql` é sempre a fonte da verdade do estado final esp
 Para reduzir o número de arquivos para rodar, tudo o que está pendente foi agrupado em só 2 arquivos, nesta ordem:
 
 1. **`database/migrations/011_a_014_consolidado.sql`**
-2. **`database/migrations/015_a_018_consolidado.sql`**
+2. **`database/migrations/015_a_019_consolidado.sql`** (o arquivo `015_a_018_consolidado.sql` antigo ainda existe na pasta, mas está substituído por este — use o `015_a_019`)
 
 Basta abrir o SQL Editor do Supabase, colar o conteúdo inteiro do arquivo 1, rodar, depois colar o conteúdo inteiro do arquivo 2 e rodar. Os erros abaixo (todos já reportados em algum momento) são exatamente a mesma causa — essas duas migrations ainda não rodaram nesse banco — e todos somem ao rodar os 2 arquivos acima:
 
@@ -57,7 +57,7 @@ index.html            tela de login (autenticação real via Supabase Auth)
 dashboard.html         painel com indicadores reais da clínica, menu rápido, anotações e aniversariantes (administrador)
 pacientes.html          ficha completa de pacientes: documentos, contato, endereço, origem do lead (inclusive indicação por integrante da equipe), anamnese, pacotes contratados e retorno financeiro (administrador, atendente)
 agenda.html            agenda com visão dia / semana / mês, menu de clique direito, bloqueio de horário, vínculo a pacote e ficha rápida do agendamento
-atendimento.html        fila de atendimento (por profissional), prontuário, fotos de evolução, remanejamento de horário e tarefa automática de retorno
+atendimento.html        fila de atendimento (por profissional), prontuário, fotos de evolução, remanejamento de horário e de profissional (com motivo quando troca quem atende) e tarefa automática de retorno
 equipe.html            equipe da clínica, qualificação profissional e quadro de tarefas com detalhe por clique (administrador)
 vendas.html            venda de planos: carrinho com múltiplos serviços, desconto e cortesia por item, fluxo pendente → aprovada/cancelada com motivo (administrador, atendente, esteticista)
 financeiro.html         transações, comissão com percentual, pacotes (com margem sobre insumos), maquininhas e parcelamento (administrador)
@@ -89,7 +89,7 @@ A ficha do paciente também mostra os pacotes contratados (sem repetição de se
 
 Agenda com visão diária (colunas por profissional), semanal e mensal, navegação entre períodos, filtro por profissional (clicando no nome da coluna na visão diária ou pelo seletor no topo, válido nas três visões), busca de paciente digitando o nome, vínculo direto a um pacote em aberto do paciente (sem repetir a mesma informação em dois lugares), aviso ao vivo no próprio formulário quando o profissional escolhido já tem atendimento marcado no mesmo horário, menu de clique direito sobre um horário livre ou sobre um dia inteiro (incluir agendamento, bloquear horário, gerenciar bloqueios, ver agenda do dia, imprimir), ficha rápida ao clicar num agendamento existente com opção de reagendar ou cancelar com motivo, e bloqueio de horário (feriado, folga, manutenção). Esteticista vê só a própria agenda. Bloqueio de duplo agendamento do mesmo profissional no mesmo horário e formato de exibição do nome do paciente (completo, primeiro nome ou nome e sobrenome) são configuráveis na tela de Configurações.
 
-Atendimento e prontuário, com fila do dia (filtrada por profissional para a visão Esteticista), registro de evolução por sessão, upload de fotos para o Supabase Storage com nome de arquivo sanitizado, opção de remover foto antes de concluir, remanejamento de horário direto da fila, vínculo (ou correção do vínculo) a um pacote de sessões no momento da conclusão, consumo automático de sessão de pacote e de insumos do estoque ao concluir um atendimento, e criação automática de uma tarefa de retorno quando o serviço atendido tem intervalo de retorno definido.
+Atendimento e prontuário, com fila do dia (filtrada por profissional para a visão Esteticista), registro de evolução por sessão, upload de fotos para o Supabase Storage com nome de arquivo sanitizado, opção de remover foto antes de concluir, remanejamento de horário e/ou profissional direto da fila (exige motivo quando troca quem vai atender), vínculo (ou correção do vínculo) a um pacote de sessões no momento da conclusão, consumo automático de sessão de pacote e de insumos do estoque ao concluir um atendimento, e criação automática de uma tarefa de retorno quando o serviço atendido tem intervalo de retorno definido.
 
 Equipe com cadastro de novos integrantes direto na plataforma (nome, e-mail e senha geram a conta e o acesso na hora), função (Esteticista/Atendente) separada do acesso de administrador — que agora é concedido por uma caixinha própria, "Conceder acesso de administrador", em vez de virar um papel à parte — remoção/reativação de acesso sem apagar o histórico da pessoa (vendas, comissões e atendimentos continuam intactos), salário e qualificação profissional (registro profissional, especialidades, biografia), busca de paciente digitando o nome ao criar uma tarefa vinculada, e um quadro de tarefas em três colunas com detalhe completo ao clicar em qualquer card.
 

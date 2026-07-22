@@ -147,6 +147,7 @@ create table public.appointments (
     status in ('agendado', 'confirmado', 'em_atendimento', 'concluido', 'faltou', 'cancelado')
   ),
   cancel_reason text,
+  reassign_reason text,
   room_or_equipment text,
   rescheduled_count integer not null default 0,
   created_at timestamptz not null default now(),

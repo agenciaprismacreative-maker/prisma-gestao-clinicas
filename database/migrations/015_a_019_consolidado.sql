@@ -1,16 +1,11 @@
 -- ============================================================================
--- SUBSTITUÍDO por database/migrations/015_a_019_consolidado.sql (inclui tudo
--- daqui + a migration 019). Use o arquivo 015_a_019_consolidado.sql em vez
--- deste — mantido aqui só porque não é possível apagar arquivos neste
--- ambiente. Rodar este aqui também não tem problema (é idempotente), mas é
--- desnecessário se você já rodou o 015_a_019.
--- ============================================================================
--- Consolidado 015 a 018: lote de melhorias — marca/descrição em produtos,
+-- Consolidado 015 a 019: lote de melhorias — marca/descrição em produtos,
 -- dados fiscais da clínica, módulo de custos e folha (despesas + salário),
 -- faixas de comissão por atingimento de meta, motivo de cancelamento de
--- venda, e função/status (ativo-inativo) do integrante da equipe.
+-- venda, função/status (ativo-inativo) do integrante da equipe, e motivo da
+-- troca de profissional num remanejamento.
 --
--- Junta as migrations 015, 016, 017 e 018 num arquivo só, pra facilitar
+-- Junta as migrations 015, 016, 017, 018 e 019 num arquivo só, pra facilitar
 -- rodar tudo de uma vez. Todas são idempotentes (seguro rodar mais de uma
 -- vez, mesmo que alguma parte já tenha sido aplicada antes).
 -- ============================================================================
@@ -148,3 +143,15 @@ alter table public.users add column if not exists is_active boolean not null def
 update public.users
 set job_function = role
 where job_function is null and role in ('atendente', 'esteticista');
+
+-- ---------- 019: motivo da troca de profissional num remanejamento ----------
+
+-- ============================================================================
+-- Migration 019: motivo da troca de profissional num remanejamento.
+-- Quando um atendimento é remanejado e o profissional responsável muda
+-- (não só o horário), guarda o motivo dessa troca, exibido futuramente no
+-- histórico do agendamento/paciente.
+-- Seguro rodar mais de uma vez.
+-- ============================================================================
+
+alter table public.appointments add column if not exists reassign_reason text;

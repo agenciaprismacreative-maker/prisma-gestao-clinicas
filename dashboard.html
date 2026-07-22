@@ -164,7 +164,13 @@
       <div class="grid grid-2 gap-3 mb-5" x-show="!loading">
         <div class="card card-shadow">
           <div class="card-header">
-            <div><h3>Faturamento — últimos 14 dias</h3><p>Procedimentos e pacotes pagos</p></div>
+            <div><h3 x-text="'Faturamento — ' + revenueChartPeriodLabel"></h3><p>Procedimentos e pacotes pagos</p></div>
+            <div class="flex gap-1">
+              <button type="button" class="btn btn-sm" :class="revenueChartPeriodDays === 7 ? 'btn-primary' : 'btn-secondary'" @click="setRevenueChartPeriod(7)">7d</button>
+              <button type="button" class="btn btn-sm" :class="revenueChartPeriodDays === 14 ? 'btn-primary' : 'btn-secondary'" @click="setRevenueChartPeriod(14)">14d</button>
+              <button type="button" class="btn btn-sm" :class="revenueChartPeriodDays === 30 ? 'btn-primary' : 'btn-secondary'" @click="setRevenueChartPeriod(30)">30d</button>
+              <button type="button" class="btn btn-sm" :class="revenueChartPeriodDays === 90 ? 'btn-primary' : 'btn-secondary'" @click="setRevenueChartPeriod(90)">3 meses</button>
+            </div>
           </div>
           <div style="position:relative;height:220px;padding:4px 12px 12px;">
             <canvas id="dashRevenueChart"></canvas>
@@ -470,21 +476,43 @@ function cssVar(name, fallback) {
 function renderDashRevenueChart(app) {
   const canvas = document.getElementById('dashRevenueChart');
   if (!canvas || !window.Chart) return;
-  const days = [];
-  const now = new Date();
-  for (let i = 13; i >= 0; i--) {
-    const d = new Date(now);
-    d.setDate(d.getDate() - i);
-    days.push(d.toISOString().slice(0, 10));
-  }
-  const sums = {};
-  app.transactions30d
-    .filter(t => t.type === 'pagamento_procedimento' || t.type === 'venda_pacote')
-    .forEach(t => { sums[t.transaction_date] = (sums[t.transaction_date] || 0) + Number(t.amount || 0); });
-  const values = days.map(d => sums[d] || 0);
-  const labels = days.map(d => { const parts = d.split('-'); return parts[2] + '/' + parts[1]; });
+  const periodDays = app.revenueChartPeriodDays || 14;
+  const relevant = app.transactionsForChart.filter(t => t.type === 'pagamento_procedimento' || t.type === 'venda_pacote');
   const c1 = cssVar('--chart-1', '#2F4A45');
   const c2 = cssVar('--chart-2', '#B8912F');
+  let labels, values;
+
+  if (periodDays <= 30) {
+    // períodos curtos: 1 barra por dia
+    const days = [];
+    const now = new Date();
+    for (let i = periodDays - 1; i >= 0; i--) {
+      const d = new Date(now);
+      d.setDate(d.getDate() - i);
+      days.push(d.toISOString().slice(0, 10));
+    }
+    const sums = {};
+    relevant.forEach(t => { sums[t.transaction_date] = (sums[t.transaction_date] || 0) + Number(t.amount || 0); });
+    values = days.map(d => sums[d] || 0);
+    labels = days.map(d => { const parts = d.split('-'); return parts[2] + '/' + parts[1]; });
+  } else {
+    // "últimos 3 meses": agrega por semana, senão viraria ~90 barras
+    // ilegíveis — cada bloco de 7 dias fecha hoje e conta pra trás.
+    const weeks = Math.ceil(periodDays / 7);
+    const now = new Date();
+    const buckets = [];
+    for (let w = weeks - 1; w >= 0; w--) {
+      const end = new Date(now);
+      end.setDate(end.getDate() - (w * 7));
+      const start = new Date(end);
+      start.setDate(start.getDate() - 6);
+      buckets.push({ startKey: start.toISOString().slice(0, 10), endKey: end.toISOString().slice(0, 10) });
+    }
+    values = buckets.map(b => relevant
+      .filter(t => t.transaction_date >= b.startKey && t.transaction_date <= b.endKey)
+      .reduce((sum, t) => sum + Number(t.amount || 0), 0));
+    labels = buckets.map(b => { const parts = b.startKey.split('-'); return parts[2] + '/' + parts[1]; });
+  }
 
   if (dashRevenueChartInstance) dashRevenueChartInstance.destroy();
   dashRevenueChartInstance = new Chart(canvas.getContext('2d'), {
@@ -543,6 +571,8 @@ function dashboardApp() {
     appointmentsToday: [],
     monthAppointments: [],
     transactions30d: [],
+    transactionsForChart: [],
+    revenueChartPeriodDays: 14,
     upcoming48h: [],
     reactivationCandidates: [],
     birthdayPatients: [],
@@ -564,6 +594,16 @@ function dashboardApp() {
       return this.notes.filter((n) => !n.target_user_id || n.target_user_id === this.currentUserId);
     },
 
+    get revenueChartPeriodLabel() {
+      const map = { 7: 'últimos 7 dias', 14: 'últimos 14 dias', 30: 'últimos 30 dias', 90: 'últimos 3 meses' };
+      return map[this.revenueChartPeriodDays] || '';
+    },
+
+    setRevenueChartPeriod(days) {
+      this.revenueChartPeriodDays = days;
+      this.$nextTick(() => renderDashRevenueChart(this));
+    },
+
     async init() {
       await this.loadClinicId();
       await Promise.all([
@@ -571,6 +611,7 @@ function dashboardApp() {
         this.loadTodayAppointments(),
         this.loadMonthAppointments(),
         this.loadTransactions30d(),
+        this.loadTransactionsForChart(),
         this.loadUpcoming48h(),
         this.loadReactivationCandidates(),
         this.loadBirthdays(),
@@ -582,6 +623,19 @@ function dashboardApp() {
         renderDashRevenueChart(this);
         renderDashStatusChart(this);
       });
+    },
+
+    async loadTransactionsForChart() {
+      // janela larga (95 dias) buscada 1 vez só; o seletor de período do
+      // gráfico de faturamento (7/14/30 dias, 3 meses) filtra e agrega
+      // isso no cliente, sem precisar buscar de novo a cada troca.
+      const since = new Date();
+      since.setDate(since.getDate() - 95);
+      const { data, error } = await supabaseClient
+        .from('transactions')
+        .select('amount, type, transaction_date')
+        .gte('transaction_date', since.toISOString().slice(0, 10));
+      this.transactionsForChart = error ? [] : (data || []);
     },
 
     async loadLowStockAlerts() {

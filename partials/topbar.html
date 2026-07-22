@@ -36,7 +36,7 @@
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <path d="M6 9a6 6 0 0 1 12 0c0 4 1.5 5.5 1.5 5.5H4.5S6 13 6 9z"/><path d="M10 18a2 2 0 0 0 4 0"/>
         </svg>
-        <span class="dot" :style="urgentCount > 0 ? 'background:var(--color-danger);' : ''" x-show="reminders.length > 0"></span>
+        <span class="dot" style="background:var(--color-danger);" x-show="reminders.length > 0"></span>
       </button>
 
       <div x-show="showReminders" x-cloak @click.outside="showReminders = false" class="card card-shadow" style="position:absolute;top:calc(100% + 6px);right:0;width:320px;padding:8px;z-index:70;max-height:400px;overflow-y:auto;">
