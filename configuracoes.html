@@ -353,7 +353,17 @@ function configuracoesApp() {
         return;
       }
 
-      const payload = { clinic_id: this.clinicId, ...this.settings, updated_at: new Date().toISOString() };
+      const payload = {
+        clinic_id: this.clinicId,
+        ...this.settings,
+        // campo numérico: "" (deixado em branco = sem limite) precisa virar
+        // null, senão o Postgres rejeita com "invalid input syntax for type
+        // numeric".
+        max_discount_percentage: (this.settings.max_discount_percentage === '' || this.settings.max_discount_percentage === null || this.settings.max_discount_percentage === undefined)
+          ? null
+          : Number(this.settings.max_discount_percentage),
+        updated_at: new Date().toISOString()
+      };
       let error;
       if (this.settingsId) {
         ({ error } = await supabaseClient.from('clinic_settings').update(payload).eq('id', this.settingsId));
