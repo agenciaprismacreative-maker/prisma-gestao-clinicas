@@ -178,7 +178,7 @@
       <div class="panel-section" x-show="!loading">
         <div class="panel-section-head"><span class="panel-section-dot"></span><h3>Tendências</h3></div>
 
-      <div class="grid grid-2 gap-3 mb-5" x-show="!loading">
+      <div class="grid grid-wide-narrow gap-3 mb-5" x-show="!loading">
         <div class="card card-shadow">
           <div class="card-header">
             <div><h3 x-text="'Faturamento (' + revenueChartPeriodLabel + ')'"></h3><p>Procedimentos e pacotes pagos</p></div>
@@ -203,164 +203,16 @@
           </div>
         </div>
 
-        <div class="card card-shadow">
-          <div class="card-header">
-            <div>
-              <h3>Anotações</h3>
-              <p>Bloco de notas rápido da clínica</p>
-            </div>
-          </div>
-          <form class="flex gap-2 mb-2" @submit.prevent="addNote()">
-            <input class="input" type="text" x-model="newNoteText" placeholder="Escrever uma anotação…">
-            <button class="btn btn-secondary btn-sm" type="submit" :disabled="!newNoteText.trim()">Adicionar</button>
-          </form>
-          <div class="form-group mb-3">
-            <select class="input" x-model="newNoteTarget" style="max-width:260px;">
-              <option value="">Pública (visível para todos)</option>
-              <template x-for="u in professionals" :key="u.id">
-                <option :value="u.id" x-text="'Só para ' + u.full_name"></option>
-              </template>
-            </select>
-          </div>
-          <div x-show="visibleNotes.length === 0" class="text-sm text-muted">Nenhuma anotação ainda.</div>
-          <div style="max-height:170px;overflow-y:auto;">
-            <template x-for="n in visibleNotes" :key="n.id">
-              <div class="note-item">
-                <p x-text="n.content"></p>
-                <div class="note-meta">
-                  <span x-text="(n.users ? n.users.full_name : '') + ' · ' + formatDateTime(n.created_at) + (n.target_user_id ? ' · privada' : ' · pública')"></span>
-                  <a href="#" @click.prevent="removeNote(n)">remover</a>
-                </div>
-              </div>
-            </template>
-          </div>
-        </div>
-
-        <div class="card card-shadow" x-show="dashboardLeaderboard.length > 0">
-          <div class="card-header">
-            <div>
-              <h3 style="font-size:15px;">🏆 Ranking do mês</h3>
-              <p>Últimos 30 dias</p>
-            </div>
-            <a href="bi.html" class="btn btn-ghost btn-sm">Ver desempenho completo</a>
-          </div>
-          <div class="podium">
-            <template x-for="row in dashboardLeaderboard" :key="row.userId">
-              <div class="podium-place" :class="'rank-' + row.rank">
-                <span class="podium-crown" x-show="row.rank === 1">👑</span>
-                <div class="podium-medal" x-text="row.rank"></div>
-                <div class="podium-avatar" x-text="initials(row.name)"></div>
-                <div class="podium-name" x-text="row.name"></div>
-                <div class="podium-value" x-text="formatCurrency(row.revenue)"></div>
-              </div>
-            </template>
-          </div>
-        </div>
-      </div>
-
-      </div>
-
-      <div class="panel-section" x-show="!loading">
-        <div class="panel-section-head"><span class="panel-section-dot"></span><h3>Atividade recente</h3></div>
-
-      <div class="card card-shadow mb-5" x-show="!loading">
-        <div class="card-header">
-          <div><h3>Últimos atendimentos</h3><p>Quem estava atendendo (5 mais recentes)</p></div>
-          <a href="bi.html" class="btn btn-ghost btn-sm">Ver mais</a>
-        </div>
-        <div x-show="recentAttendances.length === 0" class="empty-note" style="margin:20px;">Nenhum atendimento concluído ainda.</div>
-        <div class="table-wrap" x-show="recentAttendances.length > 0">
-          <table class="table">
-            <thead><tr><th>Data</th><th>Paciente</th><th>Profissional</th><th>Procedimento</th></tr></thead>
-            <tbody>
-              <template x-for="a in recentAttendances" :key="a.id">
-                <tr>
-                  <td x-text="formatDateTime(a.scheduled_at)"></td>
-                  <td x-text="a.patients ? a.patients.full_name : '—'"></td>
-                  <td x-text="professionalName(a.professional_id)"></td>
-                  <td x-text="a.services ? a.services.name : '—'"></td>
-                </tr>
-              </template>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      </div>
-
-      </div>
-      <!-- ===================== fim visão administrador ===================== -->
-
-      <!-- ===================== VISÃO BÁSICA DO FUNCIONÁRIO ===================== -->
-      <div x-show="!loading && !isAdmin" x-cloak>
-
-      <div class="panel-section">
-        <div class="panel-section-head"><span class="panel-section-dot"></span><h3>Minha agenda hoje</h3></div>
-
-        <div class="card card-shadow mb-5">
-          <div class="card-header">
-            <div>
-              <h3>Meus agendamentos de hoje</h3>
-              <p x-text="todayLabel + ' · ' + myAppointmentsTodayPending.length + ' pendente(s) de ' + myAppointmentsToday.length + ' no total'"></p>
-            </div>
-            <a href="agenda.html" class="btn btn-ghost btn-sm">Ver minha agenda</a>
-          </div>
-          <div x-show="myAppointmentsToday.length === 0" class="empty-note" style="margin:20px;">Nenhum agendamento seu para hoje.</div>
-          <div class="empty-note" style="margin:20px;" x-show="myAppointmentsToday.length > 0 && myAppointmentsTodayPending.length === 0">Todos os seus agendamentos de hoje já foram concluídos ou encerrados. ✅</div>
-          <div class="table-wrap" x-show="myAppointmentsTodayVisible.length > 0">
-            <table class="table">
-              <thead>
-                <tr><th>Horário</th><th>Paciente</th><th>Procedimento</th><th>Status</th></tr>
-              </thead>
-              <tbody>
-                <template x-for="a in myAppointmentsTodayVisible" :key="a.id">
-                  <tr>
-                    <td x-text="formatTime(a.scheduled_at)"></td>
-                    <td>
-                      <div class="row-name">
-                        <div class="avatar" x-text="initials(a.patients ? a.patients.full_name : '')"></div>
-                        <div><strong x-text="a.patients ? a.patients.full_name : 'Paciente'"></strong></div>
-                      </div>
-                    </td>
-                    <td x-text="a.services ? a.services.name : '—'"></td>
-                    <td><span class="badge" :class="statusBadgeClass(a.status)"><span class="badge-dot"></span><span x-text="statusLabel(a.status)"></span></span></td>
-                  </tr>
-                </template>
-              </tbody>
-            </table>
-          </div>
-          <p class="text-xs text-muted" style="padding:10px 20px 4px;margin:0;" x-show="myAppointmentsTodayRemaining > 0" x-text="'+ ' + myAppointmentsTodayRemaining + ' agendamento(s) pendente(s) além destes. Veja sua agenda completa.'"></p>
-        </div>
-
-        <div class="card card-shadow">
-          <div class="card-header">
-            <div><h3>Meus atendimentos</h3><p>Concluídos x cancelados/faltas</p></div>
-            <div class="flex gap-1">
-              <button type="button" class="btn btn-sm" :class="myAttendanceChartPeriodDays === 1 ? 'btn-primary' : 'btn-secondary'" @click="setMyAttendanceChartPeriod(1)">Hoje</button>
-              <button type="button" class="btn btn-sm" :class="myAttendanceChartPeriodDays === 7 ? 'btn-primary' : 'btn-secondary'" @click="setMyAttendanceChartPeriod(7)">7d</button>
-              <button type="button" class="btn btn-sm" :class="myAttendanceChartPeriodDays === 30 ? 'btn-primary' : 'btn-secondary'" @click="setMyAttendanceChartPeriod(30)">30d</button>
-              <button type="button" class="btn btn-sm" :class="myAttendanceChartPeriodDays === 90 ? 'btn-primary' : 'btn-secondary'" @click="setMyAttendanceChartPeriod(90)">3 meses</button>
-            </div>
-          </div>
-          <div style="position:relative;height:220px;padding:4px 12px 12px;">
-            <canvas id="dashMyAttendanceChart"></canvas>
-          </div>
-        </div>
-
-      </div>
-
-      <div class="panel-section">
-        <div class="panel-section-head"><span class="panel-section-dot"></span><h3>Extras</h3></div>
-
-        <div class="grid grid-2 gap-3">
+        <div class="flex" style="flex-direction:column;gap:12px;">
 
           <div class="card card-shadow">
             <div class="card-header">
               <div>
-                <h3>Anotações</h3>
-                <p>Bloco de notas rápido da clínica</p>
+                <h3 style="font-size:15px;">Anotações</h3>
+                <p>Bloco de notas rápido</p>
               </div>
             </div>
+            <div x-show="noteSentMessage" x-transition x-cloak class="text-xs mb-2" style="background:var(--color-success-bg);color:var(--color-success);padding:6px 10px;border-radius:var(--radius-md);" x-text="noteSentMessage"></div>
             <form class="flex gap-2 mb-2" @submit.prevent="addNote()">
               <input class="input" type="text" x-model="newNoteText" placeholder="Escrever uma anotação…">
               <button class="btn btn-secondary btn-sm" type="submit" :disabled="!newNoteText.trim()">Adicionar</button>
@@ -374,86 +226,111 @@
               </select>
             </div>
             <div x-show="visibleNotes.length === 0" class="text-sm text-muted">Nenhuma anotação ainda.</div>
-            <template x-for="n in visibleNotes" :key="n.id">
-              <div class="note-item">
-                <p x-text="n.content"></p>
-                <div class="note-meta">
-                  <span x-text="(n.users ? n.users.full_name : '') + ' · ' + formatDateTime(n.created_at) + (n.target_user_id ? ' · privada' : ' · pública')"></span>
-                  <a href="#" @click.prevent="removeNote(n)">remover</a>
+            <div style="max-height:130px;overflow-y:auto;">
+              <template x-for="n in visibleNotes" :key="n.id">
+                <div class="note-item">
+                  <p x-text="n.content"></p>
+                  <div class="note-meta">
+                    <span x-text="(n.users ? n.users.full_name : '') + ' · ' + formatDateTime(n.created_at) + (n.target_user_id ? ' · privada' : ' · pública')"></span>
+                    <a href="#" @click.prevent="removeNote(n)">remover</a>
+                  </div>
                 </div>
-              </div>
-            </template>
+              </template>
+            </div>
           </div>
 
-          <div class="card card-shadow">
+          <div class="card card-shadow" x-show="dashboardLeaderboard.length > 0">
             <div class="card-header">
               <div>
-                <h3 x-text="birthdaysToday.length > 0 ? 'Aniversariantes de hoje' : 'Próximos aniversariantes'"></h3>
-                <p x-text="birthdaysToday.length > 0 ? 'Comemore com o paciente' : 'Ninguém faz aniversário hoje'"></p>
+                <h3 style="font-size:15px;">🏆 Ranking do mês</h3>
+                <p>Últimos 30 dias</p>
               </div>
             </div>
-            <div x-show="birthdaysToShow.length === 0" class="text-sm text-muted">Nenhum aniversário cadastrado ainda.</div>
-            <div class="flex" style="flex-direction:column;gap:14px;">
-              <template x-for="p in birthdaysToShow" :key="p.id">
-                <div class="flex items-center justify-between">
-                  <div class="flex items-center gap-3">
-                    <div class="avatar" x-text="initials(p.full_name)"></div>
-                    <div>
-                      <strong class="text-sm" x-text="p.full_name"></strong>
-                      <div class="text-xs text-muted" x-text="p.turningAge !== null ? ('Completa ' + p.turningAge + ' anos') : ''"></div>
-                    </div>
-                  </div>
-                  <span class="badge" :class="p.daysUntil === 0 ? 'badge-success' : 'badge-neutral'" x-text="p.daysUntil === 0 ? 'Hoje' : ('em ' + p.daysUntil + ' dias')"></span>
+            <div class="podium">
+              <template x-for="row in dashboardLeaderboard" :key="row.userId">
+                <div class="podium-place" :class="'rank-' + row.rank">
+                  <span class="podium-crown" x-show="row.rank === 1">👑</span>
+                  <div class="podium-medal" x-text="row.rank"></div>
+                  <div class="podium-avatar" x-text="initials(row.name)"></div>
+                  <div class="podium-name" x-text="row.name"></div>
+                  <div class="podium-value" x-text="formatCurrency(row.revenue)"></div>
                 </div>
               </template>
             </div>
+            <div class="text-center mt-2">
+              <a href="bi.html" class="btn btn-ghost btn-sm">Ver desempenho completo</a>
+            </div>
           </div>
 
         </div>
       </div>
 
       </div>
-      <!-- ===================== fim visão básica do funcionário ===================== -->
 
-      <div class="panel-section" x-show="!loading && isAdmin" x-cloak>
-        <div class="panel-section-head"><span class="panel-section-dot"></span><h3>Agenda e acompanhamento</h3></div>
+      <div class="panel-section" x-show="!loading">
+        <div class="panel-section-head"><span class="panel-section-dot"></span><h3>Atividade recente e agenda</h3></div>
 
-      <div class="card card-shadow mb-5" x-show="!loading">
-        <div class="card-header">
-          <div>
-            <h3>Agendamentos de hoje</h3>
-            <p x-text="todayLabel + ' · ' + appointmentsTodayPending.length + ' pendente(s) de ' + appointmentsToday.length + ' no total'"></p>
+      <div class="grid grid-2 gap-3 mb-5" x-show="!loading">
+        <div class="card card-shadow">
+          <div class="card-header">
+            <div><h3>Últimos atendimentos</h3><p>Quem estava atendendo (5 mais recentes)</p></div>
+            <a href="bi.html" class="btn btn-ghost btn-sm">Ver mais</a>
           </div>
-          <a href="agenda.html" class="btn btn-ghost btn-sm">Ver agenda completa</a>
+          <div x-show="recentAttendances.length === 0" class="empty-note" style="margin:20px;">Nenhum atendimento concluído ainda.</div>
+          <div class="table-wrap" x-show="recentAttendances.length > 0">
+            <table class="table">
+              <thead><tr><th>Data</th><th>Paciente</th><th>Profissional</th><th>Procedimento</th></tr></thead>
+              <tbody>
+                <template x-for="a in recentAttendances" :key="a.id">
+                  <tr>
+                    <td x-text="formatDateTime(a.scheduled_at)"></td>
+                    <td x-text="a.patients ? a.patients.full_name : '—'"></td>
+                    <td x-text="professionalName(a.professional_id)"></td>
+                    <td x-text="a.services ? a.services.name : '—'"></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
         </div>
 
-        <div x-show="appointmentsToday.length === 0" class="empty-note" style="margin:20px;">Nenhum agendamento para hoje.</div>
-        <div class="empty-note" style="margin:20px;" x-show="appointmentsToday.length > 0 && appointmentsTodayPending.length === 0">Todos os agendamentos de hoje já foram concluídos ou encerrados. ✅</div>
-        <div class="table-wrap" x-show="appointmentsTodayVisible.length > 0">
-          <table class="table">
-            <thead>
-              <tr><th>Horário</th><th>Paciente</th><th>Procedimento</th><th>Profissional</th><th>Status</th></tr>
-            </thead>
-            <tbody>
-              <template x-for="a in appointmentsTodayVisible" :key="a.id">
-                <tr>
-                  <td x-text="formatTime(a.scheduled_at)"></td>
-                  <td>
-                    <div class="row-name">
-                      <div class="avatar" x-text="initials(a.patients ? a.patients.full_name : '')"></div>
-                      <div><strong x-text="a.patients ? a.patients.full_name : 'Paciente'"></strong></div>
-                    </div>
-                  </td>
-                  <td x-text="a.services ? a.services.name : '—'"></td>
-                  <td x-text="professionalName(a.professional_id)"></td>
-                  <td><span class="badge" :class="statusBadgeClass(a.status)"><span class="badge-dot"></span><span x-text="statusLabel(a.status)"></span></span></td>
-                </tr>
-              </template>
-            </tbody>
-          </table>
-        </div>
-        <div class="text-center" style="padding:10px 20px 4px;" x-show="appointmentsTodayRemaining > 0">
-          <button type="button" class="btn btn-ghost btn-sm" @click="appointmentsTodayExpanded = !appointmentsTodayExpanded" x-text="appointmentsTodayExpanded ? 'Ver menos' : ('Ver mais (' + appointmentsTodayRemaining + ')')"></button>
+        <div class="card card-shadow" x-show="!loading">
+          <div class="card-header">
+            <div>
+              <h3>Agendamentos de hoje</h3>
+              <p x-text="todayLabel + ' · ' + appointmentsTodayPending.length + ' pendente(s) de ' + appointmentsToday.length + ' no total'"></p>
+            </div>
+            <a href="agenda.html" class="btn btn-ghost btn-sm">Ver agenda completa</a>
+          </div>
+
+          <div x-show="appointmentsToday.length === 0" class="empty-note" style="margin:20px;">Nenhum agendamento para hoje.</div>
+          <div class="empty-note" style="margin:20px;" x-show="appointmentsToday.length > 0 && appointmentsTodayPending.length === 0">Todos os agendamentos de hoje já foram concluídos ou encerrados. ✅</div>
+          <div class="table-wrap" x-show="appointmentsTodayVisible.length > 0">
+            <table class="table">
+              <thead>
+                <tr><th>Horário</th><th>Paciente</th><th>Procedimento</th><th>Profissional</th><th>Status</th></tr>
+              </thead>
+              <tbody>
+                <template x-for="a in appointmentsTodayVisible" :key="a.id">
+                  <tr>
+                    <td x-text="formatTime(a.scheduled_at)"></td>
+                    <td>
+                      <div class="row-name">
+                        <div class="avatar" x-text="initials(a.patients ? a.patients.full_name : '')"></div>
+                        <div><strong x-text="a.patients ? a.patients.full_name : 'Paciente'"></strong></div>
+                      </div>
+                    </td>
+                    <td x-text="a.services ? a.services.name : '—'"></td>
+                    <td x-text="professionalName(a.professional_id)"></td>
+                    <td><span class="badge" :class="statusBadgeClass(a.status)"><span class="badge-dot"></span><span x-text="statusLabel(a.status)"></span></span></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+          <div class="text-center" style="padding:10px 20px 4px;" x-show="appointmentsTodayRemaining > 0">
+            <button type="button" class="btn btn-ghost btn-sm" @click="appointmentsTodayExpanded = !appointmentsTodayExpanded" x-text="appointmentsTodayExpanded ? 'Ver menos' : ('Ver mais (' + appointmentsTodayRemaining + ')')"></button>
+          </div>
         </div>
       </div>
 
@@ -536,6 +413,134 @@
       </div>
 
       </div>
+
+      </div>
+      <!-- ===================== fim visão administrador ===================== -->
+
+      <!-- ===================== VISÃO BÁSICA DO FUNCIONÁRIO ===================== -->
+      <div x-show="!loading && !isAdmin" x-cloak>
+
+      <div class="panel-section">
+        <div class="panel-section-head"><span class="panel-section-dot"></span><h3>Minha agenda hoje</h3></div>
+
+        <div class="card card-shadow mb-5">
+          <div class="card-header">
+            <div>
+              <h3>Meus agendamentos de hoje</h3>
+              <p x-text="todayLabel + ' · ' + myAppointmentsTodayPending.length + ' pendente(s) de ' + myAppointmentsToday.length + ' no total'"></p>
+            </div>
+            <a href="agenda.html" class="btn btn-ghost btn-sm">Ver minha agenda</a>
+          </div>
+          <div x-show="myAppointmentsToday.length === 0" class="empty-note" style="margin:20px;">Nenhum agendamento seu para hoje.</div>
+          <div class="empty-note" style="margin:20px;" x-show="myAppointmentsToday.length > 0 && myAppointmentsTodayPending.length === 0">Todos os seus agendamentos de hoje já foram concluídos ou encerrados. ✅</div>
+          <div class="table-wrap" x-show="myAppointmentsTodayVisible.length > 0">
+            <table class="table">
+              <thead>
+                <tr><th>Horário</th><th>Paciente</th><th>Procedimento</th><th>Status</th></tr>
+              </thead>
+              <tbody>
+                <template x-for="a in myAppointmentsTodayVisible" :key="a.id">
+                  <tr>
+                    <td x-text="formatTime(a.scheduled_at)"></td>
+                    <td>
+                      <div class="row-name">
+                        <div class="avatar" x-text="initials(a.patients ? a.patients.full_name : '')"></div>
+                        <div><strong x-text="a.patients ? a.patients.full_name : 'Paciente'"></strong></div>
+                      </div>
+                    </td>
+                    <td x-text="a.services ? a.services.name : '—'"></td>
+                    <td><span class="badge" :class="statusBadgeClass(a.status)"><span class="badge-dot"></span><span x-text="statusLabel(a.status)"></span></span></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+          <p class="text-xs text-muted" style="padding:10px 20px 4px;margin:0;" x-show="myAppointmentsTodayRemaining > 0" x-text="'+ ' + myAppointmentsTodayRemaining + ' agendamento(s) pendente(s) além destes. Veja sua agenda completa.'"></p>
+        </div>
+
+        <div class="card card-shadow">
+          <div class="card-header">
+            <div><h3>Meus atendimentos</h3><p>Concluídos x cancelados/faltas</p></div>
+            <div class="flex gap-1">
+              <button type="button" class="btn btn-sm" :class="myAttendanceChartPeriodDays === 1 ? 'btn-primary' : 'btn-secondary'" @click="setMyAttendanceChartPeriod(1)">Hoje</button>
+              <button type="button" class="btn btn-sm" :class="myAttendanceChartPeriodDays === 7 ? 'btn-primary' : 'btn-secondary'" @click="setMyAttendanceChartPeriod(7)">7d</button>
+              <button type="button" class="btn btn-sm" :class="myAttendanceChartPeriodDays === 30 ? 'btn-primary' : 'btn-secondary'" @click="setMyAttendanceChartPeriod(30)">30d</button>
+              <button type="button" class="btn btn-sm" :class="myAttendanceChartPeriodDays === 90 ? 'btn-primary' : 'btn-secondary'" @click="setMyAttendanceChartPeriod(90)">3 meses</button>
+            </div>
+          </div>
+          <div style="position:relative;height:220px;padding:4px 12px 12px;">
+            <canvas id="dashMyAttendanceChart"></canvas>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="panel-section">
+        <div class="panel-section-head"><span class="panel-section-dot"></span><h3>Extras</h3></div>
+
+        <div class="grid grid-2 gap-3">
+
+          <div class="card card-shadow">
+            <div class="card-header">
+              <div>
+                <h3>Anotações</h3>
+                <p>Bloco de notas rápido da clínica</p>
+              </div>
+            </div>
+            <div x-show="noteSentMessage" x-transition x-cloak class="text-xs mb-2" style="background:var(--color-success-bg);color:var(--color-success);padding:6px 10px;border-radius:var(--radius-md);" x-text="noteSentMessage"></div>
+            <form class="flex gap-2 mb-2" @submit.prevent="addNote()">
+              <input class="input" type="text" x-model="newNoteText" placeholder="Escrever uma anotação…">
+              <button class="btn btn-secondary btn-sm" type="submit" :disabled="!newNoteText.trim()">Adicionar</button>
+            </form>
+            <div class="form-group mb-3">
+              <select class="input" x-model="newNoteTarget" style="max-width:260px;">
+                <option value="">Pública (visível para todos)</option>
+                <template x-for="u in professionals" :key="u.id">
+                  <option :value="u.id" x-text="'Só para ' + u.full_name"></option>
+                </template>
+              </select>
+            </div>
+            <div x-show="visibleNotes.length === 0" class="text-sm text-muted">Nenhuma anotação ainda.</div>
+            <template x-for="n in visibleNotes" :key="n.id">
+              <div class="note-item">
+                <p x-text="n.content"></p>
+                <div class="note-meta">
+                  <span x-text="(n.users ? n.users.full_name : '') + ' · ' + formatDateTime(n.created_at) + (n.target_user_id ? ' · privada' : ' · pública')"></span>
+                  <a href="#" @click.prevent="removeNote(n)">remover</a>
+                </div>
+              </div>
+            </template>
+          </div>
+
+          <div class="card card-shadow">
+            <div class="card-header">
+              <div>
+                <h3 x-text="birthdaysToday.length > 0 ? 'Aniversariantes de hoje' : 'Próximos aniversariantes'"></h3>
+                <p x-text="birthdaysToday.length > 0 ? 'Comemore com o paciente' : 'Ninguém faz aniversário hoje'"></p>
+              </div>
+            </div>
+            <div x-show="birthdaysToShow.length === 0" class="text-sm text-muted">Nenhum aniversário cadastrado ainda.</div>
+            <div class="flex" style="flex-direction:column;gap:14px;">
+              <template x-for="p in birthdaysToShow" :key="p.id">
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center gap-3">
+                    <div class="avatar" x-text="initials(p.full_name)"></div>
+                    <div>
+                      <strong class="text-sm" x-text="p.full_name"></strong>
+                      <div class="text-xs text-muted" x-text="p.turningAge !== null ? ('Completa ' + p.turningAge + ' anos') : ''"></div>
+                    </div>
+                  </div>
+                  <span class="badge" :class="p.daysUntil === 0 ? 'badge-success' : 'badge-neutral'" x-text="p.daysUntil === 0 ? 'Hoje' : ('em ' + p.daysUntil + ' dias')"></span>
+                </div>
+              </template>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      </div>
+      <!-- ===================== fim visão básica do funcionário ===================== -->
 
     </main>
   </div>
@@ -730,6 +735,7 @@ function dashboardApp() {
     notes: [],
     newNoteText: '',
     newNoteTarget: '',
+    noteSentMessage: '',
     currentUserId: null,
     currentUserRole: null,
     lowStockProducts: [],
@@ -911,9 +917,13 @@ function dashboardApp() {
         this.showFeedback('error', 'Erro ao adicionar anotação: ' + error.message);
         return;
       }
-      this.showFeedback('success', targetId
-        ? ('Lembrete inserido no dashboard de ' + this.professionalName(targetId) + '.')
-        : 'Anotação pública adicionada ao dashboard.');
+      // mensagem curta e animada perto do próprio card de Anotações (o
+      // aviso lá em cima, feedback.message, fica longe e passa despercebido).
+      this.noteSentMessage = targetId
+        ? ('Anotação enviada para ' + this.professionalName(targetId) + '.')
+        : 'Anotação enviada para todos.';
+      clearTimeout(this._noteSentTimeout);
+      this._noteSentTimeout = setTimeout(() => { this.noteSentMessage = ''; }, 3500);
       this.newNoteText = '';
       this.newNoteTarget = '';
       await this.loadNotes();
