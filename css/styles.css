@@ -211,12 +211,11 @@ svg.icon { width: 20px; height: 20px; flex-shrink: 0; }
 }
 .nav-item svg { color: rgba(255,255,255,.55); }
 .nav-item:hover { background: rgba(255,255,255,.06); color: #fff; }
-.nav-item.active { background: rgba(255,255,255,.12); color: #fff; }
-.nav-item.active::before {
-  content: ''; position: absolute; left: 0; top: 8px; bottom: 8px;
-  width: 3px; border-radius: var(--radius-full); background: var(--color-accent);
-}
-.nav-item.active svg { color: var(--color-accent); }
+/* item ativo: recorte branco sólido com o ícone na cor principal do
+   sistema (a mesma marca usada no resto da interface, customizável por
+   clínica em Configurações), em vez do antigo overlay translúcido. */
+.nav-item.active { background: #fff; color: var(--color-primary); }
+.nav-item.active svg { color: var(--color-primary); }
 .nav-item.disabled { opacity: .45; cursor: default; pointer-events: none; }
 .nav-badge {
   margin-left: auto; font-size: 9.5px; font-weight: 600; text-transform: uppercase;
