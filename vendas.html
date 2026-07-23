@@ -187,11 +187,11 @@
           <div class="form-group" style="position:relative;">
             <label class="label">Paciente</label>
             <input class="input" type="text" x-model="patientSearch" @focus="patientDropdownOpen = true" @input="patientDropdownOpen = true; newSale.patient_id = ''" placeholder="Digite o nome do paciente" autocomplete="off">
-            <div x-show="patientDropdownOpen" x-cloak @click.away="patientDropdownOpen = false"
-                 style="position:absolute;z-index:10;top:100%;left:0;right:0;background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-md);box-shadow:var(--shadow-md);max-height:200px;overflow-y:auto;margin-top:4px;">
+            <div x-show="patientDropdownOpen" x-cloak @click.away="patientDropdownOpen = false" class="patient-dropdown"
+                 style="position:absolute;z-index:10;top:100%;left:0;right:0;background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-md);box-shadow:var(--shadow-md);margin-top:4px;">
               <div x-show="filteredPatients.length === 0" class="text-xs text-muted" style="padding:10px 14px;">Nenhum paciente encontrado.</div>
               <template x-for="p in filteredPatients" :key="p.id">
-                <div @click="selectPatient(p)" class="patient-option" style="padding:9px 14px;cursor:pointer;font-size:13.5px;" x-text="p.full_name"></div>
+                <div @click="selectPatient(p)" class="patient-option" x-text="p.full_name"></div>
               </template>
             </div>
           </div>
@@ -239,10 +239,10 @@
           <div class="form-group" style="position:relative;" x-show="newSale.origin === 'Indicação de paciente'" x-cloak>
             <label class="label">Indicado por qual paciente?</label>
             <input class="input" type="text" x-model="referralPatientSearch" @focus="referralPatientDropdownOpen = true" @input="referralPatientDropdownOpen = true; newSale.referred_by_patient_id = ''" placeholder="Digite o nome do paciente" autocomplete="off">
-            <div x-show="referralPatientDropdownOpen" x-cloak @click.away="referralPatientDropdownOpen = false"
-                 style="position:absolute;z-index:10;top:100%;left:0;right:0;background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-md);box-shadow:var(--shadow-md);max-height:200px;overflow-y:auto;margin-top:4px;">
+            <div x-show="referralPatientDropdownOpen" x-cloak @click.away="referralPatientDropdownOpen = false" class="patient-dropdown"
+                 style="position:absolute;z-index:10;top:100%;left:0;right:0;background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-md);box-shadow:var(--shadow-md);margin-top:4px;">
               <template x-for="p in filteredPatientsFor(referralPatientSearch)" :key="p.id">
-                <div @click="newSale.referred_by_patient_id = p.id; referralPatientSearch = p.full_name; referralPatientDropdownOpen = false" class="patient-option" style="padding:9px 14px;cursor:pointer;font-size:13.5px;" x-text="p.full_name"></div>
+                <div @click="newSale.referred_by_patient_id = p.id; referralPatientSearch = p.full_name; referralPatientDropdownOpen = false" class="patient-option" x-text="p.full_name"></div>
               </template>
             </div>
           </div>
