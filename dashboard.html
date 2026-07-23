@@ -73,15 +73,24 @@
       <div class="panel-section" x-show="!loading">
         <div class="panel-section-head"><span class="panel-section-dot"></span><h3>Indicadores do dia</h3></div>
 
-      <!-- faturamento estimado do dia -->
-      <div class="card card-shadow mb-5" style="padding:22px 26px;" x-show="!loading">
+      <!-- faturamento estimado do dia: cor adaptável conforme o realizado de
+           hoje está abaixo, na média ou acima da média diária dos últimos
+           30 dias (revenueToday.status, calculado no getter). -->
+      <div class="card card-shadow mb-5"
+           style="padding:22px 26px;border-top:3px solid transparent;"
+           :style="revenueToday.status === 'abaixo' ? 'border-top-color:var(--color-danger);' : (revenueToday.status === 'acima' ? 'border-top-color:var(--color-info);' : '')"
+           x-show="!loading">
         <div class="flex items-center justify-between" style="flex-wrap:wrap;gap:16px;">
           <div>
             <p class="text-xs text-muted" style="margin-bottom:2px;">Faturamento estimado de hoje</p>
             <div class="flex items-center" style="gap:10px;flex-wrap:wrap;">
-              <span style="font-size:30px;font-weight:700;letter-spacing:-.02em;" x-text="formatCurrency(revenueToday.realizado)"></span>
+              <span style="font-size:30px;font-weight:700;letter-spacing:-.02em;"
+                    :style="revenueToday.status === 'abaixo' ? 'color:var(--color-danger);' : (revenueToday.status === 'acima' ? 'color:var(--color-info);' : '')"
+                    x-text="formatCurrency(revenueToday.realizado)"></span>
+              <span style="font-size:19px;" x-show="revenueToday.status === 'acima'" title="Acima da média dos últimos 30 dias">🚀</span>
               <span class="text-sm text-muted">realizado de <strong x-text="formatCurrency(revenueToday.previsto)"></strong> previstos (marcados hoje)</span>
             </div>
+            <p class="text-xs text-muted mt-1" x-show="revenueToday.avgDaily > 0" x-text="'Média dos últimos 30 dias: ' + formatCurrency(revenueToday.avgDaily) + '/dia'"></p>
           </div>
           <div style="text-align:right;">
             <span class="badge" :class="revenueToday.previsto === 0 ? 'badge-neutral' : (revenueToday.pct >= 100 ? 'badge-success' : 'badge-warning')"
@@ -93,16 +102,16 @@
 
       <div class="grid grid-4 mb-5" x-show="!loading">
 
-        <div class="stat-card" style="--accent-color:var(--color-primary);">
+        <div class="stat-card" style="--accent-color:var(--color-info);">
           <div class="stat-label">
             Ocupação da agenda hoje
-            <div class="stat-icon" style="background:var(--color-primary-light);color:var(--color-primary);">
+            <div class="stat-icon" style="background:var(--color-info-bg);color:var(--color-info);">
               <svg class="icon" style="width:17px;height:17px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                 <rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18"/><path d="M8 3v4"/><path d="M16 3v4"/>
               </svg>
             </div>
           </div>
-          <div class="stat-value" style="color:var(--color-primary);" x-text="occupancyToday + '%'"></div>
+          <div class="stat-value" style="color:var(--color-info);" x-text="occupancyToday + '%'"></div>
           <div class="stat-trend text-muted">Com base nos profissionais ativos, janela 08h–18h</div>
         </div>
 
@@ -119,16 +128,16 @@
           <div class="stat-trend text-muted">Concluídos vs. faltas neste mês</div>
         </div>
 
-        <div class="stat-card" style="--accent-color:var(--color-accent);">
+        <div class="stat-card" style="--accent-color:var(--color-purple);">
           <div class="stat-label">
             Ticket médio
-            <div class="stat-icon" style="background:var(--color-accent-light);color:var(--color-accent);">
+            <div class="stat-icon" style="background:var(--color-purple-light);color:var(--color-purple);">
               <svg class="icon" style="width:17px;height:17px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="12" cy="12" r="9"/><path d="M12 7.5v9"/><path d="M15 9.8c0-1.2-1.3-2-3-2s-3 .8-3 2 1.3 1.8 3 1.8 3 .8 3 2-1.3 2-3 2-3-.8-3-2"/>
               </svg>
             </div>
           </div>
-          <div class="stat-value" style="color:var(--color-accent);" x-text="formatCurrency(avgTicket30d)"></div>
+          <div class="stat-value" style="color:var(--color-purple);" x-text="formatCurrency(avgTicket30d)"></div>
           <div class="stat-trend text-muted">Últimos 30 dias</div>
         </div>
 
@@ -376,7 +385,7 @@
       <div class="panel-section" x-show="!loading && isAdmin" x-cloak>
         <div class="panel-section-head"><span class="panel-section-dot"></span><h3>Agenda e acompanhamento</h3></div>
 
-      <div class="grid grid-main-side">
+      <div class="grid grid-main-side mb-5">
 
         <div class="card card-shadow" x-show="!loading">
           <div class="card-header">
@@ -412,41 +421,45 @@
               </tbody>
             </table>
           </div>
-          <p class="text-xs text-muted" style="padding:10px 20px 4px;margin:0;" x-show="appointmentsTodayRemaining > 0" x-text="'+ ' + appointmentsTodayRemaining + ' agendamento(s) pendente(s) além destes. Veja a agenda completa.'"></p>
+          <div class="text-center" style="padding:10px 20px 4px;" x-show="appointmentsTodayRemaining > 0">
+            <button type="button" class="btn btn-ghost btn-sm" @click="appointmentsTodayExpanded = !appointmentsTodayExpanded" x-text="appointmentsTodayExpanded ? 'Ver menos' : ('Ver mais (' + appointmentsTodayRemaining + ')')"></button>
+          </div>
         </div>
 
-        <div class="flex" style="flex-direction:column;gap:24px;" x-show="!loading">
-
-          <div class="card card-shadow">
-            <div class="card-header">
-              <div>
-                <h3>Anotações</h3>
-                <p>Bloco de notas rápido da clínica</p>
-              </div>
+        <div class="card card-shadow" x-show="!loading">
+          <div class="card-header">
+            <div>
+              <h3>Anotações</h3>
+              <p>Bloco de notas rápido da clínica</p>
             </div>
-            <form class="flex gap-2 mb-2" @submit.prevent="addNote()">
-              <input class="input" type="text" x-model="newNoteText" placeholder="Escrever uma anotação…">
-              <button class="btn btn-secondary btn-sm" type="submit" :disabled="!newNoteText.trim()">Adicionar</button>
-            </form>
-            <div class="form-group mb-3">
-              <select class="input" x-model="newNoteTarget" style="max-width:260px;">
-                <option value="">Pública (visível para todos)</option>
-                <template x-for="u in professionals" :key="u.id">
-                  <option :value="u.id" x-text="'Só para ' + u.full_name"></option>
-                </template>
-              </select>
-            </div>
-            <div x-show="visibleNotes.length === 0" class="text-sm text-muted">Nenhuma anotação ainda.</div>
-            <template x-for="n in visibleNotes" :key="n.id">
-              <div class="note-item">
-                <p x-text="n.content"></p>
-                <div class="note-meta">
-                  <span x-text="(n.users ? n.users.full_name : '') + ' · ' + formatDateTime(n.created_at) + (n.target_user_id ? ' · privada' : ' · pública')"></span>
-                  <a href="#" @click.prevent="removeNote(n)">remover</a>
-                </div>
-              </div>
-            </template>
           </div>
+          <form class="flex gap-2 mb-2" @submit.prevent="addNote()">
+            <input class="input" type="text" x-model="newNoteText" placeholder="Escrever uma anotação…">
+            <button class="btn btn-secondary btn-sm" type="submit" :disabled="!newNoteText.trim()">Adicionar</button>
+          </form>
+          <div class="form-group mb-3">
+            <select class="input" x-model="newNoteTarget" style="max-width:260px;">
+              <option value="">Pública (visível para todos)</option>
+              <template x-for="u in professionals" :key="u.id">
+                <option :value="u.id" x-text="'Só para ' + u.full_name"></option>
+              </template>
+            </select>
+          </div>
+          <div x-show="visibleNotes.length === 0" class="text-sm text-muted">Nenhuma anotação ainda.</div>
+          <template x-for="n in visibleNotes" :key="n.id">
+            <div class="note-item">
+              <p x-text="n.content"></p>
+              <div class="note-meta">
+                <span x-text="(n.users ? n.users.full_name : '') + ' · ' + formatDateTime(n.created_at) + (n.target_user_id ? ' · privada' : ' · pública')"></span>
+                <a href="#" @click.prevent="removeNote(n)">remover</a>
+              </div>
+            </div>
+          </template>
+        </div>
+
+      </div>
+
+      <div class="grid grid-3 gap-3" x-show="!loading">
 
           <div class="card card-shadow">
             <div class="card-header">
@@ -521,8 +534,6 @@
               </template>
             </div>
           </div>
-
-        </div>
 
       </div>
 
@@ -711,6 +722,7 @@ function dashboardApp() {
     transactions30d: [],
     transactionsForChart: [],
     revenueChartPeriodDays: 14,
+    appointmentsTodayExpanded: false,
     myAttendanceHistory: [],
     myAttendanceChartPeriodDays: 30,
     recentAttendances: [],
@@ -1011,11 +1023,13 @@ function dashboardApp() {
     },
 
     get appointmentsTodayVisible() {
-      return this.appointmentsTodayPending.slice(0, 10);
+      // mostra só os 5 primeiros por padrão; "ver mais" revela o resto sem
+      // sair do dashboard, "ver menos" volta a recolher.
+      return this.appointmentsTodayExpanded ? this.appointmentsTodayPending : this.appointmentsTodayPending.slice(0, 5);
     },
 
     get appointmentsTodayRemaining() {
-      return Math.max(0, this.appointmentsTodayPending.length - 10);
+      return Math.max(0, this.appointmentsTodayPending.length - 5);
     },
 
     get occupancyToday() {
@@ -1045,12 +1059,28 @@ function dashboardApp() {
       const todayStr = new Date().toISOString().slice(0, 10);
       const relevantToday = this.appointmentsToday.filter(a => a.status !== 'cancelado');
       const previsto = relevantToday.reduce((sum, a) => sum + Number(a.services && a.services.price ? a.services.price : 0), 0);
-      const realizado = this.transactions30d
-        .filter(t => t.transaction_date === todayStr && (t.type === 'pagamento_procedimento' || t.type === 'venda_pacote'))
+      const relevantTx = this.transactions30d.filter(t => t.type === 'pagamento_procedimento' || t.type === 'venda_pacote');
+      const realizado = relevantTx
+        .filter(t => t.transaction_date === todayStr)
         .reduce((sum, t) => sum + Number(t.amount || 0), 0);
       const concluidos = this.appointmentsToday.filter(a => a.status === 'concluido').length;
       const pct = previsto > 0 ? Math.round((realizado / previsto) * 100) : 0;
-      return { previsto, realizado, pct, concluidos, total: relevantToday.length };
+
+      // média diária dos últimos 30 dias (excluindo hoje, pra não comparar o
+      // dia com ele mesmo), usada só para colorir o card conforme o
+      // faturamento de hoje está abaixo, na média ou acima do normal.
+      const pastTx = relevantTx.filter(t => t.transaction_date !== todayStr);
+      const pastDays = new Set(pastTx.map(t => t.transaction_date));
+      const avgDaily = pastDays.size > 0
+        ? pastTx.reduce((sum, t) => sum + Number(t.amount || 0), 0) / pastDays.size
+        : 0;
+      let status = 'media';
+      if (avgDaily > 0) {
+        if (realizado < avgDaily * 0.85) status = 'abaixo';
+        else if (realizado > avgDaily * 1.15) status = 'acima';
+      }
+
+      return { previsto, realizado, pct, concluidos, total: relevantToday.length, avgDaily, status };
     },
 
     get dashboardLeaderboard() {
