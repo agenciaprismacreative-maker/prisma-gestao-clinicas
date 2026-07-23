@@ -70,8 +70,9 @@ async function fillUserInfo() {
   if (!window.supabaseClient) return;
   const nameEl = document.querySelector('[data-slot="user-name"]');
   const clinicEl = document.querySelector('[data-slot="clinic-name"]');
+  const clinicTopEl = document.querySelector('[data-slot="clinic-name-top"]');
   const initialsEl = document.querySelector('[data-slot="user-initials"]');
-  if (!nameEl && !clinicEl && !initialsEl) return;
+  if (!nameEl && !clinicEl && !clinicTopEl && !initialsEl) return;
 
   try {
     const { data: { user } } = await supabaseClient.auth.getUser();
@@ -96,6 +97,9 @@ async function fillUserInfo() {
 
     if (nameEl) nameEl.textContent = profile.full_name || user.email;
     if (clinicEl) clinicEl.textContent = profile.clinics ? profile.clinics.name : '';
+    // texto no topo do sidebar, ao lado da logo: mantém "Prisma" (marca do
+    // sistema) só se a clínica ainda não tiver nome próprio carregado.
+    if (clinicTopEl && profile.clinics && profile.clinics.name) clinicTopEl.textContent = profile.clinics.name;
     if (initialsEl) initialsEl.textContent = getInitials(profile.full_name);
     window.__prismaClinicName = profile.clinics ? profile.clinics.name : '';
 
@@ -225,9 +229,11 @@ async function applyClinicSettings(clinicId, role) {
 
     if (settings && settings.logo_url) {
       const logoImg = document.querySelector('[data-slot="clinic-logo"]');
-      const defaultLogo = document.querySelector('[data-slot="default-logo"]');
+      const logoMark = document.querySelector('[data-slot="logo-mark"]');
+      // a logo enviada pela clínica substitui só o ícone "P" de marca; o
+      // nome da clínica ao lado (clinic-name-top) continua sempre visível.
       if (logoImg) { logoImg.src = settings.logo_url; logoImg.style.display = 'block'; }
-      if (defaultLogo) defaultLogo.style.display = 'none';
+      if (logoMark) logoMark.style.display = 'none';
     }
 
     const isAdmin = window.isAdminRole && window.isAdminRole(role);

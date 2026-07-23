@@ -482,38 +482,6 @@
               </div>
             </div>
 
-            <div class="card card-shadow mb-4" x-show="leaderboard.length > 0">
-              <h3 class="mb-2" style="font-size:15px;">🏆 Ranking do mês · quem está liderando</h3>
-              <p class="text-xs text-soft mb-3">Ordenado pelo valor realizado em <span x-text="currentMonthLabel"></span>. Serve como referência de competitividade, não substitui a avaliação de qualidade do atendimento.</p>
-
-              <div class="podium">
-                <template x-for="row in leaderboard.slice(0, 3)" :key="row.userId">
-                  <div class="podium-place" :class="'rank-' + row.rank">
-                    <span class="podium-crown" x-show="row.rank === 1">👑</span>
-                    <div class="podium-medal" x-text="row.rank"></div>
-                    <div class="podium-avatar" x-text="getInitials(row.name)"></div>
-                    <div class="podium-name" x-text="row.name"></div>
-                    <div class="podium-value" x-text="formatCurrency(row.revenue)"></div>
-                    <div class="podium-sub" x-text="row.salesCount + ' venda(s)' + (row.goalPct === null ? '' : ' · ' + row.goalPct + '% da meta')"></div>
-                  </div>
-                </template>
-              </div>
-
-              <div style="margin-top:22px;" x-show="leaderboard.length > 3">
-                <template x-for="row in leaderboard.slice(3)" :key="row.userId">
-                  <div class="leaderboard-row">
-                    <span class="leaderboard-rank" x-text="row.rank + 'º'"></span>
-                    <div class="avatar" style="width:30px;height:30px;font-size:11px;" x-text="getInitials(row.name)"></div>
-                    <div style="flex:1;">
-                      <strong class="text-sm" x-text="row.name"></strong>
-                      <div class="text-xs text-muted" x-text="row.salesCount + ' venda(s) · ' + row.clientsAttended + ' cliente(s) atendido(s)'"></div>
-                    </div>
-                    <strong class="text-sm" x-text="formatCurrency(row.revenue)"></strong>
-                  </div>
-                </template>
-              </div>
-            </div>
-
             <div class="card card-shadow" style="padding:0;">
               <div style="padding:20px 20px 0;"><h3 style="font-size:15px;">Metas e realizado por integrante</h3></div>
               <div class="table-wrap">
@@ -630,15 +598,53 @@
           </div>
           </template>
 
-          <div class="card card-shadow mb-5">
-            <h3 class="mb-3" style="font-size:15px;">Procedimentos mais executados</h3>
-            <div x-show="topProcedures.length === 0" class="text-sm text-muted">Nenhum atendimento concluído ainda.</div>
-            <template x-for="(proc, idx) in topProcedures" :key="proc.name">
-              <div class="procedure-rank-row">
-                <span x-text="(idx + 1) + 'º ' + proc.name"></span>
-                <span class="badge badge-accent" x-text="proc.count"></span>
+          <div class="grid grid-2 gap-3 mb-5">
+            <div class="card card-shadow" x-show="leaderboard.length > 0">
+              <h3 class="mb-2" style="font-size:15px;">🏆 Ranking do mês</h3>
+              <p class="text-xs text-soft mb-3">Quem mais faturou em <span x-text="currentMonthLabel"></span>. Referência de competitividade, não substitui a avaliação de qualidade do atendimento.</p>
+
+              <div class="podium">
+                <template x-for="row in leaderboard.slice(0, 3)" :key="row.userId">
+                  <div class="podium-place" :class="'rank-' + row.rank">
+                    <span class="podium-crown" x-show="row.rank === 1">👑</span>
+                    <div class="podium-medal" x-text="row.rank"></div>
+                    <div class="podium-avatar" x-text="getInitials(row.name)"></div>
+                    <div class="podium-name" x-text="row.name"></div>
+                    <div class="podium-value" x-text="formatCurrency(row.revenue)"></div>
+                    <div class="podium-sub" x-text="row.salesCount + ' venda(s)' + (row.goalPct === null ? '' : ' · ' + row.goalPct + '% da meta')"></div>
+                  </div>
+                </template>
               </div>
-            </template>
+
+              <div style="margin-top:22px;" x-show="leaderboard.length > 3">
+                <template x-for="row in leaderboard.slice(3)" :key="row.userId">
+                  <div class="leaderboard-row">
+                    <span class="leaderboard-rank" x-text="row.rank + 'º'"></span>
+                    <div class="avatar" style="width:30px;height:30px;font-size:11px;" x-text="getInitials(row.name)"></div>
+                    <div style="flex:1;">
+                      <strong class="text-sm" x-text="row.name"></strong>
+                      <div class="text-xs text-muted" x-text="row.salesCount + ' venda(s) · ' + row.clientsAttended + ' cliente(s) atendido(s)'"></div>
+                    </div>
+                    <strong class="text-sm" x-text="formatCurrency(row.revenue)"></strong>
+                  </div>
+                </template>
+              </div>
+            </div>
+
+            <div class="card card-shadow">
+              <h3 class="mb-2" style="font-size:15px;">Procedimentos mais executados</h3>
+              <p class="text-xs text-soft mb-3">Volume de atendimentos concluídos em <span x-text="currentMonthLabel"></span>, do mais para o menos executado.</p>
+              <div x-show="topProcedures.length === 0" class="text-sm text-muted">Nenhum atendimento concluído ainda.</div>
+              <template x-for="(proc, idx) in topProcedures" :key="proc.name">
+                <div class="mb-3">
+                  <div class="flex items-center justify-between mb-1">
+                    <span class="text-sm" x-text="(idx + 1) + 'º ' + proc.name"></span>
+                    <span class="text-xs text-muted" x-text="proc.count + (proc.count === 1 ? ' atendimento' : ' atendimentos')"></span>
+                  </div>
+                  <div class="bi-bar"><div class="bi-bar-fill" :style="'width:' + proc.pct + '%'"></div></div>
+                </div>
+              </template>
+            </div>
           </div>
         </div>
 
@@ -1635,10 +1641,14 @@ function biApp() {
       this.appointments
         .filter(a => a.status === 'concluido' && a.services && a.services.name)
         .forEach(a => { counts[a.services.name] = (counts[a.services.name] || 0) + 1; });
-      return Object.entries(counts)
+      const rows = Object.entries(counts)
         .map(([name, count]) => ({ name, count }))
         .sort((a, b) => b.count - a.count)
         .slice(0, 8);
+      // pct é relativo ao mais executado (ele fica com a barra cheia), só
+      // para desenhar a barrinha de proporção ao lado de cada procedimento.
+      const max = rows.length > 0 ? rows[0].count : 0;
+      return rows.map(r => Object.assign(r, { pct: max > 0 ? Math.round((r.count / max) * 100) : 0 }));
     },
 
     get appointmentsByProfessional() {

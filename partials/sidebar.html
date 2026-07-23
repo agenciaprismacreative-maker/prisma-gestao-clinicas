@@ -3,13 +3,11 @@
   <div class="sidebar-inner">
 
     <div class="sidebar-logo">
-      <img data-slot="clinic-logo" style="display:none;height:34px;max-width:170px;object-fit:contain;">
-      <div data-slot="default-logo" style="display:contents;">
-        <div class="logo-mark">P</div>
-        <div class="logo-text">
-          <strong>Prisma</strong>
-          <span>Gestão de Clínicas</span>
-        </div>
+      <div class="logo-mark" data-slot="logo-mark">P</div>
+      <img data-slot="clinic-logo" style="display:none;width:36px;height:36px;object-fit:cover;border-radius:var(--radius-md);flex-shrink:0;">
+      <div class="logo-text">
+        <strong data-slot="clinic-name-top">Prisma</strong>
+        <span>Gestão de Clínicas</span>
       </div>
     </div>
 
@@ -40,14 +38,6 @@
       </a>
 
       <div class="sidebar-group-label">Operação</div>
-
-      <a href="equipe.html" class="nav-item" data-page="equipe" data-allowed-roles="administrador">
-        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="5" y="4" width="14" height="17" rx="2"/><rect x="9" y="2.5" width="6" height="3" rx="1"/>
-          <path d="M8.5 11h7"/><path d="M8.5 15h7"/><path d="M8.5 19h4"/>
-        </svg>
-        <span>Equipe e tarefas</span>
-      </a>
 
       <a href="atendimento.html" class="nav-item" data-page="atendimento" data-allowed-roles="administrador,esteticista">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -111,6 +101,14 @@
           <path d="M4 18h9"/><circle cx="16" cy="18" r="2"/>
         </svg>
         <span>Configurações</span>
+      </a>
+
+      <a href="equipe.html" class="nav-item" data-page="equipe" data-allowed-roles="administrador">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="5" y="4" width="14" height="17" rx="2"/><rect x="9" y="2.5" width="6" height="3" rx="1"/>
+          <path d="M8.5 11h7"/><path d="M8.5 15h7"/><path d="M8.5 19h4"/>
+        </svg>
+        <span>Equipe e tarefas</span>
       </a>
     </nav>
 

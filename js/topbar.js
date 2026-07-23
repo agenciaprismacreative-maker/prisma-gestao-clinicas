@@ -3,6 +3,24 @@
    Componente Alpine independente, injetado junto com partials/topbar.html.
    =================================================================== */
 
+// Texto de abertura da barra superior, contextual por página (lido de
+// data-page no <body>). Mantém a data/hora ao final em todas as telas; só a
+// frase de abertura muda, para refletir o que cada área do sistema mostra.
+const TOPBAR_SUBTITLES = {
+  dashboard: 'Aqui estão os dados de hoje',
+  pacientes: 'Sua base de pacientes',
+  agenda: 'Sua agenda de atendimentos',
+  atendimento: 'Fila de atendimento de hoje',
+  vendas: 'Vendas e aprovações',
+  financeiro: 'Panorama financeiro da clínica',
+  reativacao: 'Pacientes para reativar',
+  servicos: 'Serviços e procedimentos',
+  estoque: 'Controle do estoque',
+  bi: 'Desempenho e metas da equipe',
+  equipe: 'Gestão da equipe e tarefas',
+  configuracoes: 'Configurações da clínica'
+};
+
 function topbarApp() {
   return {
     clinicId: null,
@@ -44,7 +62,9 @@ function topbarApp() {
       const dateLabel = this.now.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
       const timeLabel = this.now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
       const capitalized = dateLabel.charAt(0).toUpperCase() + dateLabel.slice(1);
-      return 'Aqui estão os dados de hoje · ' + capitalized + ' · ' + timeLabel;
+      const page = document.body.getAttribute('data-page');
+      const lead = TOPBAR_SUBTITLES[page] || TOPBAR_SUBTITLES.dashboard;
+      return lead + ' · ' + capitalized + ' · ' + timeLabel;
     },
 
     async onSearchInput() {

@@ -644,6 +644,13 @@ alter table public.clinic_settings enable row level security;
 create policy "clinics_select" on public.clinics for select
   using (id = public.auth_clinic_id() or public.auth_is_prisma_team());
 
+-- clinics: só administrador da própria clínica edita os dados dela
+-- (nome, etc.). Sem essa policy o update roda sem erro e sem efeito, porque
+-- a checagem de RLS descarta a linha antes de gravar.
+create policy "clinics_update" on public.clinics for update
+  using (id = public.auth_clinic_id() and public.auth_is_admin())
+  with check (id = public.auth_clinic_id() and public.auth_is_admin());
+
 -- users: cada usuário vê os colegas da própria clínica
 create policy "users_select" on public.users for select
   using (clinic_id = public.auth_clinic_id() or public.auth_is_prisma_team());
