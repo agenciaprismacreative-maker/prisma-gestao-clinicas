@@ -6,6 +6,11 @@
         <path d="M3 6h18"/><path d="M3 12h18"/><path d="M3 18h18"/>
       </svg>
     </button>
+    <button class="icon-btn" type="button" @click="goBack()" title="Voltar" aria-label="Voltar">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M15 18l-6-6 6-6"/>
+      </svg>
+    </button>
     <div class="topbar-title">
       <h1 x-text="greeting">Olá!</h1>
       <span class="text-muted" x-text="todaySummary"></span>

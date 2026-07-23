@@ -151,20 +151,41 @@ svg.icon { width: 20px; height: 20px; flex-shrink: 0; }
   top: 0; left: 0; bottom: 0;
   z-index: 40;
   overflow: hidden;
-  transition: width .18s ease, transform .2s ease;
+  transition: width .22s ease;
 }
-/* recolhida por padrão (só ícones); passar o mouse expande por cima do
-   conteúdo (position:fixed + z-index acima do topbar), sem empurrar o
-   .main, que já fica com margem fixa na largura recolhida. */
+/* recolhida por padrão (só ícones, como botões); passar o mouse expande
+   por cima do conteúdo (position:fixed + z-index acima do topbar), sem
+   empurrar o .main, que já fica com margem fixa na largura recolhida.
+   .sidebar-inner tem largura fixa (a cheia); quem anima é só o "recorte"
+   do .sidebar por fora, e o texto some/aparece com opacidade — assim o
+   ícone nunca fica cortado no meio, some por completo. */
 .sidebar:hover { width: var(--sidebar-width); box-shadow: var(--shadow-lg); }
 .sidebar-inner {
   display: flex; flex-direction: column; height: 100%;
   width: var(--sidebar-width);
 }
 
+/* textos que só aparecem com a sidebar expandida (hover); some por
+   opacidade (não por corte), então nunca aparece pela metade. Seleciona
+   pela estrutura existente, sem precisar mexer no HTML de cada item. */
+.logo-text,
+.sidebar-group-label,
+.sidebar-user,
+.nav-item > span:not([data-slot]) {
+  opacity: 0;
+  transition: opacity .12s ease;
+}
+.sidebar:hover .logo-text,
+.sidebar:hover .sidebar-group-label,
+.sidebar:hover .sidebar-user,
+.sidebar:hover .nav-item > span:not([data-slot]) {
+  opacity: 1;
+  transition: opacity .2s ease .06s;
+}
+
 .sidebar-logo {
   display: flex; align-items: center; gap: var(--space-3);
-  padding: var(--space-5) var(--space-5) var(--space-4);
+  padding: var(--space-4) var(--space-5) var(--space-3);
 }
 .logo-mark {
   width: 36px; height: 36px; border-radius: var(--radius-md);
@@ -176,15 +197,15 @@ svg.icon { width: 20px; height: 20px; flex-shrink: 0; }
 .logo-text strong { font-size: 15px; font-weight: 600; }
 .logo-text span { font-size: 11.5px; color: rgba(255,255,255,.55); }
 
-.sidebar-nav { flex: 1; overflow-y: auto; padding: var(--space-3) var(--space-4); display: flex; flex-direction: column; gap: 2px; }
+.sidebar-nav { flex: 1; overflow: hidden; padding: var(--space-2) var(--space-4); display: flex; flex-direction: column; gap: 2px; }
 .sidebar-group-label {
-  padding: 0 var(--space-2); margin: var(--space-3) 0 6px;
+  padding: 0 var(--space-2); margin: var(--space-2) 0 4px;
   font-size: 10.5px; font-weight: 700; text-transform: uppercase;
   letter-spacing: .06em; color: rgba(255,255,255,.35);
 }
 .nav-item {
   display: flex; align-items: center; gap: var(--space-3);
-  padding: 10px var(--space-4); border-radius: var(--radius-md);
+  padding: 9px var(--space-4); border-radius: var(--radius-md);
   color: rgba(255,255,255,.72); font-size: 14px; font-weight: 500;
   position: relative;
 }
@@ -205,12 +226,12 @@ svg.icon { width: 20px; height: 20px; flex-shrink: 0; }
 
 .sidebar-footer {
   display: flex; align-items: center; gap: var(--space-3);
-  padding: var(--space-4) var(--space-5); border-top: 1px solid rgba(255,255,255,.08);
+  padding: var(--space-3) var(--space-5); border-top: 1px solid rgba(255,255,255,.08);
 }
 .sidebar-user { display: flex; flex-direction: column; line-height: 1.25; flex: 1; min-width: 0; }
 .sidebar-user strong { font-size: 13.5px; font-weight: 600; }
 .sidebar-user span { font-size: 11.5px; color: rgba(255,255,255,.5); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.sidebar-logout { color: rgba(255,255,255,.55); padding: 6px; border-radius: var(--radius-sm); background: none; border: none; cursor: pointer; }
+.sidebar-logout { color: rgba(255,255,255,.55); padding: 6px; border-radius: var(--radius-sm); background: none; border: none; cursor: pointer; flex-shrink: 0; }
 .sidebar-logout:hover { color: #fff; background: rgba(255,255,255,.08); }
 
 .main { margin-left: var(--sidebar-collapsed-width); flex: 1; display: flex; flex-direction: column; min-width: 0; }
@@ -385,6 +406,14 @@ textarea.input { resize: vertical; min-height: 80px; }
   .sidebar { width: var(--sidebar-width); transform: translateX(-100%); box-shadow: var(--shadow-lg); }
   .sidebar:hover { width: var(--sidebar-width); }
   .sidebar.is-open { transform: translateX(0); }
+  /* no celular não existe hover pra revelar o texto; ele precisa aparecer
+     assim que o menu abre pelo hambúrguer, sempre. */
+  .sidebar .logo-text,
+  .sidebar .sidebar-group-label,
+  .sidebar .sidebar-user,
+  .sidebar .nav-item > span:not([data-slot]) {
+    opacity: 1;
+  }
   .main { margin-left: 0; }
   .menu-toggle { display: flex; }
   .content { padding: var(--space-4); }

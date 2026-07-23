@@ -58,6 +58,17 @@ function topbarApp() {
       return this.firstName ? ('Olá, ' + this.firstName + '!') : 'Olá!';
     },
 
+    // seta de voltar no topo, presente em toda página autenticada. Usa o
+    // histórico do navegador quando existe; sem histórico (ex.: link aberto
+    // direto numa aba nova), cai para o dashboard em vez de não fazer nada.
+    goBack() {
+      if (window.history.length > 1) {
+        window.history.back();
+      } else {
+        window.location.href = 'dashboard.html';
+      }
+    },
+
     get todaySummary() {
       const dateLabel = this.now.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
       const timeLabel = this.now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
