@@ -261,9 +261,9 @@
           </p>
           <p class="input-hint mb-3" x-show="newSale.origin === 'Indicação de funcionário' && newSale.referred_by_user_id && referralPreview.loading" x-cloak>Calculando faixa de comissão…</p>
           <div class="input-hint mb-3" x-show="newSale.origin === 'Indicação de funcionário' && newSale.referred_by_user_id && !referralPreview.loading" x-cloak>
-            <span x-show="!referralPreview.hasGoal">Este funcionário ainda não tem meta individual cadastrada este mês em Desempenho › Metas — sem meta, essa indicação não gera comissão.</span>
-            <span x-show="referralPreview.hasGoal && referralPreview.tierPct === null">Está em <strong x-text="referralPreview.goalPct + '%'"></strong> da própria meta (<span x-text="formatCurrency(referralPreview.revenue)"></span> de <span x-text="formatCurrency(referralPreview.target)"></span>) — ainda abaixo da 1ª faixa de comissão. Se aprovar agora, esta indicação não gera comissão.</span>
-            <span x-show="referralPreview.hasGoal && referralPreview.tierPct !== null">Está em <strong x-text="referralPreview.goalPct + '%'"></strong> da própria meta (<span x-text="formatCurrency(referralPreview.revenue)"></span> de <span x-text="formatCurrency(referralPreview.target)"></span>) — se aprovar agora, esta indicação gera <strong x-text="referralPreview.tierPct + '%'"></strong> de comissão.</span>
+            <span x-show="!referralPreview.hasGoal">Este funcionário ainda não tem meta individual cadastrada este mês em Desempenho › Metas. Sem meta, essa indicação não gera comissão.</span>
+            <span x-show="referralPreview.hasGoal && referralPreview.tierPct === null">Está em <strong x-text="referralPreview.goalPct + '%'"></strong> da própria meta (<span x-text="formatCurrency(referralPreview.revenue)"></span> de <span x-text="formatCurrency(referralPreview.target)"></span>), ainda abaixo da 1ª faixa de comissão. Se aprovar agora, esta indicação não gera comissão.</span>
+            <span x-show="referralPreview.hasGoal && referralPreview.tierPct !== null">Está em <strong x-text="referralPreview.goalPct + '%'"></strong> da própria meta (<span x-text="formatCurrency(referralPreview.revenue)"></span> de <span x-text="formatCurrency(referralPreview.target)"></span>). Se aprovar agora, esta indicação gera <strong x-text="referralPreview.tierPct + '%'"></strong> de comissão.</span>
           </div>
 
           <hr class="divider">

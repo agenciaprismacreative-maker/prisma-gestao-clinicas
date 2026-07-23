@@ -288,7 +288,7 @@
             </div>
             <div class="form-group" x-show="newAppt.patient_id" x-cloak>
               <label class="label">Vincular a pacote (opcional)</label>
-              <div x-show="patientPackages.length === 0" class="text-xs text-muted">Nenhum pacote em aberto para este paciente — selecione o serviço abaixo para uma sessão avulsa.</div>
+              <div x-show="patientPackages.length === 0" class="text-xs text-muted">Nenhum pacote em aberto para este paciente. Selecione o serviço abaixo para uma sessão avulsa.</div>
               <select class="input" x-model="newAppt.package_id" x-show="patientPackages.length > 0" @change="onPackageChangeForAppt()">
                 <option value="">Sessão avulsa (sem pacote)</option>
                 <template x-for="pk in patientPackages" :key="pk.id">
