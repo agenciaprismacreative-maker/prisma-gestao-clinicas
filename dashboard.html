@@ -70,6 +70,9 @@
       <!-- ===================== VISÃO ADMINISTRADOR ===================== -->
       <div x-show="isAdmin" x-cloak>
 
+      <div class="panel-section" x-show="!loading">
+        <div class="panel-section-head"><span class="panel-section-dot"></span><h3>Indicadores do dia</h3></div>
+
       <!-- faturamento estimado do dia -->
       <div class="card card-shadow mb-5" style="padding:22px 26px;" x-show="!loading">
         <div class="flex items-center justify-between" style="flex-wrap:wrap;gap:16px;">
@@ -161,10 +164,15 @@
         </div>
       </div>
 
+      </div>
+
+      <div class="panel-section" x-show="!loading">
+        <div class="panel-section-head"><span class="panel-section-dot"></span><h3>Tendências</h3></div>
+
       <div class="grid grid-2 gap-3 mb-5" x-show="!loading">
         <div class="card card-shadow">
           <div class="card-header">
-            <div><h3 x-text="'Faturamento — ' + revenueChartPeriodLabel"></h3><p>Procedimentos e pacotes pagos</p></div>
+            <div><h3 x-text="'Faturamento (' + revenueChartPeriodLabel + ')'"></h3><p>Procedimentos e pacotes pagos</p></div>
             <div class="flex gap-1">
               <button type="button" class="btn btn-sm" :class="revenueChartPeriodDays === 7 ? 'btn-primary' : 'btn-secondary'" @click="setRevenueChartPeriod(7)">7d</button>
               <button type="button" class="btn btn-sm" :class="revenueChartPeriodDays === 14 ? 'btn-primary' : 'btn-secondary'" @click="setRevenueChartPeriod(14)">14d</button>
@@ -187,9 +195,14 @@
         </div>
       </div>
 
+      </div>
+
+      <div class="panel-section" x-show="!loading">
+        <div class="panel-section-head"><span class="panel-section-dot"></span><h3>Atividade recente</h3></div>
+
       <div class="card card-shadow mb-5" x-show="!loading">
         <div class="card-header">
-          <div><h3>Últimos atendimentos</h3><p>Quem estava atendendo — 5 mais recentes</p></div>
+          <div><h3>Últimos atendimentos</h3><p>Quem estava atendendo (5 mais recentes)</p></div>
           <a href="bi.html" class="btn btn-ghost btn-sm">Ver mais</a>
         </div>
         <div x-show="recentAttendances.length === 0" class="empty-note" style="margin:20px;">Nenhum atendimento concluído ainda.</div>
@@ -214,7 +227,7 @@
         <div class="card-header">
           <div>
             <h3>🏆 Ranking do mês</h3>
-            <p>Quem está liderando em vendas — últimos 30 dias</p>
+            <p>Quem está liderando em vendas nos últimos 30 dias</p>
           </div>
           <a href="bi.html" class="btn btn-ghost btn-sm">Ver desempenho completo</a>
         </div>
@@ -232,10 +245,16 @@
       </div>
 
       </div>
+
+      </div>
       <!-- ===================== fim visão administrador ===================== -->
 
       <!-- ===================== VISÃO BÁSICA DO FUNCIONÁRIO ===================== -->
       <div x-show="!loading && !isAdmin" x-cloak>
+
+      <div class="panel-section">
+        <div class="panel-section-head"><span class="panel-section-dot"></span><h3>Minha agenda hoje</h3></div>
+
         <div class="card card-shadow mb-5">
           <div class="card-header">
             <div>
@@ -268,10 +287,10 @@
               </tbody>
             </table>
           </div>
-          <p class="text-xs text-muted" style="padding:10px 20px 4px;margin:0;" x-show="myAppointmentsTodayRemaining > 0" x-text="'+ ' + myAppointmentsTodayRemaining + ' agendamento(s) pendente(s) além destes — veja sua agenda completa.'"></p>
+          <p class="text-xs text-muted" style="padding:10px 20px 4px;margin:0;" x-show="myAppointmentsTodayRemaining > 0" x-text="'+ ' + myAppointmentsTodayRemaining + ' agendamento(s) pendente(s) além destes. Veja sua agenda completa.'"></p>
         </div>
 
-        <div class="card card-shadow mb-5">
+        <div class="card card-shadow">
           <div class="card-header">
             <div><h3>Meus atendimentos</h3><p>Concluídos x cancelados/faltas</p></div>
             <div class="flex gap-1">
@@ -285,6 +304,11 @@
             <canvas id="dashMyAttendanceChart"></canvas>
           </div>
         </div>
+
+      </div>
+
+      <div class="panel-section">
+        <div class="panel-section-head"><span class="panel-section-dot"></span><h3>Extras</h3></div>
 
         <div class="grid grid-2 gap-3">
 
@@ -345,9 +369,14 @@
 
         </div>
       </div>
+
+      </div>
       <!-- ===================== fim visão básica do funcionário ===================== -->
 
-      <div class="grid grid-main-side" x-show="!loading && isAdmin" x-cloak>
+      <div class="panel-section" x-show="!loading && isAdmin" x-cloak>
+        <div class="panel-section-head"><span class="panel-section-dot"></span><h3>Agenda e acompanhamento</h3></div>
+
+      <div class="grid grid-main-side">
 
         <div class="card card-shadow" x-show="!loading">
           <div class="card-header">
@@ -383,7 +412,7 @@
               </tbody>
             </table>
           </div>
-          <p class="text-xs text-muted" style="padding:10px 20px 4px;margin:0;" x-show="appointmentsTodayRemaining > 0" x-text="'+ ' + appointmentsTodayRemaining + ' agendamento(s) pendente(s) além destes — veja a agenda completa.'"></p>
+          <p class="text-xs text-muted" style="padding:10px 20px 4px;margin:0;" x-show="appointmentsTodayRemaining > 0" x-text="'+ ' + appointmentsTodayRemaining + ' agendamento(s) pendente(s) além destes. Veja a agenda completa.'"></p>
         </div>
 
         <div class="flex" style="flex-direction:column;gap:24px;" x-show="!loading">
@@ -494,6 +523,8 @@
           </div>
 
         </div>
+
+      </div>
 
       </div>
 

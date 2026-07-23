@@ -556,12 +556,18 @@ textarea.input { resize: vertical; min-height: 80px; }
 .procedure-rank-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--color-border); font-size: 13px; }
 .procedure-rank-row:last-child { border-bottom: none; }
 
-/* ---------- seção de metas: agrupamento por trilha, progresso e faixas ---------- */
-.goal-section { background: var(--color-surface-alt); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: 20px; margin-bottom: var(--space-5); }
-.goal-section-head { display: flex; align-items: center; gap: 10px; margin-bottom: var(--space-4); flex-wrap: wrap; }
-.goal-section-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--color-primary); flex-shrink: 0; }
-.goal-section.is-collective .goal-section-dot { background: var(--color-accent); }
-.goal-section-head h3 { font-size: 17px; margin: 0; }
+/* ---------- agrupamento visual de cards relacionados em qualquer página ----------
+   .panel-section é a versão genérica do agrupamento criado para a aba Metas
+   (.goal-section, em BI): um painel com fundo e rótulo próprios, reunindo
+   visualmente vários cards que pertencem ao mesmo bloco de conteúdo. As duas
+   classes compartilham a mesma receita visual de propósito. */
+.goal-section, .panel-section { background: var(--color-surface-alt); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: 20px; margin-bottom: var(--space-5); }
+.goal-section-head, .panel-section-head { display: flex; align-items: center; gap: 10px; margin-bottom: var(--space-4); flex-wrap: wrap; }
+.goal-section-dot, .panel-section-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--color-primary); flex-shrink: 0; }
+.goal-section.is-collective .goal-section-dot, .panel-section.is-accent .panel-section-dot { background: var(--color-accent); }
+.goal-section-head h3, .panel-section-head h3 { font-size: 17px; margin: 0; }
+.panel-section-head .text-xs { color: var(--color-text-muted); }
+.panel-section > .card:last-child, .goal-section > .card:last-child { margin-bottom: 0; }
 
 .goal-meter-stats { display: flex; gap: 18px; flex-wrap: wrap; margin-bottom: 14px; }
 .goal-meter-stat { flex: 1; min-width: 130px; }
