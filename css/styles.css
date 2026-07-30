@@ -299,6 +299,7 @@ svg.icon { width: 20px; height: 20px; flex-shrink: 0; }
 .grid-2 { grid-template-columns: repeat(2, 1fr); }
 .grid-main-side { grid-template-columns: 1.6fr 1fr; }
 .grid-wide-narrow { grid-template-columns: 1fr 1fr .72fr; }
+.row-span-2 { grid-row: span 2; }
 
 .stat-card { position: relative; overflow: hidden; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: var(--space-5); }
 .stat-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: var(--accent-color, transparent); }
@@ -399,6 +400,7 @@ textarea.input { resize: vertical; min-height: 80px; }
   .grid-wide-narrow { grid-template-columns: repeat(2, 1fr); }
   .grid-main-side { grid-template-columns: 1fr; }
   .topbar-search { display: none; }
+  .row-span-2 { grid-row: auto; }
 }
 
 @media (max-width: 720px) {
@@ -420,6 +422,7 @@ textarea.input { resize: vertical; min-height: 80px; }
   .content { padding: var(--space-4); }
   .topbar { padding: 0 var(--space-4); }
   .grid-4, .grid-3, .grid-2, .grid-wide-narrow { grid-template-columns: 1fr; }
+  .row-span-2 { grid-row: auto; }
   .page-header { flex-direction: column; align-items: stretch; }
   .sidebar-backdrop { display: block; }
 }
@@ -596,6 +599,24 @@ textarea.input { resize: vertical; min-height: 80px; }
 .podium-name { font-size: 13px; font-weight: 600; margin-bottom: 2px; }
 .podium-value { font-size: 14.5px; font-weight: 700; color: var(--color-primary); }
 .podium-sub { font-size: 11px; color: var(--color-text-muted); margin-top: 3px; }
+
+/* ---------- ranking em lista vertical (colunas estreitas) ----------
+   Mesma ideia do pódio acima (1º/2º/3º com destaque de ouro/prata/bronze),
+   mas em linhas empilhadas em vez de 3 caixas lado a lado -- o pódio
+   horizontal quebra/sobrepõe em colunas estreitas (ex.: Tendências do
+   dashboard), então este é o formato usado ali. */
+.rank-row { display: flex; align-items: center; gap: 10px; padding: 9px 11px; border-radius: var(--radius-md); border: 1px solid var(--color-border); background: var(--color-surface-alt); }
+.rank-row + .rank-row { margin-top: 8px; }
+.rank-row-badge { width: 25px; height: 25px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #fff; background: var(--color-text-soft); }
+.rank-row-1 { background: #FFF6DE; border-color: #E8C666; }
+.rank-row-1 .rank-row-badge { background: #C9971F; }
+.rank-row-2 { background: #F0F2F4; border-color: #C7CDD3; }
+.rank-row-2 .rank-row-badge { background: #8D96A0; }
+.rank-row-3 { background: #FBEDE1; border-color: #DCAE85; }
+.rank-row-3 .rank-row-badge { background: #B0724A; }
+html[data-theme="escuro"] .rank-row-1 { background: #332C1B; border-color: #5C4B23; }
+html[data-theme="escuro"] .rank-row-2 { background: #2A2D30; border-color: #454C52; }
+html[data-theme="escuro"] .rank-row-3 { background: #2E2620; border-color: #5C4530; }
 
 .leaderboard-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--color-border); }
 .leaderboard-row:last-child { border-bottom: none; }

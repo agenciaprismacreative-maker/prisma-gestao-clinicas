@@ -24,6 +24,7 @@
         <div class="flex gap-3">
           <input type="file" accept=".csv" x-ref="csvInput" @change="importCsv($event)" style="display:none;">
           <button class="btn btn-secondary" type="button" @click="$refs.csvInput.click()" title="Aceita CSV com colunas como nome, telefone, e-mail, nascimento e CPF, em qualquer ordem, com vírgula ou ponto e vírgula.">Importar lista de clientes</button>
+          <button class="btn btn-secondary" type="button" @click="exportCsv()" title="Exporta a lista de pacientes em .csv, útil para migração ou atualização em outra base de dados.">Exportar lista (.csv)</button>
           <button class="btn btn-primary" type="button" @click="openNewForm()">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
             Novo paciente
@@ -1462,6 +1463,53 @@ function pacientesApp() {
       if (skippedEmails > 0) message += ' ' + skippedEmails + ' e-mail(s) em formato inválido foram ignorados.';
       this.showFeedback('success', message);
       await this.loadPatients();
+    },
+
+    // Exporta a lista (respeitando a busca ativa) em CSV, pensado para
+    // migração/atualização em outra base de dados: valores crus (não o
+    // texto traduzido de tela), separador vírgula, tudo entre aspas e um
+    // BOM UTF-8 no início para o Excel abrir acentos corretamente.
+    exportCsv() {
+      const rows = this.filtered;
+      if (rows.length === 0) {
+        this.showFeedback('error', 'Não há pacientes para exportar.');
+        return;
+      }
+
+      const headers = [
+        'nome_completo', 'cpf', 'rg', 'rg_orgao_emissor', 'rg_data_emissao',
+        'telefone', 'telefone2', 'telefone_fixo', 'email', 'data_nascimento',
+        'instagram', 'facebook', 'cep', 'endereco', 'numero', 'bairro', 'complemento',
+        'origem', 'alergias', 'lgpd_consentimento_em'
+      ];
+      const esc = (value) => {
+        const s = (value === null || value === undefined) ? '' : String(value);
+        return '"' + s.replace(/"/g, '""') + '"';
+      };
+      const lines = [headers.map(esc).join(',')];
+      rows.forEach((p) => {
+        lines.push([
+          p.full_name, p.cpf, p.rg, p.rg_orgao_emissor, p.rg_data_emissao,
+          p.phone, p.phone2, p.landline, p.email, p.birth_date,
+          p.instagram, p.facebook, p.address_cep, p.address_street, p.address_number,
+          p.address_neighborhood, p.address_complement,
+          p.lead_source, p.allergies, p.lgpd_consent_at
+        ].map(esc).join(','));
+      });
+
+      const csvContent = '﻿' + lines.join('\r\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      const stamp = new Date().toISOString().slice(0, 10);
+      link.href = url;
+      link.download = 'pacientes_' + stamp + '.csv';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      this.showFeedback('success', rows.length + ' paciente(s) exportado(s) em CSV.');
     },
 
     showFeedback(type, message) {

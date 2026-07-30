@@ -189,7 +189,7 @@
               <button type="button" class="btn btn-sm" :class="revenueChartPeriodDays === 90 ? 'btn-primary' : 'btn-secondary'" @click="setRevenueChartPeriod(90)">3 meses</button>
             </div>
           </div>
-          <div style="position:relative;height:190px;padding:4px 12px 12px;">
+          <div style="position:relative;height:150px;padding:4px 12px 8px;">
             <canvas id="dashRevenueChart"></canvas>
           </div>
         </div>
@@ -198,12 +198,12 @@
             <div><h3>Agendamentos de hoje por status</h3><p x-text="appointmentsToday.length + ' no total'"></p></div>
           </div>
           <div x-show="appointmentsToday.length === 0" class="empty-note" style="margin:20px;">Nenhum agendamento para hoje.</div>
-          <div style="position:relative;height:190px;padding:4px 12px 12px;" x-show="appointmentsToday.length > 0">
+          <div style="position:relative;height:150px;padding:4px 12px 8px;" x-show="appointmentsToday.length > 0">
             <canvas id="dashStatusChart"></canvas>
           </div>
         </div>
 
-        <div class="flex" style="flex-direction:column;gap:12px;">
+        <div class="flex row-span-2" style="flex-direction:column;gap:12px;">
 
           <div class="card card-shadow">
             <div class="card-header">
@@ -239,38 +239,32 @@
             </div>
           </div>
 
-          <div class="card card-shadow" x-show="dashboardLeaderboard.length > 0">
+          <div class="card card-shadow" x-show="dashboardLeaderboard.length > 0" style="flex:1;display:flex;flex-direction:column;">
             <div class="card-header">
               <div>
                 <h3 style="font-size:15px;">🏆 Ranking do mês</h3>
                 <p>Últimos 30 dias</p>
               </div>
             </div>
-            <div class="podium">
+            <div class="flex" style="flex-direction:column;">
               <template x-for="row in dashboardLeaderboard" :key="row.userId">
-                <div class="podium-place" :class="'rank-' + row.rank">
-                  <span class="podium-crown" x-show="row.rank === 1">👑</span>
-                  <div class="podium-medal" x-text="row.rank"></div>
-                  <div class="podium-avatar" x-text="initials(row.name)"></div>
-                  <div class="podium-name" x-text="row.name"></div>
-                  <div class="podium-value" x-text="formatCurrency(row.revenue)"></div>
+                <div class="rank-row" :class="'rank-row-' + row.rank">
+                  <div class="rank-row-badge" x-text="row.rank"></div>
+                  <div class="avatar" x-text="initials(row.name)"></div>
+                  <div style="flex:1;min-width:0;">
+                    <strong class="text-sm" x-text="row.name" style="display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></strong>
+                  </div>
+                  <strong class="text-sm" x-text="formatCurrency(row.revenue)" style="white-space:nowrap;"></strong>
                 </div>
               </template>
             </div>
-            <div class="text-center mt-2">
+            <div class="text-center" style="margin-top:auto;padding-top:12px;">
               <a href="bi.html" class="btn btn-ghost btn-sm">Ver desempenho completo</a>
             </div>
           </div>
 
         </div>
-      </div>
 
-      </div>
-
-      <div class="panel-section" x-show="!loading">
-        <div class="panel-section-head"><span class="panel-section-dot"></span><h3>Atividade recente e agenda</h3></div>
-
-      <div class="grid grid-2 gap-3 mb-5" x-show="!loading">
         <div class="card card-shadow">
           <div class="card-header">
             <div><h3>Últimos atendimentos</h3><p>Quem estava atendendo (5 mais recentes)</p></div>
@@ -332,7 +326,13 @@
             <button type="button" class="btn btn-ghost btn-sm" @click="appointmentsTodayExpanded = !appointmentsTodayExpanded" x-text="appointmentsTodayExpanded ? 'Ver menos' : ('Ver mais (' + appointmentsTodayRemaining + ')')"></button>
           </div>
         </div>
+
       </div>
+
+      </div>
+
+      <div class="panel-section" x-show="!loading">
+        <div class="panel-section-head"><span class="panel-section-dot"></span><h3>Acompanhamento</h3></div>
 
       <div class="grid grid-3 gap-3" x-show="!loading">
 
