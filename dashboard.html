@@ -243,7 +243,7 @@
             <div class="card-header">
               <div>
                 <h3 style="font-size:15px;">🏆 Ranking do mês</h3>
-                <p>Últimos 30 dias</p>
+                <p x-text="currentMonthLabel"></p>
               </div>
             </div>
             <div class="flex" style="flex-direction:column;">
@@ -820,7 +820,7 @@ function dashboardApp() {
       since.setDate(since.getDate() - 95);
       const { data, error } = await supabaseClient
         .from('transactions')
-        .select('amount, type, transaction_date')
+        .select('amount, type, transaction_date, professional_id')
         .gte('transaction_date', since.toISOString().slice(0, 10));
       this.transactionsForChart = error ? [] : (data || []);
     },
@@ -1091,10 +1091,26 @@ function dashboardApp() {
       return { previsto, realizado, pct, concluidos, total: relevantToday.length, avgDaily, status };
     },
 
+    // chave do mês corrente (ex.: "2026-08"), mesmo padrão usado no BI para
+    // que "ranking do mês" e "metas do mês" sempre falem do mesmo período.
+    get currentMonthKey() {
+      const now = new Date();
+      return now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+    },
+
+    get currentMonthLabel() {
+      const label = new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+      return label.charAt(0).toUpperCase() + label.slice(1);
+    },
+
     get dashboardLeaderboard() {
       const sums = {};
-      this.transactions30d
-        .filter(t => t.type === 'pagamento_procedimento' || t.type === 'venda_pacote')
+      // transactionsForChart já cobre 95 dias (carregado 1 vez só), então
+      // sempre inclui o mês corrente inteiro desde o dia 1 -- ao contrário
+      // de transactions30d, que é uma janela rolante de 30 dias e não é o
+      // mesmo período que "mês" (ficava incorreto perto da virada do mês).
+      this.transactionsForChart
+        .filter(t => (t.type === 'pagamento_procedimento' || t.type === 'venda_pacote') && t.transaction_date && t.transaction_date.slice(0, 7) === this.currentMonthKey)
         .forEach(t => {
           if (!t.professional_id) return;
           sums[t.professional_id] = (sums[t.professional_id] || 0) + Number(t.amount || 0);
