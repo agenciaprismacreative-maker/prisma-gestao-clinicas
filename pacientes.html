@@ -25,6 +25,7 @@
           <input type="file" accept=".csv" x-ref="csvInput" @change="importCsv($event)" style="display:none;">
           <button class="btn btn-secondary" type="button" @click="$refs.csvInput.click()" title="Aceita CSV com colunas como nome, telefone, e-mail, nascimento e CPF, em qualquer ordem, com vírgula ou ponto e vírgula.">Importar lista de clientes</button>
           <button class="btn btn-secondary" type="button" @click="exportCsv()" title="Exporta a lista de pacientes em .csv, útil para migração ou atualização em outra base de dados.">Exportar lista (.csv)</button>
+          <button class="btn btn-secondary" type="button" @click="toggleEditMode()" x-text="editMode ? 'Cancelar seleção' : 'Editar lista de pacientes'"></button>
           <button class="btn btn-primary" type="button" @click="openNewForm()">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
             Novo paciente
@@ -45,6 +46,20 @@
           </div>
         </div>
 
+        <div x-show="editMode" x-cloak class="card mb-4" style="padding:12px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:var(--color-surface-alt);">
+          <label class="flex items-center gap-2 text-sm" style="cursor:pointer;margin:0;">
+            <input type="checkbox" :checked="allFilteredSelected" @change="toggleSelectAll()" style="width:auto;">
+            <span>Selecionar todos<span x-show="filtered.length !== patients.length"> (<span x-text="filtered.length"></span> filtrados)</span></span>
+          </label>
+          <div class="flex items-center gap-3">
+            <span class="text-sm text-muted"><span x-text="selectedIds.length"></span> selecionado(s)</span>
+            <button class="btn btn-sm" type="button" @click="bulkDeleteSelected()" :disabled="selectedIds.length === 0 || bulkDeleting" style="background:var(--color-danger);border-color:var(--color-danger);color:#fff;">
+              <span x-show="!bulkDeleting">Excluir selecionados</span>
+              <span x-show="bulkDeleting" x-cloak>Excluindo…</span>
+            </button>
+          </div>
+        </div>
+
         <div class="card card-shadow" style="padding:0;">
           <div x-show="loading" class="text-sm text-muted" style="padding:24px;">Carregando pacientes…</div>
           <div x-show="!loading && patients.length === 0" class="empty-note" style="margin:20px;">
@@ -53,11 +68,19 @@
           <div class="table-wrap" x-show="!loading && patients.length > 0">
             <table class="table">
               <thead>
-                <tr><th>Paciente</th><th>WhatsApp</th><th>Origem</th><th>Nascimento</th><th>LGPD</th><th></th></tr>
+                <tr>
+                  <th x-show="editMode" style="width:36px;">
+                    <input type="checkbox" :checked="allFilteredSelected" @click.stop="toggleSelectAll()" style="width:auto;">
+                  </th>
+                  <th>Paciente</th><th>WhatsApp</th><th>Origem</th><th>Nascimento</th><th>LGPD</th><th x-show="!editMode"></th>
+                </tr>
               </thead>
               <tbody>
                 <template x-for="p in filtered" :key="p.id">
-                  <tr @click="selectPatient(p)" style="cursor:pointer;">
+                  <tr @click="editMode ? toggleSelectPatient(p.id) : selectPatient(p)" style="cursor:pointer;" :class="editMode && selectedIds.includes(p.id) ? 'row-selected' : ''">
+                    <td x-show="editMode" @click.stop>
+                      <input type="checkbox" :checked="selectedIds.includes(p.id)" @change="toggleSelectPatient(p.id)" style="width:auto;">
+                    </td>
                     <td>
                       <div class="row-name">
                         <div class="avatar" x-text="initials(p.full_name)"></div>
@@ -73,7 +96,7 @@
                         <span x-text="p.lgpd_consent_at ? 'Assinado' : 'Pendente'"></span>
                       </span>
                     </td>
-                    <td><a href="#" class="btn btn-ghost btn-sm" @click.stop="selectPatient(p)">Ver ficha</a></td>
+                    <td x-show="!editMode"><a href="#" class="btn btn-ghost btn-sm" @click.stop="selectPatient(p)">Ver ficha</a></td>
                   </tr>
                 </template>
               </tbody>
@@ -741,6 +764,9 @@ function pacientesApp() {
     saving: false,
     search: '',
     selected: null,
+    editMode: false,
+    selectedIds: [],
+    bulkDeleting: false,
     patients: [],
     users: [],
     clinicId: null,
@@ -1515,6 +1541,73 @@ function pacientesApp() {
     showFeedback(type, message) {
       this.feedback = { type, message };
       setTimeout(() => { this.feedback = { type: '', message: '' }; }, 5000);
+    },
+
+    // -----------------------------------------------------------------------
+    // Edição em massa: seleção de vários pacientes para exclusão definitiva.
+    // -----------------------------------------------------------------------
+    toggleEditMode() {
+      this.editMode = !this.editMode;
+      this.selectedIds = [];
+    },
+
+    toggleSelectPatient(id) {
+      const idx = this.selectedIds.indexOf(id);
+      if (idx === -1) this.selectedIds.push(id);
+      else this.selectedIds.splice(idx, 1);
+    },
+
+    get allFilteredSelected() {
+      return this.filtered.length > 0 && this.filtered.every(p => this.selectedIds.includes(p.id));
+    },
+
+    toggleSelectAll() {
+      const filteredIds = this.filtered.map(p => p.id);
+      if (this.allFilteredSelected) {
+        this.selectedIds = this.selectedIds.filter(id => !filteredIds.includes(id));
+      } else {
+        this.selectedIds = [...new Set([...this.selectedIds, ...filteredIds])];
+      }
+    },
+
+    async bulkDeleteSelected() {
+      const ids = this.selectedIds.slice();
+      if (ids.length === 0) return;
+
+      const plural = ids.length > 1;
+      const ok = await confirmDialog(
+        'Você tem certeza que deseja excluir a ficha de ' + ids.length + (plural ? ' pacientes' : ' paciente') +
+        '? A ação é permanente e não pode ser restaurada. Todas as informações e mídias dos pacientes excluídos serão perdidas.',
+        { danger: true, confirmLabel: 'Sim, quero excluir' }
+      );
+      if (!ok) return;
+
+      this.bulkDeleting = true;
+      try {
+        // Exclusão em cascata no banco remove as linhas de patient_photos,
+        // mas não os arquivos no Storage -- precisa apagar explicitamente
+        // antes, senão fica lixo órfão ocupando espaço no bucket.
+        const { data: photos } = await supabaseClient
+          .from('patient_photos')
+          .select('storage_path')
+          .in('patient_id', ids);
+        if (photos && photos.length > 0) {
+          await supabaseClient.storage.from('patient-photos').remove(photos.map(ph => ph.storage_path));
+        }
+
+        const { error } = await supabaseClient.from('patients').delete().in('id', ids);
+        if (error) {
+          this.showFeedback('error', 'Erro ao excluir: ' + error.message);
+          return;
+        }
+
+        this.patients = this.patients.filter(p => !ids.includes(p.id));
+        this.showFeedback('success', ids.length + (plural ? ' pacientes excluídos' : ' paciente excluído') + ' permanentemente.');
+        this.selectedIds = [];
+        this.editMode = false;
+      } finally {
+        this.bulkDeleting = false;
+      }
     }
   };
 }

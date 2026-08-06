@@ -40,6 +40,16 @@
   const role = profile ? profile.role : null;
   window.__prismaUserRole = role;
 
+  // equipe_prisma tem o próprio console (admin-clinicas.html), fora do
+  // contexto de qualquer clínica. Depois da restrição de acesso a dado de
+  // paciente (LGPD), não faz sentido esse papel abrir dashboard/pacientes/
+  // agenda/etc de clínica nenhuma -- manda de volta pro console sempre que
+  // cair em outra página autenticada por engano (link antigo, URL direta).
+  if (role === 'equipe_prisma' && document.body.getAttribute('data-page') !== 'admin-clinicas') {
+    window.location.href = 'admin-clinicas.html';
+    return;
+  }
+
   // Páginas marcadas com data-allowed-roles="administrador,atendente" no
   // <body> restringem quais papéis podem acessá-las direto pela URL. Sem o
   // atributo, a página é aberta a qualquer papel autenticado (ex.: Agenda,

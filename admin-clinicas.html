@@ -1,0 +1,1026 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Painel Prisma · Clínicas</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body data-page="admin-clinicas">
+
+<div class="main" style="margin-left:0;" x-data="adminClinicasApp()" x-init="init()">
+
+  <header class="topbar">
+    <div class="flex items-center gap-3">
+      <div class="logo-mark" style="background:var(--color-primary);color:#fff;">P</div>
+      <div class="topbar-title">
+        <h1>Painel Prisma</h1>
+        <span class="text-muted">Gestão das clínicas clientes da plataforma</span>
+      </div>
+    </div>
+    <div class="topbar-actions flex items-center gap-2">
+      <button class="btn btn-sm" type="button" @click="activeSection = 'clinicas'" :class="activeSection === 'clinicas' ? 'btn-primary' : 'btn-ghost'">Clínicas</button>
+      <button class="btn btn-sm" type="button" @click="activeSection = 'personalizacao'" :class="activeSection === 'personalizacao' ? 'btn-primary' : 'btn-ghost'">Personalização</button>
+      <button class="btn btn-secondary btn-sm" type="button" @click="logout()">Sair</button>
+    </div>
+  </header>
+
+  <main class="content">
+
+    <div x-show="feedback.message" x-cloak class="card mb-4" :style="'padding:12px 16px;border-color:' + (feedback.type==='error' ? 'var(--color-danger)' : 'var(--color-success)')">
+      <span class="text-sm" x-text="feedback.message" :style="'color:' + (feedback.type==='error' ? 'var(--color-danger)' : 'var(--color-success)')"></span>
+    </div>
+
+    <div x-show="loading" class="text-sm text-muted" style="padding:24px;">Carregando painel…</div>
+
+    <!-- ===================== LISTA / VISÃO GERAL ===================== -->
+    <div x-show="!loading && activeSection === 'clinicas' && !selectedClinic" x-cloak>
+
+      <div class="page-header">
+        <div>
+          <h2>Clínicas</h2>
+          <p><span x-text="clinics.length"></span> clínica(s) cadastrada(s) na plataforma</p>
+        </div>
+        <div class="flex gap-3">
+          <button class="btn btn-primary" type="button" @click="openNewClinicModal()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+            Nova clínica
+          </button>
+        </div>
+      </div>
+
+      <div class="grid grid-4 gap-3 mb-5">
+        <div class="stat-card" style="--accent-color:var(--color-success);">
+          <div class="stat-label">Clínicas ativas</div>
+          <div class="stat-value" x-text="stats.ativas"></div>
+          <div class="stat-trend text-muted" x-text="stats.trial + ' em trial'"></div>
+        </div>
+        <div class="stat-card" style="--accent-color:var(--color-info);">
+          <div class="stat-label">MRR aproximado</div>
+          <div class="stat-value" x-text="formatCurrency(stats.mrr)"></div>
+          <div class="stat-trend text-muted">Soma dos planos ativos (mensal)</div>
+        </div>
+        <div class="stat-card" style="--accent-color:var(--color-danger);">
+          <div class="stat-label">Inadimplentes</div>
+          <div class="stat-value" x-text="stats.inadimplentes"></div>
+          <div class="stat-trend text-muted">Precisam de contato</div>
+        </div>
+        <div class="stat-card" style="--accent-color:var(--color-accent);">
+          <div class="stat-label">Solicitações pendentes</div>
+          <div class="stat-value" x-text="signupRequests.length"></div>
+          <div class="stat-trend text-muted">Aguardando aprovação</div>
+        </div>
+      </div>
+
+      <!-- Ranking de faturamento entre clínicas -->
+      <div class="panel-section">
+        <div class="panel-section-head"><span class="panel-section-dot"></span><h3>🏆 Ranking de faturamento entre clínicas</h3></div>
+        <div class="card card-shadow">
+          <div class="card-header">
+            <div><h3 style="font-size:15px;">Top clínicas</h3><p x-text="currentMonthLabel"></p></div>
+          </div>
+          <p class="text-xs text-soft mb-3">Só o total somado por clínica -- nenhum dado de paciente ou transação individual é exibido aqui (ver LGPD no README).</p>
+          <div x-show="!loadingRanking && ranking.length === 0" class="text-sm text-muted">Nenhum faturamento registrado neste mês ainda.</div>
+          <div class="flex" style="flex-direction:column;">
+            <template x-for="(row, idx) in ranking.slice(0, 3)" :key="row.clinic_id">
+              <div class="rank-row" :class="'rank-row-' + (idx + 1)">
+                <div class="rank-row-badge" x-text="idx + 1"></div>
+                <div style="flex:1;min-width:0;">
+                  <strong class="text-sm" x-text="row.clinic_name"></strong>
+                  <div class="text-xs text-muted" x-text="formatCurrency(row.total_revenue)"></div>
+                </div>
+                <button class="btn btn-secondary btn-sm" type="button" @click="openCongratsModal(row, idx + 1)" x-show="row.total_revenue > 0">
+                  <span x-show="!alreadyCongratulated(row.clinic_id)">Parabenizar</span>
+                  <span x-show="alreadyCongratulated(row.clinic_id)">Já parabenizado</span>
+                </button>
+              </div>
+            </template>
+          </div>
+          <div class="text-center mt-2" x-show="ranking.length > 3">
+            <button class="btn btn-ghost btn-sm" type="button" @click="showFullRanking = !showFullRanking" x-text="showFullRanking ? 'Ver menos' : 'Ver ranking completo'"></button>
+          </div>
+          <div x-show="showFullRanking" x-cloak style="margin-top:10px;">
+            <template x-for="(row, idx) in ranking.slice(3)" :key="row.clinic_id">
+              <div class="flex items-center justify-between" style="padding:7px 0;border-bottom:1px solid var(--color-border);">
+                <span class="text-sm" x-text="(idx + 4) + 'º · ' + row.clinic_name"></span>
+                <span class="text-sm text-muted" x-text="formatCurrency(row.total_revenue)"></span>
+              </div>
+            </template>
+          </div>
+        </div>
+      </div>
+
+      <!-- Solicitações pendentes -->
+      <div class="panel-section" x-show="signupRequests.length > 0">
+        <div class="panel-section-head"><span class="panel-section-dot"></span><h3>Solicitações de acesso</h3></div>
+        <div class="card card-shadow" style="padding:0;">
+          <div class="table-wrap">
+            <table class="table">
+              <thead><tr><th>Clínica</th><th>Contato</th><th>Origem</th><th>Recebida em</th><th></th></tr></thead>
+              <tbody>
+                <template x-for="r in signupRequests" :key="r.id">
+                  <tr>
+                    <td><strong x-text="r.clinic_name"></strong><div class="text-xs text-muted" x-text="r.specialty || ''"></div></td>
+                    <td>
+                      <div x-text="r.contact_name"></div>
+                      <div class="text-xs text-muted" x-text="r.contact_email + (r.contact_phone ? ' · ' + r.contact_phone : '')"></div>
+                    </td>
+                    <td><span class="badge" :class="r.requester_auth_user_id ? 'badge-info' : 'badge-neutral'" x-text="r.requester_auth_user_id ? 'Conta Google' : 'Formulário'"></span></td>
+                    <td x-text="formatDate(r.created_at)"></td>
+                    <td>
+                      <div class="flex gap-2">
+                        <button class="btn btn-primary btn-sm" type="button" @click="openApproveModal(r)">Aprovar</button>
+                        <button class="btn btn-ghost btn-sm" type="button" @click="rejectRequest(r)">Recusar</button>
+                      </div>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Lista de clínicas -->
+      <div class="panel-section">
+        <div class="panel-section-head"><span class="panel-section-dot"></span><h3>Todas as clínicas</h3></div>
+
+        <div class="card card-shadow mb-4" style="padding:14px 18px;">
+          <div class="input-icon-wrap" style="max-width:320px;">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+            <input class="input" type="text" x-model="search" placeholder="Buscar por nome da clínica…">
+          </div>
+        </div>
+
+        <div class="card card-shadow" style="padding:0;">
+          <div x-show="filteredClinics.length === 0" class="empty-note" style="margin:20px;">Nenhuma clínica encontrada.</div>
+          <div class="table-wrap" x-show="filteredClinics.length > 0">
+            <table class="table">
+              <thead><tr><th>Clínica</th><th>Status</th><th>Plano</th><th>Próximo vencimento</th><th>Criada em</th><th></th></tr></thead>
+              <tbody>
+                <template x-for="c in filteredClinics" :key="c.id">
+                  <tr @click="selectClinic(c)" style="cursor:pointer;">
+                    <td><strong x-text="c.name"></strong><div class="text-xs text-muted" x-text="c.specialty || ''"></div></td>
+                    <td><span class="badge" :class="statusBadgeClass(c.status)"><span class="badge-dot"></span><span x-text="statusLabel(c.status)"></span></span></td>
+                    <td x-text="c.plan_name ? (c.plan_name + (c.plan_value ? ' · ' + formatCurrency(c.plan_value) : '')) : '—'"></td>
+                    <td x-text="c.next_due_date ? formatDate(c.next_due_date) : '—'"></td>
+                    <td x-text="formatDate(c.created_at)"></td>
+                    <td><a href="#" class="btn btn-ghost btn-sm" @click.stop="selectClinic(c)">Ver</a></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ===================== DETALHE DA CLÍNICA ===================== -->
+    <div x-show="!loading && activeSection === 'clinicas' && selectedClinic" x-cloak>
+      <button class="btn btn-ghost btn-sm mb-4" type="button" @click="closeClinicDetail()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;"><path d="M19 12H5"/><path d="M11 18l-6-6 6-6"/></svg>
+        Voltar para a lista
+      </button>
+
+      <template x-if="selectedClinic">
+      <div>
+        <div class="page-header">
+          <div>
+            <h2 x-text="selectedClinic.name"></h2>
+            <p>Cadastrada em <span x-text="formatDate(selectedClinic.created_at)"></span></p>
+          </div>
+          <span class="badge" :class="statusBadgeClass(selectedClinic.status)" style="font-size:13px;padding:6px 12px;"><span class="badge-dot"></span><span x-text="statusLabel(selectedClinic.status)"></span></span>
+        </div>
+
+        <div class="grid grid-2 gap-3 mb-5">
+
+          <div class="card card-shadow">
+            <div class="card-header"><div><h3>Ciclo de vida e plano</h3><p>Controlado só pela Prisma</p></div></div>
+
+            <div class="form-group">
+              <label class="label">Status</label>
+              <select class="input" x-model="editClinic.status">
+                <option value="trial">Trial</option>
+                <option value="ativo">Ativo</option>
+                <option value="inadimplente">Inadimplente</option>
+                <option value="suspenso">Suspenso</option>
+                <option value="cancelado">Cancelado</option>
+              </select>
+            </div>
+            <div class="grid grid-2 gap-3">
+              <div class="form-group">
+                <label class="label">Plano</label>
+                <input class="input" type="text" x-model="editClinic.plan_name" placeholder="Ex.: Profissional">
+              </div>
+              <div class="form-group">
+                <label class="label">Valor</label>
+                <input class="input" type="text" inputmode="decimal" x-model="editClinic.plan_value_input" @input="editClinic.plan_value_input = maskCurrencyInput($event.target.value)" placeholder="R$ 0,00">
+              </div>
+            </div>
+            <div class="grid grid-2 gap-3">
+              <div class="form-group">
+                <label class="label">Ciclo de cobrança</label>
+                <select class="input" x-model="editClinic.billing_cycle">
+                  <option value="mensal">Mensal</option>
+                  <option value="anual">Anual</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="label">Próximo vencimento</label>
+                <input class="input" type="date" x-model="editClinic.next_due_date">
+              </div>
+            </div>
+            <div class="form-group" x-show="editClinic.status === 'trial'">
+              <label class="label">Trial termina em</label>
+              <input class="input" type="date" x-model="editClinic.trial_ends_at">
+            </div>
+            <div class="form-group">
+              <label class="label">Anotações internas</label>
+              <textarea class="input" rows="3" x-model="editClinic.notes" placeholder="Combinados, histórico, observações…"></textarea>
+            </div>
+            <button class="btn btn-primary btn-sm" type="button" @click="saveClinicEdits()" :disabled="savingClinic">Salvar alterações</button>
+          </div>
+
+          <div class="flex" style="flex-direction:column;gap:12px;">
+
+            <div class="card card-shadow">
+              <div class="card-header"><div><h3>Contato</h3></div></div>
+              <div class="form-group">
+                <label class="label">Nome do responsável</label>
+                <input class="input" type="text" x-model="editClinic.owner_name">
+              </div>
+              <div class="grid grid-2 gap-3">
+                <div class="form-group">
+                  <label class="label">E-mail</label>
+                  <input class="input" type="email" x-model="editClinic.owner_email">
+                </div>
+                <div class="form-group">
+                  <label class="label">Telefone</label>
+                  <input class="input" type="text" x-model="editClinic.owner_phone">
+                </div>
+              </div>
+            </div>
+
+            <div class="card card-shadow">
+              <div class="card-header"><div><h3>Acessos da clínica</h3><p x-text="clinicUsers.length + ' conta(s)'"></p></div></div>
+              <div x-show="clinicUsers.length === 0" class="text-sm text-muted">Nenhum acesso cadastrado ainda.</div>
+              <div class="flex" style="flex-direction:column;gap:10px;">
+                <template x-for="u in clinicUsers" :key="u.id">
+                  <div class="flex items-center justify-between">
+                    <div>
+                      <strong class="text-sm" x-text="u.full_name"></strong>
+                      <div class="text-xs text-muted" x-text="u.email + ' · ' + roleLabel(u.role)"></div>
+                    </div>
+                    <span class="badge" :class="u.is_active === false ? 'badge-neutral' : 'badge-success'" x-text="u.is_active === false ? 'Inativo' : 'Ativo'"></span>
+                  </div>
+                </template>
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+
+        <div class="panel-section">
+          <div class="panel-section-head"><span class="panel-section-dot"></span><h3>Pagamentos da assinatura</h3></div>
+          <div class="card card-shadow">
+            <div class="card-header">
+              <div><h3 style="font-size:15px;">Histórico</h3><p>Registro manual, controlado pela Prisma</p></div>
+              <button class="btn btn-secondary btn-sm" type="button" @click="openPaymentModal()">+ Registrar pagamento</button>
+            </div>
+            <div x-show="clinicPayments.length === 0" class="text-sm text-muted">Nenhum pagamento registrado ainda.</div>
+            <div class="table-wrap" x-show="clinicPayments.length > 0">
+              <table class="table">
+                <thead><tr><th>Vencimento</th><th>Valor</th><th>Status</th><th>Método</th><th>Referência</th><th></th></tr></thead>
+                <tbody>
+                  <template x-for="p in clinicPayments" :key="p.id">
+                    <tr>
+                      <td x-text="p.due_date ? formatDate(p.due_date) : '—'"></td>
+                      <td x-text="formatCurrency(p.amount)"></td>
+                      <td><span class="badge" :class="paymentBadgeClass(p.status)" x-text="paymentStatusLabel(p.status)"></span></td>
+                      <td x-text="p.payment_method || '—'"></td>
+                      <td x-text="p.reference || '—'"></td>
+                      <td>
+                        <button class="btn btn-ghost btn-sm" type="button" @click="markPaid(p)" x-show="p.status !== 'pago'">Marcar como pago</button>
+                      </td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+      </div>
+      </template>
+    </div>
+
+    <!-- ===================== PERSONALIZAÇÃO DA TELA DE LOGIN ===================== -->
+    <div x-show="!loading && activeSection === 'personalizacao'" x-cloak>
+      <div class="page-header">
+        <div>
+          <h2>Personalização</h2>
+          <p>Identidade visual da tela de login, aplicada a todas as clínicas</p>
+        </div>
+      </div>
+
+      <div class="grid grid-2 gap-3">
+        <div class="card card-shadow">
+          <div class="card-header"><div><h3>Marca</h3><p>Logo, imagem de fundo e cores</p></div></div>
+
+          <div class="form-group">
+            <label class="label">Logo</label>
+            <div class="flex items-center gap-3">
+              <div style="width:48px;height:48px;border-radius:var(--radius-md);background:var(--color-surface-alt);display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;">
+                <img x-show="branding.logo_url" :src="branding.logo_url" style="width:100%;height:100%;object-fit:cover;">
+                <span x-show="!branding.logo_url" class="text-xs text-muted">P</span>
+              </div>
+              <input type="file" accept="image/*" x-ref="logoInput" @change="uploadBrandingImage($event, 'logo_url')" style="display:none;">
+              <button class="btn btn-secondary btn-sm" type="button" @click="$refs.logoInput.click()" :disabled="uploadingLogo">
+                <span x-show="!uploadingLogo">Enviar logo</span><span x-show="uploadingLogo" x-cloak>Enviando…</span>
+              </button>
+              <button class="btn btn-ghost btn-sm" type="button" @click="branding.logo_url = ''" x-show="branding.logo_url">Remover</button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="label">Imagem de fundo</label>
+            <div class="flex items-center gap-3">
+              <div style="width:72px;height:48px;border-radius:var(--radius-md);background:var(--color-surface-alt);overflow:hidden;flex-shrink:0;">
+                <img x-show="branding.background_url" :src="branding.background_url" style="width:100%;height:100%;object-fit:cover;">
+              </div>
+              <input type="file" accept="image/*" x-ref="bgInput" @change="uploadBrandingImage($event, 'background_url')" style="display:none;">
+              <button class="btn btn-secondary btn-sm" type="button" @click="$refs.bgInput.click()" :disabled="uploadingBackground">
+                <span x-show="!uploadingBackground">Enviar imagem</span><span x-show="uploadingBackground" x-cloak>Enviando…</span>
+              </button>
+              <button class="btn btn-ghost btn-sm" type="button" @click="branding.background_url = ''" x-show="branding.background_url">Remover</button>
+            </div>
+          </div>
+
+          <div class="grid grid-2 gap-3">
+            <div class="form-group">
+              <label class="label">Cor primária</label>
+              <div class="flex items-center gap-2">
+                <input type="color" x-model="branding.primary_color" style="width:40px;height:36px;padding:2px;border-radius:var(--radius-sm);border:1px solid var(--color-border);">
+                <input class="input" type="text" x-model="branding.primary_color" placeholder="#2F4A45">
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="label">Cor de destaque</label>
+              <div class="flex items-center gap-2">
+                <input type="color" x-model="branding.accent_color" style="width:40px;height:36px;padding:2px;border-radius:var(--radius-sm);border:1px solid var(--color-border);">
+                <input class="input" type="text" x-model="branding.accent_color" placeholder="#B8912F">
+              </div>
+            </div>
+          </div>
+
+          <hr class="divider">
+
+          <div class="form-group">
+            <label class="label">Título</label>
+            <input class="input" type="text" x-model="branding.login_title" placeholder="Prisma · Gestão de Clínicas">
+          </div>
+          <div class="form-group">
+            <label class="label">Subtítulo</label>
+            <input class="input" type="text" x-model="branding.login_subtitle" placeholder="Acesse o painel da sua clínica">
+          </div>
+          <div class="form-group">
+            <label class="label">Mensagem de suporte</label>
+            <input class="input" type="text" x-model="branding.support_message" placeholder="Esqueceu a senha? Fale com a administração da clínica.">
+          </div>
+          <div class="form-group">
+            <label class="label">Rodapé</label>
+            <input class="input" type="text" x-model="branding.footer_text" placeholder="Sistema interno · Prisma Creative">
+          </div>
+
+          <button class="btn btn-primary btn-sm" type="button" @click="saveBranding()" :disabled="savingBranding">
+            <span x-show="!savingBranding">Salvar personalização</span><span x-show="savingBranding" x-cloak>Salvando…</span>
+          </button>
+        </div>
+
+        <div class="card card-shadow">
+          <div class="card-header"><div><h3>Pré-visualização</h3><p>Como a tela de login vai ficar</p></div></div>
+          <div style="border-radius:var(--radius-lg);padding:40px 20px;display:flex;align-items:center;justify-content:center;"
+               :style="branding.background_url ? ('background:url(\'' + branding.background_url + '\') center/cover;') : 'background:linear-gradient(160deg, #1F332F, #2F4A45 60%, #3C5C55);'">
+            <div style="background:#fff;border-radius:var(--radius-lg);box-shadow:var(--shadow-lg);width:100%;max-width:280px;padding:28px 22px;text-align:center;">
+              <div style="width:40px;height:40px;border-radius:var(--radius-md);margin:0 auto 10px;display:flex;align-items:center;justify-content:center;overflow:hidden;"
+                   :style="'background:' + (branding.accent_color || '#B8912F') + ';'">
+                <img x-show="branding.logo_url" :src="branding.logo_url" style="width:100%;height:100%;object-fit:cover;">
+                <span x-show="!branding.logo_url" style="font-weight:700;color:#2F4A45;">P</span>
+              </div>
+              <strong style="font-size:14px;display:block;" x-text="branding.login_title || 'Prisma · Gestão de Clínicas'"></strong>
+              <p class="text-xs text-muted mt-1 mb-3" x-text="branding.login_subtitle || 'Acesse o painel da sua clínica'"></p>
+              <div style="height:30px;border-radius:var(--radius-md);border:1px solid #E6E2D9;margin-bottom:8px;"></div>
+              <div style="height:30px;border-radius:var(--radius-md);border:1px solid #E6E2D9;margin-bottom:12px;"></div>
+              <div style="height:34px;border-radius:var(--radius-md);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:600;"
+                   :style="'background:' + (branding.primary_color || '#2F4A45') + ';'">Entrar</div>
+            </div>
+          </div>
+          <p class="text-xs text-soft mt-3">Pré-visualização aproximada. Abra a tela de login em outra aba para conferir o resultado final.</p>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ===================== MODAL: NOVA CLÍNICA ===================== -->
+  <div x-show="showNewClinicModal" x-cloak class="modal-overlay" @click.self="showNewClinicModal=false">
+    <div class="card card-shadow" style="margin:auto;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;">
+      <div class="card-header"><h3>Nova clínica</h3><button class="btn btn-ghost btn-sm" @click="showNewClinicModal=false">Fechar</button></div>
+      <p class="text-sm mb-3" x-show="newClinicError" x-cloak :style="'color:var(--color-danger)'" x-text="newClinicError"></p>
+
+      <p class="text-xs text-soft mb-2" style="text-transform:uppercase;font-weight:600;">Dados da clínica</p>
+      <div class="form-group">
+        <label class="label">Nome da clínica</label>
+        <input class="input" type="text" x-model="newClinic.name" required>
+      </div>
+      <div class="grid grid-2 gap-3">
+        <div class="form-group">
+          <label class="label">Especialidade</label>
+          <input class="input" type="text" x-model="newClinic.specialty" placeholder="Ex.: Estética facial e corporal">
+        </div>
+        <div class="form-group">
+          <label class="label">Plano</label>
+          <input class="input" type="text" x-model="newClinic.plan_name" placeholder="Ex.: Profissional">
+        </div>
+      </div>
+
+      <p class="text-xs text-soft mb-2 mt-3" style="text-transform:uppercase;font-weight:600;">Primeiro acesso (administrador)</p>
+      <div class="form-group">
+        <label class="label">Nome completo</label>
+        <input class="input" type="text" x-model="newClinic.admin_name" required>
+      </div>
+      <div class="grid grid-2 gap-3">
+        <div class="form-group">
+          <label class="label">E-mail</label>
+          <input class="input" type="email" x-model="newClinic.admin_email" required>
+        </div>
+        <div class="form-group">
+          <label class="label">Senha inicial</label>
+          <input class="input" type="text" x-model="newClinic.admin_password" placeholder="Mín. 6 caracteres" required>
+        </div>
+      </div>
+
+      <div class="flex justify-end gap-2 mt-3">
+        <button class="btn btn-secondary btn-sm" type="button" @click="showNewClinicModal=false">Cancelar</button>
+        <button class="btn btn-primary btn-sm" type="button" @click="createClinic()" :disabled="savingNewClinic">Criar clínica e acesso</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== MODAL: APROVAR SOLICITAÇÃO ===================== -->
+  <div x-show="showApproveModal" x-cloak class="modal-overlay" @click.self="showApproveModal=false">
+    <div class="card card-shadow" style="margin:auto;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;">
+      <div class="card-header"><h3>Aprovar solicitação</h3><button class="btn btn-ghost btn-sm" @click="showApproveModal=false">Fechar</button></div>
+      <p class="text-sm mb-3" x-show="approveError" x-cloak style="color:var(--color-danger);" x-text="approveError"></p>
+      <p class="text-xs text-soft mb-3" x-show="approvingRequest && approvingRequest.requester_auth_user_id">Este pedido já tem uma conta Google verificada -- não é preciso definir senha, só confirmar os dados e vincular a uma clínica nova.</p>
+
+      <div class="form-group">
+        <label class="label">Nome da clínica</label>
+        <input class="input" type="text" x-model="approveForm.name" required>
+      </div>
+      <div class="form-group">
+        <label class="label">Especialidade</label>
+        <input class="input" type="text" x-model="approveForm.specialty">
+      </div>
+      <div class="form-group">
+        <label class="label">Nome do administrador</label>
+        <input class="input" type="text" x-model="approveForm.admin_name" required>
+      </div>
+      <div class="form-group">
+        <label class="label">E-mail do administrador</label>
+        <input class="input" type="email" x-model="approveForm.admin_email" required :disabled="approvingRequest && approvingRequest.requester_auth_user_id">
+      </div>
+      <div class="form-group" x-show="!(approvingRequest && approvingRequest.requester_auth_user_id)">
+        <label class="label">Senha inicial</label>
+        <input class="input" type="text" x-model="approveForm.admin_password" placeholder="Mín. 6 caracteres">
+      </div>
+
+      <div class="flex justify-end gap-2 mt-3">
+        <button class="btn btn-secondary btn-sm" type="button" @click="showApproveModal=false">Cancelar</button>
+        <button class="btn btn-primary btn-sm" type="button" @click="approveRequest()" :disabled="savingApprove">Aprovar e criar acesso</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== MODAL: REGISTRAR PAGAMENTO ===================== -->
+  <div x-show="showPaymentModal" x-cloak class="modal-overlay" @click.self="showPaymentModal=false">
+    <div class="card card-shadow-sm modal-card" style="margin:auto;">
+      <div class="card-header"><h3>Registrar pagamento</h3><button class="btn btn-ghost btn-sm" @click="showPaymentModal=false">Fechar</button></div>
+      <div class="form-group">
+        <label class="label">Valor</label>
+        <input class="input" type="text" inputmode="decimal" x-model="newPayment.amount_input" @input="newPayment.amount_input = maskCurrencyInput($event.target.value)" placeholder="R$ 0,00">
+      </div>
+      <div class="grid grid-2 gap-3">
+        <div class="form-group">
+          <label class="label">Vencimento</label>
+          <input class="input" type="date" x-model="newPayment.due_date">
+        </div>
+        <div class="form-group">
+          <label class="label">Status</label>
+          <select class="input" x-model="newPayment.status">
+            <option value="pendente">Pendente</option>
+            <option value="pago">Pago</option>
+            <option value="atrasado">Atrasado</option>
+          </select>
+        </div>
+      </div>
+      <div class="grid grid-2 gap-3">
+        <div class="form-group">
+          <label class="label">Método</label>
+          <input class="input" type="text" x-model="newPayment.payment_method" placeholder="Pix, boleto, cartão…">
+        </div>
+        <div class="form-group">
+          <label class="label">Referência</label>
+          <input class="input" type="text" x-model="newPayment.reference" placeholder="Opcional">
+        </div>
+      </div>
+      <div class="flex justify-end gap-2 mt-3">
+        <button class="btn btn-secondary btn-sm" type="button" @click="showPaymentModal=false">Cancelar</button>
+        <button class="btn btn-primary btn-sm" type="button" @click="addPayment()" :disabled="savingPayment">Registrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== MODAL: PARABENIZAR ===================== -->
+  <div x-show="showCongratsModal" x-cloak class="modal-overlay" @click.self="showCongratsModal=false">
+    <div class="card card-shadow-sm modal-card" style="margin:auto;">
+      <div class="card-header"><h3>Parabenizar clínica</h3><button class="btn btn-ghost btn-sm" @click="showCongratsModal=false">Fechar</button></div>
+      <p class="text-sm text-muted mb-3" x-text="congratsTarget ? (congratsTarget.clinic_name + ' · ' + formatCurrency(congratsTarget.total_revenue) + ' neste mês') : ''"></p>
+      <div class="form-group">
+        <label class="label">Mensagem</label>
+        <textarea class="input" rows="5" x-model="congratsMessage"></textarea>
+      </div>
+      <p class="text-xs text-soft mb-3">Abre um e-mail pronto pro contato da clínica. Nenhum envio automático é feito por aqui.</p>
+      <div class="flex justify-end gap-2">
+        <button class="btn btn-secondary btn-sm" type="button" @click="showCongratsModal=false">Cancelar</button>
+        <button class="btn btn-primary btn-sm" type="button" @click="sendCongrats()">Abrir e-mail e registrar</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// Client Supabase "efêmero": mesma URL/chave do client principal, mas sem
+// persistir sessão. Usado só para criar a conta de acesso de um novo
+// administrador de clínica (signUp) sem substituir a sessão da Prisma.
+function createEphemeralClient() {
+  return window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
+  });
+}
+
+function adminClinicasApp() {
+  return {
+    loading: true,
+    currentUserId: null,
+    activeSection: 'clinicas',
+    branding: {},
+    brandingLoading: true,
+    savingBranding: false,
+    uploadingLogo: false,
+    uploadingBackground: false,
+    clinics: [],
+    signupRequests: [],
+    ranking: [],
+    loadingRanking: true,
+    showFullRanking: false,
+    shoutouts: [],
+    search: '',
+
+    selectedClinic: null,
+    clinicUsers: [],
+    clinicPayments: [],
+    editClinic: {},
+    savingClinic: false,
+
+    showNewClinicModal: false,
+    newClinic: { name: '', specialty: '', plan_name: '', admin_name: '', admin_email: '', admin_password: '' },
+    savingNewClinic: false,
+    newClinicError: '',
+
+    showApproveModal: false,
+    approvingRequest: null,
+    approveForm: { name: '', specialty: '', admin_name: '', admin_email: '', admin_password: '' },
+    savingApprove: false,
+    approveError: '',
+
+    showPaymentModal: false,
+    newPayment: { amount_input: '', due_date: '', status: 'pendente', payment_method: '', reference: '' },
+    savingPayment: false,
+
+    showCongratsModal: false,
+    congratsTarget: null,
+    congratsRank: null,
+    congratsMessage: '',
+
+    feedback: { type: '', message: '' },
+
+    async init() {
+      const { data: { user } } = await supabaseClient.auth.getUser();
+      if (!user) { window.location.href = 'index.html'; return; }
+      this.currentUserId = user.id;
+      const { data: profile } = await supabaseClient.from('users').select('role').eq('id', user.id).single();
+      if (!profile || profile.role !== 'equipe_prisma') {
+        window.location.href = window.homeForRole ? window.homeForRole(profile ? profile.role : null) : 'index.html';
+        return;
+      }
+      await Promise.all([this.loadClinics(), this.loadSignupRequests(), this.loadRanking(), this.loadShoutouts(), this.loadBranding()]);
+      this.loading = false;
+    },
+
+    async logout() {
+      await supabaseClient.auth.signOut();
+      window.location.href = 'index.html';
+    },
+
+    async loadClinics() {
+      const { data, error } = await supabaseClient.from('clinics').select('*').order('created_at', { ascending: false });
+      this.clinics = error ? [] : (data || []);
+    },
+
+    async loadSignupRequests() {
+      const { data, error } = await supabaseClient.from('clinic_signup_requests').select('*').eq('status', 'pendente').order('created_at', { ascending: true });
+      this.signupRequests = error ? [] : (data || []);
+    },
+
+    get currentMonthKey() {
+      const now = new Date();
+      return now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+    },
+
+    get currentMonthLabel() {
+      const label = new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+      return label.charAt(0).toUpperCase() + label.slice(1);
+    },
+
+    async loadRanking() {
+      this.loadingRanking = true;
+      const { data, error } = await supabaseClient.rpc('prisma_clinic_revenue_ranking', { period_month: this.currentMonthKey });
+      this.ranking = error ? [] : (data || []);
+      this.loadingRanking = false;
+    },
+
+    async loadShoutouts() {
+      const { data, error } = await supabaseClient.from('clinic_shoutouts').select('clinic_id, period_month').eq('period_month', this.currentMonthKey);
+      this.shoutouts = error ? [] : (data || []);
+    },
+
+    alreadyCongratulated(clinicId) {
+      return this.shoutouts.some((s) => s.clinic_id === clinicId);
+    },
+
+    get filteredClinics() {
+      const q = this.search.trim().toLowerCase();
+      if (!q) return this.clinics;
+      return this.clinics.filter((c) => c.name.toLowerCase().includes(q));
+    },
+
+    get stats() {
+      const ativas = this.clinics.filter((c) => c.status === 'ativo').length;
+      const trial = this.clinics.filter((c) => c.status === 'trial').length;
+      const inadimplentes = this.clinics.filter((c) => c.status === 'inadimplente').length;
+      const mrr = this.clinics
+        .filter((c) => c.status === 'ativo' && c.plan_value)
+        .reduce((sum, c) => sum + (c.billing_cycle === 'anual' ? Number(c.plan_value) / 12 : Number(c.plan_value)), 0);
+      return { ativas, trial, inadimplentes, mrr };
+    },
+
+    statusBadgeClass(status) {
+      const map = { trial: 'badge-info', ativo: 'badge-success', inadimplente: 'badge-danger', suspenso: 'badge-warning', cancelado: 'badge-neutral' };
+      return map[status] || 'badge-neutral';
+    },
+    statusLabel(status) {
+      const map = { trial: 'Trial', ativo: 'Ativo', inadimplente: 'Inadimplente', suspenso: 'Suspenso', cancelado: 'Cancelado' };
+      return map[status] || status;
+    },
+    paymentBadgeClass(status) {
+      const map = { pago: 'badge-success', pendente: 'badge-neutral', atrasado: 'badge-danger', cancelado: 'badge-neutral' };
+      return map[status] || 'badge-neutral';
+    },
+    paymentStatusLabel(status) {
+      const map = { pago: 'Pago', pendente: 'Pendente', atrasado: 'Atrasado', cancelado: 'Cancelado' };
+      return map[status] || status;
+    },
+    roleLabel(role) {
+      const map = { administrador: 'Administrador', esteticista: 'Esteticista', atendente: 'Atendente', equipe_prisma: 'Equipe Prisma' };
+      return map[role] || role;
+    },
+
+    formatCurrency(value) {
+      return (Number(value) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    },
+    formatDate(value) {
+      if (!value) return '—';
+      const d = new Date(value.length <= 10 ? value + 'T00:00:00' : value);
+      if (isNaN(d)) return '—';
+      return d.toLocaleDateString('pt-BR');
+    },
+
+    showFeedback(type, message) {
+      this.feedback = { type, message };
+      setTimeout(() => { this.feedback = { type: '', message: '' }; }, 5000);
+    },
+
+    // ---------------------------------------------------------------------
+    // Nova clínica (manual, direto pelo painel)
+    // ---------------------------------------------------------------------
+    openNewClinicModal() {
+      this.newClinic = { name: '', specialty: '', plan_name: '', admin_name: '', admin_email: '', admin_password: '' };
+      this.newClinicError = '';
+      this.showNewClinicModal = true;
+    },
+
+    async createClinic() {
+      const c = this.newClinic;
+      if (!c.name.trim() || !c.admin_name.trim() || !c.admin_email.trim() || !c.admin_password.trim()) {
+        this.newClinicError = 'Preencha nome da clínica, nome, e-mail e senha do administrador.';
+        return;
+      }
+      if (c.admin_password.length < 6) {
+        this.newClinicError = 'A senha precisa ter pelo menos 6 caracteres.';
+        return;
+      }
+      this.savingNewClinic = true;
+      this.newClinicError = '';
+
+      const { data: clinicRow, error: clinicError } = await supabaseClient
+        .from('clinics')
+        .insert({ name: c.name.trim(), specialty: c.specialty || null, plan_name: c.plan_name || null, status: 'trial' })
+        .select('id')
+        .single();
+      if (clinicError) {
+        this.savingNewClinic = false;
+        this.newClinicError = 'Erro ao criar clínica: ' + clinicError.message;
+        return;
+      }
+
+      const ephemeral = createEphemeralClient();
+      const { data: signUpData, error: signUpError } = await ephemeral.auth.signUp({ email: c.admin_email, password: c.admin_password });
+      if (signUpError || !signUpData.user) {
+        this.savingNewClinic = false;
+        this.newClinicError = 'Clínica criada, mas houve erro ao criar o acesso: ' + (signUpError ? signUpError.message : 'tente novamente.');
+        return;
+      }
+
+      const { error: userError } = await supabaseClient.from('users').insert({
+        id: signUpData.user.id, clinic_id: clinicRow.id, full_name: c.admin_name, email: c.admin_email, role: 'administrador'
+      });
+      this.savingNewClinic = false;
+      if (userError) {
+        this.newClinicError = 'Clínica e acesso criados, mas houve erro ao vincular o administrador: ' + userError.message;
+        return;
+      }
+
+      this.showNewClinicModal = false;
+      this.showFeedback('success', 'Clínica "' + c.name + '" criada com sucesso.');
+      await this.loadClinics();
+    },
+
+    // ---------------------------------------------------------------------
+    // Solicitações de acesso
+    // ---------------------------------------------------------------------
+    openApproveModal(req) {
+      this.approvingRequest = req;
+      this.approveForm = {
+        name: req.clinic_name, specialty: req.specialty || '',
+        admin_name: req.contact_name, admin_email: req.contact_email, admin_password: ''
+      };
+      this.approveError = '';
+      this.showApproveModal = true;
+    },
+
+    async approveRequest() {
+      const f = this.approveForm;
+      const req = this.approvingRequest;
+      if (!f.name.trim() || !f.admin_name.trim() || !f.admin_email.trim()) {
+        this.approveError = 'Preencha nome da clínica, nome e e-mail do administrador.';
+        return;
+      }
+      const hasGoogleAccount = !!(req && req.requester_auth_user_id);
+      if (!hasGoogleAccount && (!f.admin_password || f.admin_password.length < 6)) {
+        this.approveError = 'Defina uma senha inicial com pelo menos 6 caracteres.';
+        return;
+      }
+      this.savingApprove = true;
+      this.approveError = '';
+
+      const { data: clinicRow, error: clinicError } = await supabaseClient
+        .from('clinics')
+        .insert({ name: f.name.trim(), specialty: f.specialty || null, status: 'trial', owner_name: f.admin_name, owner_email: f.admin_email })
+        .select('id')
+        .single();
+      if (clinicError) {
+        this.savingApprove = false;
+        this.approveError = 'Erro ao criar clínica: ' + clinicError.message;
+        return;
+      }
+
+      let adminUserId = hasGoogleAccount ? req.requester_auth_user_id : null;
+      if (!hasGoogleAccount) {
+        const ephemeral = createEphemeralClient();
+        const { data: signUpData, error: signUpError } = await ephemeral.auth.signUp({ email: f.admin_email, password: f.admin_password });
+        if (signUpError || !signUpData.user) {
+          this.savingApprove = false;
+          this.approveError = 'Clínica criada, mas houve erro ao criar o acesso: ' + (signUpError ? signUpError.message : 'tente novamente.');
+          return;
+        }
+        adminUserId = signUpData.user.id;
+      }
+
+      const { error: userError } = await supabaseClient.from('users').insert({
+        id: adminUserId, clinic_id: clinicRow.id, full_name: f.admin_name, email: f.admin_email, role: 'administrador'
+      });
+      if (userError) {
+        this.savingApprove = false;
+        this.approveError = 'Clínica criada, mas houve erro ao vincular o administrador: ' + userError.message;
+        return;
+      }
+
+      await supabaseClient.from('clinic_signup_requests').update({
+        status: 'aprovado', reviewed_at: new Date().toISOString(), reviewed_by: this.currentUserId, resulting_clinic_id: clinicRow.id
+      }).eq('id', req.id);
+
+      this.savingApprove = false;
+      this.showApproveModal = false;
+      this.showFeedback('success', 'Solicitação aprovada. Clínica "' + f.name + '" criada.');
+      await Promise.all([this.loadClinics(), this.loadSignupRequests()]);
+    },
+
+    async rejectRequest(req) {
+      if (!(await confirmDialog('Recusar o pedido de acesso de "' + req.clinic_name + '"?', { danger: true, confirmLabel: 'Recusar' }))) return;
+      const { error } = await supabaseClient.from('clinic_signup_requests').update({
+        status: 'recusado', reviewed_at: new Date().toISOString(), reviewed_by: this.currentUserId
+      }).eq('id', req.id);
+      if (error) { this.showFeedback('error', 'Erro ao recusar: ' + error.message); return; }
+      this.showFeedback('success', 'Solicitação recusada.');
+      await this.loadSignupRequests();
+    },
+
+    // ---------------------------------------------------------------------
+    // Detalhe da clínica
+    // ---------------------------------------------------------------------
+    async selectClinic(c) {
+      this.selectedClinic = c;
+      this.editClinic = {
+        status: c.status, plan_name: c.plan_name || '', plan_value_input: c.plan_value ? numberToCurrencyInput(c.plan_value) : '',
+        billing_cycle: c.billing_cycle || 'mensal', next_due_date: c.next_due_date || '', trial_ends_at: c.trial_ends_at ? c.trial_ends_at.slice(0, 10) : '',
+        notes: c.notes || '', owner_name: c.owner_name || '', owner_email: c.owner_email || '', owner_phone: c.owner_phone || ''
+      };
+      const [usersRes, paymentsRes] = await Promise.all([
+        supabaseClient.from('users').select('id, full_name, email, role, is_active').eq('clinic_id', c.id).order('full_name'),
+        supabaseClient.from('clinic_payments').select('*').eq('clinic_id', c.id).order('due_date', { ascending: false })
+      ]);
+      this.clinicUsers = usersRes.error ? [] : (usersRes.data || []);
+      this.clinicPayments = paymentsRes.error ? [] : (paymentsRes.data || []);
+    },
+
+    closeClinicDetail() {
+      this.selectedClinic = null;
+      this.clinicUsers = [];
+      this.clinicPayments = [];
+    },
+
+    async saveClinicEdits() {
+      this.savingClinic = true;
+      const e = this.editClinic;
+      const payload = {
+        status: e.status, plan_name: e.plan_name || null, plan_value: e.plan_value_input ? parseCurrencyToNumber(e.plan_value_input) : null,
+        billing_cycle: e.billing_cycle, next_due_date: e.next_due_date || null,
+        trial_ends_at: e.trial_ends_at ? new Date(e.trial_ends_at + 'T00:00:00').toISOString() : null,
+        notes: e.notes || null, owner_name: e.owner_name || null, owner_email: e.owner_email || null, owner_phone: e.owner_phone || null
+      };
+      if (e.status === 'ativo' && this.selectedClinic.status !== 'ativo') {
+        payload.activated_at = new Date().toISOString();
+      }
+      const { error } = await supabaseClient.from('clinics').update(payload).eq('id', this.selectedClinic.id);
+      this.savingClinic = false;
+      if (error) { this.showFeedback('error', 'Erro ao salvar: ' + error.message); return; }
+      this.showFeedback('success', 'Alterações salvas.');
+      Object.assign(this.selectedClinic, payload);
+      await this.loadClinics();
+    },
+
+    // ---------------------------------------------------------------------
+    // Pagamentos
+    // ---------------------------------------------------------------------
+    openPaymentModal() {
+      this.newPayment = { amount_input: '', due_date: '', status: 'pendente', payment_method: '', reference: '' };
+      this.showPaymentModal = true;
+    },
+
+    async addPayment() {
+      const amount = parseCurrencyToNumber(this.newPayment.amount_input);
+      if (!amount || amount <= 0) { this.showFeedback('error', 'Informe um valor válido.'); return; }
+      this.savingPayment = true;
+      const payload = {
+        clinic_id: this.selectedClinic.id, amount, due_date: this.newPayment.due_date || null,
+        status: this.newPayment.status, payment_method: this.newPayment.payment_method || null,
+        reference: this.newPayment.reference || null, created_by: this.currentUserId
+      };
+      if (this.newPayment.status === 'pago') payload.paid_at = new Date().toISOString();
+      const { error } = await supabaseClient.from('clinic_payments').insert(payload);
+      this.savingPayment = false;
+      if (error) { this.showFeedback('error', 'Erro ao registrar: ' + error.message); return; }
+      this.showPaymentModal = false;
+      this.showFeedback('success', 'Pagamento registrado.');
+      await this.selectClinic(this.selectedClinic);
+    },
+
+    async markPaid(payment) {
+      const { error } = await supabaseClient.from('clinic_payments').update({ status: 'pago', paid_at: new Date().toISOString() }).eq('id', payment.id);
+      if (error) { this.showFeedback('error', 'Erro: ' + error.message); return; }
+      await this.selectClinic(this.selectedClinic);
+    },
+
+    // ---------------------------------------------------------------------
+    // Parabenizar clínica em destaque
+    // ---------------------------------------------------------------------
+    openCongratsModal(row, rank) {
+      this.congratsTarget = row;
+      this.congratsRank = rank;
+      this.congratsMessage = 'Olá! Passando para parabenizar a equipe pelo resultado deste mês -- ficaram entre as clínicas com melhor faturamento na plataforma. 🎉\n\nSe precisarem de qualquer suporte por aqui, é só chamar.\n\nAbraço,\nEquipe Prisma';
+      this.showCongratsModal = true;
+    },
+
+    async sendCongrats() {
+      const clinic = this.clinics.find((c) => c.id === this.congratsTarget.clinic_id);
+      const email = clinic ? clinic.owner_email : '';
+      const subject = encodeURIComponent('Parabéns pelo resultado deste mês! 🎉');
+      const body = encodeURIComponent(this.congratsMessage);
+      window.open('mailto:' + (email || '') + '?subject=' + subject + '&body=' + body, '_blank');
+
+      await supabaseClient.from('clinic_shoutouts').insert({
+        clinic_id: this.congratsTarget.clinic_id, period_month: this.currentMonthKey, rank: this.congratsRank,
+        channel: 'email', message: this.congratsMessage, sent_by: this.currentUserId
+      });
+      this.showCongratsModal = false;
+      this.showFeedback('success', 'E-mail aberto e registro salvo.');
+      await this.loadShoutouts();
+    },
+
+    // ---------------------------------------------------------------------
+    // Personalização da tela de login (logo, fundo, cores, textos)
+    // ---------------------------------------------------------------------
+    async loadBranding() {
+      this.brandingLoading = true;
+      const { data, error } = await supabaseClient.from('platform_branding').select('*').eq('id', 1).maybeSingle();
+      if (!error && data) this.branding = data;
+      this.brandingLoading = false;
+    },
+
+    async uploadBrandingImage(event, field) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const flag = field === 'logo_url' ? 'uploadingLogo' : 'uploadingBackground';
+      this[flag] = true;
+      const ext = (file.name.split('.').pop() || 'png').toLowerCase();
+      const path = field + '_' + Date.now() + '.' + ext;
+      const { error: uploadError } = await supabaseClient.storage.from('platform-branding').upload(path, file, { upsert: true });
+      if (uploadError) {
+        this.showFeedback('error', 'Erro ao enviar imagem: ' + uploadError.message);
+        this[flag] = false;
+        event.target.value = '';
+        return;
+      }
+      const { data: urlData } = supabaseClient.storage.from('platform-branding').getPublicUrl(path);
+      this.branding[field] = urlData.publicUrl;
+      this[flag] = false;
+      event.target.value = '';
+    },
+
+    async saveBranding() {
+      this.savingBranding = true;
+      const b = this.branding;
+      const payload = {
+        id: 1,
+        logo_url: b.logo_url || null,
+        background_url: b.background_url || null,
+        primary_color: b.primary_color || null,
+        accent_color: b.accent_color || null,
+        login_title: b.login_title || 'Prisma · Gestão de Clínicas',
+        login_subtitle: b.login_subtitle || 'Acesse o painel da sua clínica',
+        support_message: b.support_message || 'Esqueceu a senha? Fale com a administração da clínica.',
+        footer_text: b.footer_text || 'Sistema interno · Prisma Creative',
+        updated_at: new Date().toISOString(),
+        updated_by: this.currentUserId
+      };
+      const { error } = await supabaseClient.from('platform_branding').upsert(payload);
+      this.savingBranding = false;
+      if (error) { this.showFeedback('error', 'Erro ao salvar: ' + error.message); return; }
+      this.showFeedback('success', 'Personalização salva. A tela de login já reflete as mudanças.');
+    }
+  };
+}
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="js/supabase-client.js"></script>
+<script src="js/currency-mask.js"></script>
+<script src="js/confirm-dialog.js"></script>
+<script src="js/auth-guard.js"></script>
+<script src="js/include.js" defer></script>
+</body>
+</html>

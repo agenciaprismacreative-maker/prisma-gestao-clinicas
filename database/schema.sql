@@ -209,7 +209,9 @@ create table public.tasks (
   status text not null default 'pendente' check (
     status in ('pendente', 'em_andamento', 'concluida')
   ),
-  patient_id uuid references public.patients (id),
+  -- set null: se o paciente for excluído (LGPD), a tarefa continua existindo,
+  -- só perde o vínculo.
+  patient_id uuid references public.patients (id) on delete set null,
   appointment_id uuid references public.appointments (id),
   created_at timestamptz not null default now()
 );
@@ -220,7 +222,9 @@ create table public.tasks (
 create table public.transactions (
   id uuid primary key default gen_random_uuid(),
   clinic_id uuid not null references public.clinics (id) on delete cascade,
-  patient_id uuid references public.patients (id),
+  -- set null: excluir o paciente não pode apagar o histórico financeiro
+  -- (obrigação legal/fiscal de manter registro de receita), só desvincula.
+  patient_id uuid references public.patients (id) on delete set null,
   appointment_id uuid references public.appointments (id),
   package_id uuid references public.packages (id),
   professional_id uuid references public.users (id),
@@ -265,7 +269,9 @@ create table public.leads (
 create table public.communications_log (
   id uuid primary key default gen_random_uuid(),
   clinic_id uuid not null references public.clinics (id) on delete cascade,
-  patient_id uuid references public.patients (id),
+  -- set null: excluir o paciente preserva o log de comunicação (auditoria),
+  -- só desvincula.
+  patient_id uuid references public.patients (id) on delete set null,
   appointment_id uuid references public.appointments (id),
   channel text not null default 'whatsapp',
   message_type text check (
@@ -958,6 +964,38 @@ create policy "clinic_shoutouts_all" on public.clinic_shoutouts for all
   with check (public.auth_is_prisma_team());
 
 -- ============================================================================
+-- PLATFORM_BRANDING: linha única com a identidade visual da tela de login
+-- (logo, imagem de fundo, cores, textos), editável só pela equipe Prisma.
+-- Leitura pública porque a tela de login é acessada sem sessão autenticada.
+-- ============================================================================
+create table public.platform_branding (
+  id integer primary key default 1,
+  constraint platform_branding_singleton check (id = 1),
+  logo_url text,
+  background_url text,
+  primary_color text,
+  accent_color text,
+  login_title text not null default 'Prisma · Gestão de Clínicas',
+  login_subtitle text not null default 'Acesse o painel da sua clínica',
+  support_message text not null default 'Esqueceu a senha? Fale com a administração da clínica.',
+  footer_text text not null default 'Sistema interno · Prisma Creative',
+  updated_at timestamptz not null default now(),
+  updated_by uuid references public.users (id) on delete set null
+);
+
+insert into public.platform_branding (id) values (1) on conflict (id) do nothing;
+
+alter table public.platform_branding enable row level security;
+
+create policy "platform_branding_select" on public.platform_branding for select
+  to anon, authenticated
+  using (true);
+
+create policy "platform_branding_write" on public.platform_branding for all
+  using (public.auth_is_prisma_team())
+  with check (public.auth_is_prisma_team());
+
+-- ============================================================================
 -- STORAGE: bucket para fotos de evolução dos pacientes
 -- ============================================================================
 insert into storage.buckets (id, name, public)
@@ -985,6 +1023,28 @@ create policy "clinic_assets_storage_insert" on storage.objects for insert
 
 create policy "clinic_assets_storage_update" on storage.objects for update
   using (bucket_id = 'clinic-assets' and auth.role() = 'authenticated');
+
+-- ============================================================================
+-- STORAGE: bucket público para a personalização da tela de login (logo e
+-- imagem de fundo definidos pela equipe Prisma). Separado do clinic-assets
+-- porque o upload aqui precisa ficar restrito à equipe Prisma, não a
+-- "qualquer autenticado".
+-- ============================================================================
+insert into storage.buckets (id, name, public)
+values ('platform-branding', 'platform-branding', true)
+on conflict (id) do nothing;
+
+create policy "platform_branding_storage_select" on storage.objects for select
+  using (bucket_id = 'platform-branding');
+
+create policy "platform_branding_storage_insert" on storage.objects for insert
+  with check (bucket_id = 'platform-branding' and public.auth_is_prisma_team());
+
+create policy "platform_branding_storage_update" on storage.objects for update
+  using (bucket_id = 'platform-branding' and public.auth_is_prisma_team());
+
+create policy "platform_branding_storage_delete" on storage.objects for delete
+  using (bucket_id = 'platform-branding' and public.auth_is_prisma_team());
 
 -- ============================================================================
 -- Fim do schema. Próximo passo: criar a clínica e o primeiro usuário de teste
