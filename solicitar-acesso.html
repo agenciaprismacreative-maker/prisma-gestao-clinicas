@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Solicitar acesso · Prisma Gestão de Clínicas</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body data-page="solicitar-acesso">
+
+<div class="auth-screen" x-data="solicitarAcessoApp()" x-init="init()" style="align-items:flex-start;padding-top:60px;padding-bottom:60px;">
+  <div class="auth-card" style="max-width:520px;">
+
+    <div class="auth-logo">
+      <div class="logo-mark" style="background:var(--color-accent);color:var(--color-primary-dark);">P</div>
+      <h1>Solicitar acesso</h1>
+      <p>Preencha os dados abaixo. A equipe Prisma analisa e aprova o acesso da sua clínica.</p>
+    </div>
+
+    <!-- formulário -->
+    <template x-if="step === 'form'">
+      <form @submit.prevent="submit()">
+
+        <div class="card" style="background:var(--color-surface-alt);box-shadow:none;padding:14px 16px;margin-bottom:18px;">
+          <p class="text-sm mb-2" x-show="!googleUser">Prefere não digitar senha agora? Use sua conta Google -- ela também serve para fazer login depois, assim que o acesso for aprovado.</p>
+          <button type="button" class="btn btn-secondary btn-block" @click="loginWithGoogle()" x-show="!googleUser">
+            <svg viewBox="0 0 48 48" style="width:16px;height:16px;margin-right:6px;vertical-align:-3px;"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.9 32.5 29.4 35.5 24 35.5c-6.4 0-11.6-5.2-11.6-11.5S17.6 12.5 24 12.5c3 0 5.6 1.1 7.7 2.9l5.7-5.7C34.1 6.7 29.3 4.5 24 4.5 13.2 4.5 4.5 13.2 4.5 24S13.2 43.5 24 43.5 43.5 34.8 43.5 24c0-1.2-.1-2.4-.3-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 15.9 18.9 12.5 24 12.5c3 0 5.6 1.1 7.7 2.9l5.7-5.7C34.1 6.7 29.3 4.5 24 4.5c-7.7 0-14.4 4.4-17.7 10.2z"/><path fill="#4CAF50" d="M24 43.5c5.2 0 9.9-2 13.5-5.2l-6.2-5.3C29.3 34.6 26.8 35.5 24 35.5c-5.4 0-9.9-3.4-11.6-8.1l-6.5 5C9.5 39 16.2 43.5 24 43.5z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.1-4.1 5.5l6.2 5.3C41 35.6 43.5 30.3 43.5 24c0-1.2-.1-2.4-.3-3.5z"/></svg>
+            Continuar com Google
+          </button>
+          <p class="text-sm" x-show="googleUser" style="color:var(--color-success);">✓ Conta Google conectada: <strong x-text="googleUser.email"></strong></p>
+        </div>
+
+        <h4 class="text-xs text-muted mb-2" style="text-transform:uppercase;letter-spacing:.04em;">Dados da clínica</h4>
+        <div class="form-group">
+          <label class="label">Nome da clínica *</label>
+          <input class="input" type="text" x-model="form.clinic_name" required>
+        </div>
+        <div class="form-group">
+          <label class="label">Especialidade</label>
+          <input class="input" type="text" x-model="form.specialty" placeholder="Ex.: Estética facial e corporal">
+        </div>
+
+        <hr class="divider">
+
+        <h4 class="text-xs text-muted mb-2" style="text-transform:uppercase;letter-spacing:.04em;">Seus dados</h4>
+        <div class="form-group">
+          <label class="label">Nome completo *</label>
+          <input class="input" type="text" x-model="form.contact_name" required>
+        </div>
+        <div class="grid grid-2 gap-3">
+          <div class="form-group">
+            <label class="label">E-mail *</label>
+            <input class="input" type="email" x-model="form.contact_email" required :disabled="!!googleUser">
+          </div>
+          <div class="form-group">
+            <label class="label">Telefone/WhatsApp</label>
+            <input class="input" type="text" x-model="form.contact_phone" placeholder="(11) 90000-0000">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="label">Mensagem (opcional)</label>
+          <textarea class="input" rows="3" x-model="form.message" placeholder="Conte um pouco sobre a clínica ou alguma dúvida específica"></textarea>
+        </div>
+
+        <p x-show="errorMsg" x-cloak class="text-sm mb-3" style="color:var(--color-danger);" x-text="errorMsg"></p>
+
+        <button class="btn btn-primary btn-block mt-2" type="submit" :disabled="loading">
+          <span x-show="!loading">Enviar solicitação</span>
+          <span x-show="loading" x-cloak>Enviando…</span>
+        </button>
+      </form>
+    </template>
+
+    <!-- confirmação -->
+    <template x-if="step === 'success'">
+      <div style="text-align:center;">
+        <p class="text-sm mb-3">Solicitação enviada. A equipe Prisma vai analisar os dados e liberar o acesso -- você recebe a confirmação por e-mail em <strong x-text="form.contact_email"></strong>.</p>
+        <a href="index.html" class="btn btn-secondary btn-sm">Voltar para o login</a>
+      </div>
+    </template>
+
+    <div class="auth-footer">
+      Já tem acesso? <a href="index.html" style="color:var(--color-primary);">Entrar</a>
+    </div>
+  </div>
+</div>
+
+<script>
+function solicitarAcessoApp() {
+  return {
+    step: 'form',
+    loading: false,
+    errorMsg: '',
+    googleUser: null,
+    form: {
+      clinic_name: '', specialty: '',
+      contact_name: '', contact_email: '', contact_phone: '',
+      message: ''
+    },
+
+    async init() {
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      if (session) this.applyGoogleSession(session.user);
+      supabaseClient.auth.onAuthStateChange((event, sess) => {
+        if (event === 'SIGNED_IN' && sess) this.applyGoogleSession(sess.user);
+      });
+    },
+
+    // Depois do redirect de volta do Google, a sessão já vem pronta --
+    // usa o e-mail (e nome, se o Google devolver) para pré-preencher o
+    // formulário e guarda o id para linkar na solicitação.
+    applyGoogleSession(user) {
+      this.googleUser = user;
+      this.form.contact_email = user.email || this.form.contact_email;
+      const meta = user.user_metadata || {};
+      if (!this.form.contact_name) this.form.contact_name = meta.full_name || meta.name || '';
+    },
+
+    async loginWithGoogle() {
+      this.errorMsg = '';
+      const { error } = await supabaseClient.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo: window.location.href.split('?')[0] }
+      });
+      if (error) this.errorMsg = 'Não foi possível conectar com o Google agora: ' + error.message;
+    },
+
+    async submit() {
+      if (!this.form.clinic_name.trim() || !this.form.contact_name.trim() || !this.form.contact_email.trim()) {
+        this.errorMsg = 'Preencha nome da clínica, seu nome e e-mail.';
+        return;
+      }
+      this.loading = true;
+      this.errorMsg = '';
+
+      const payload = {
+        clinic_name: this.form.clinic_name.trim(),
+        specialty: this.form.specialty || null,
+        contact_name: this.form.contact_name.trim(),
+        contact_email: this.form.contact_email.trim(),
+        contact_phone: this.form.contact_phone || null,
+        message: this.form.message || null,
+        requester_auth_user_id: this.googleUser ? this.googleUser.id : null
+      };
+
+      const { error } = await supabaseClient.from('clinic_signup_requests').insert(payload);
+
+      // A sessão do Google só serviu para confirmar o e-mail e linkar a
+      // conta -- sem aprovação ainda não há papel/clínica, então não faz
+      // sentido deixar a pessoa "logada" navegando pelo sistema.
+      if (this.googleUser) await supabaseClient.auth.signOut();
+
+      this.loading = false;
+      if (error) {
+        this.errorMsg = 'Erro ao enviar solicitação: ' + error.message;
+        return;
+      }
+      this.step = 'success';
+    }
+  };
+}
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="js/supabase-client.js"></script>
+<script src="js/include.js" defer></script>
+</body>
+</html>
