@@ -26,7 +26,10 @@ window.isAdminRole = function (role) {
 };
 window.PRISMA_ROLE_HOME = {
   administrador: 'dashboard.html',
-  equipe_prisma: 'dashboard.html',
+  // equipe_prisma tem o próprio console, fora do contexto de qualquer
+  // clínica -- não é mais tratado como "administrador de uma clínica"
+  // depois da restrição de acesso a dado de paciente (LGPD).
+  equipe_prisma: 'admin-clinicas.html',
   esteticista: 'dashboard.html',
   atendente: 'dashboard.html'
 };

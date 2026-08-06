@@ -239,13 +239,14 @@
             </div>
           </div>
 
-          <div class="card card-shadow" x-show="dashboardLeaderboard.length > 0" style="flex:1;display:flex;flex-direction:column;">
+          <div class="card card-shadow" style="flex:1;display:flex;flex-direction:column;">
             <div class="card-header">
               <div>
                 <h3 style="font-size:15px;">🏆 Ranking do mês</h3>
                 <p x-text="currentMonthLabel"></p>
               </div>
             </div>
+            <div x-show="dashboardLeaderboard.length === 0" class="text-sm text-muted" style="padding:4px 0 8px;">Ninguém com faturamento registrado neste mês ainda.</div>
             <div class="flex" style="flex-direction:column;">
               <template x-for="row in dashboardLeaderboard" :key="row.userId">
                 <div class="rank-row" :class="'rank-row-' + row.rank">

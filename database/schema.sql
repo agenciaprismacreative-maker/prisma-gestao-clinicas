@@ -15,7 +15,20 @@ create table public.clinics (
   cnpj text,
   address text,
   specialty text,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  -- ciclo de vida comercial (painel administrativo da Prisma) --------------
+  status text not null default 'trial'
+    check (status in ('trial', 'ativo', 'inadimplente', 'suspenso', 'cancelado')),
+  plan_name text,
+  plan_value numeric(10, 2),
+  billing_cycle text default 'mensal' check (billing_cycle in ('mensal', 'anual')),
+  trial_ends_at timestamptz,
+  next_due_date date,
+  activated_at timestamptz,
+  owner_name text,
+  owner_email text,
+  owner_phone text,
+  notes text
 );
 
 -- ============================================================================
@@ -516,6 +529,57 @@ create table public.commission_tiers (
 );
 
 -- ============================================================================
+-- PAINEL PRISMA (visão da agência sobre as clínicas clientes da plataforma)
+-- ============================================================================
+
+-- ficha manual de pagamentos por clínica (assinatura da plataforma) --
+-- controlada pela Prisma, não é cobrança automática.
+create table public.clinic_payments (
+  id uuid primary key default gen_random_uuid(),
+  clinic_id uuid not null references public.clinics (id) on delete cascade,
+  amount numeric(10, 2) not null,
+  due_date date,
+  paid_at timestamptz,
+  status text not null default 'pendente'
+    check (status in ('pago', 'pendente', 'atrasado', 'cancelado')),
+  payment_method text,
+  reference text,
+  created_by uuid references public.users (id) on delete set null,
+  created_at timestamptz not null default now()
+);
+
+-- pedidos de acesso vindos da página pública solicitar-acesso.html
+create table public.clinic_signup_requests (
+  id uuid primary key default gen_random_uuid(),
+  clinic_name text not null,
+  contact_name text not null,
+  contact_email text not null,
+  contact_phone text,
+  specialty text,
+  message text,
+  requester_auth_user_id uuid references auth.users (id) on delete set null,
+  status text not null default 'pendente' check (status in ('pendente', 'aprovado', 'recusado')),
+  created_at timestamptz not null default now(),
+  reviewed_at timestamptz,
+  reviewed_by uuid references public.users (id) on delete set null,
+  review_notes text,
+  resulting_clinic_id uuid references public.clinics (id) on delete set null
+);
+
+-- histórico de mensagens de parabéns/reconhecimento enviadas às clínicas que
+-- se destacaram em faturamento no mês (ver prisma_clinic_revenue_ranking)
+create table public.clinic_shoutouts (
+  id uuid primary key default gen_random_uuid(),
+  clinic_id uuid not null references public.clinics (id) on delete cascade,
+  period_month text not null,
+  rank int,
+  channel text,
+  message text,
+  sent_by uuid references public.users (id) on delete set null,
+  sent_at timestamptz not null default now()
+);
+
+-- ============================================================================
 -- ÍNDICES (consultas mais comuns: por clínica e por data)
 -- ============================================================================
 create index idx_patients_clinic on public.patients (clinic_id);
@@ -576,6 +640,36 @@ as $$
     (select role = 'equipe_prisma' from public.users where id = auth.uid()),
     false
   );
+$$;
+
+-- Ranking de faturamento entre clínicas para o painel Prisma, sem expor
+-- nenhum dado de paciente: soma transactions.amount por clínica e devolve
+-- só o total (nunca uma linha individual). security definer para poder ler
+-- transactions de todas as clínicas apesar da RLS restrita da tabela; a
+-- checagem de "é a equipe Prisma" é feita explicitamente aqui dentro.
+create or replace function public.prisma_clinic_revenue_ranking(period_month text)
+returns table (clinic_id uuid, clinic_name text, total_revenue numeric)
+language plpgsql
+security definer
+stable
+as $$
+begin
+  if not public.auth_is_prisma_team() then
+    raise exception 'not authorized';
+  end if;
+
+  return query
+    select c.id, c.name, coalesce(sum(t.amount), 0)::numeric
+    from public.clinics c
+    left join public.transactions t
+      on t.clinic_id = c.id
+      and t.type in ('pagamento_procedimento', 'venda_pacote')
+      and t.transaction_date is not null
+      and to_char(t.transaction_date::date, 'YYYY-MM') = period_month
+    where c.status <> 'cancelado'
+    group by c.id, c.name
+    order by 3 desc;
+end;
 $$;
 
 -- Confirma se quem está logado é Administrador (ou equipe Prisma). Usada
@@ -648,8 +742,13 @@ create policy "clinics_select" on public.clinics for select
 -- (nome, etc.). Sem essa policy o update roda sem erro e sem efeito, porque
 -- a checagem de RLS descarta a linha antes de gravar.
 create policy "clinics_update" on public.clinics for update
-  using (id = public.auth_clinic_id() and public.auth_is_admin())
-  with check (id = public.auth_clinic_id() and public.auth_is_admin());
+  using ((id = public.auth_clinic_id() and public.auth_is_admin()) or public.auth_is_prisma_team())
+  with check ((id = public.auth_clinic_id() and public.auth_is_admin()) or public.auth_is_prisma_team());
+
+-- clinics: criar clínica nova é ação exclusiva da Prisma (onboarding de
+-- cliente na plataforma), nunca de um administrador sobre a própria conta.
+create policy "clinics_insert" on public.clinics for insert
+  with check (public.auth_is_prisma_team());
 
 -- users: cada usuário vê os colegas da própria clínica
 create policy "users_select" on public.users for select
@@ -674,41 +773,46 @@ create policy "services_all" on public.services for all
   using (clinic_id = public.auth_clinic_id() or public.auth_is_prisma_team())
   with check (clinic_id = public.auth_clinic_id() or public.auth_is_prisma_team());
 
+-- patients: dado de saúde é sensível (LGPD art. 5º, II) -- só a própria
+-- clínica acessa, sem bypass para a equipe Prisma (ver painel administrativo
+-- mais abaixo: a Prisma administra acesso/plano, não enxerga ficha de paciente).
 create policy "patients_all" on public.patients for all
-  using (clinic_id = public.auth_clinic_id() or public.auth_is_prisma_team())
-  with check (clinic_id = public.auth_clinic_id() or public.auth_is_prisma_team());
+  using (clinic_id = public.auth_clinic_id())
+  with check (clinic_id = public.auth_clinic_id());
 
 create policy "packages_all" on public.packages for all
-  using (clinic_id = public.auth_clinic_id() or public.auth_is_prisma_team())
-  with check (clinic_id = public.auth_clinic_id() or public.auth_is_prisma_team());
+  using (clinic_id = public.auth_clinic_id())
+  with check (clinic_id = public.auth_clinic_id());
 
 create policy "appointments_all" on public.appointments for all
-  using (clinic_id = public.auth_clinic_id() or public.auth_is_prisma_team())
-  with check (clinic_id = public.auth_clinic_id() or public.auth_is_prisma_team());
+  using (clinic_id = public.auth_clinic_id())
+  with check (clinic_id = public.auth_clinic_id());
 
 create policy "medical_records_all" on public.medical_records for all
-  using (clinic_id = public.auth_clinic_id() or public.auth_is_prisma_team())
-  with check (clinic_id = public.auth_clinic_id() or public.auth_is_prisma_team());
+  using (clinic_id = public.auth_clinic_id())
+  with check (clinic_id = public.auth_clinic_id());
 
 create policy "patient_photos_all" on public.patient_photos for all
-  using (clinic_id = public.auth_clinic_id() or public.auth_is_prisma_team())
-  with check (clinic_id = public.auth_clinic_id() or public.auth_is_prisma_team());
+  using (clinic_id = public.auth_clinic_id())
+  with check (clinic_id = public.auth_clinic_id());
 
+-- tasks: tarefa interna da equipe, não é dado de paciente -- Prisma mantém
+-- acesso de suporte (ex.: ajudar a entender por que uma tarefa não aparece).
 create policy "tasks_all" on public.tasks for all
   using (clinic_id = public.auth_clinic_id() or public.auth_is_prisma_team())
   with check (clinic_id = public.auth_clinic_id() or public.auth_is_prisma_team());
 
 create policy "transactions_all" on public.transactions for all
-  using (clinic_id = public.auth_clinic_id() or public.auth_is_prisma_team())
-  with check (clinic_id = public.auth_clinic_id() or public.auth_is_prisma_team());
+  using (clinic_id = public.auth_clinic_id())
+  with check (clinic_id = public.auth_clinic_id());
 
 create policy "leads_all" on public.leads for all
-  using (clinic_id = public.auth_clinic_id() or public.auth_is_prisma_team())
-  with check (clinic_id = public.auth_clinic_id() or public.auth_is_prisma_team());
+  using (clinic_id = public.auth_clinic_id())
+  with check (clinic_id = public.auth_clinic_id());
 
 create policy "communications_log_all" on public.communications_log for all
-  using (clinic_id = public.auth_clinic_id() or public.auth_is_prisma_team())
-  with check (clinic_id = public.auth_clinic_id() or public.auth_is_prisma_team());
+  using (clinic_id = public.auth_clinic_id())
+  with check (clinic_id = public.auth_clinic_id());
 
 create policy "schedule_blocks_all" on public.schedule_blocks for all
   using (clinic_id = public.auth_clinic_id() or public.auth_is_prisma_team())
@@ -762,24 +866,22 @@ create policy "payment_machines_all" on public.payment_machines for all
   with check (clinic_id = public.auth_clinic_id() or public.auth_is_prisma_team());
 
 create policy "sales_all" on public.sales for all
-  using (clinic_id = public.auth_clinic_id() or public.auth_is_prisma_team())
-  with check (clinic_id = public.auth_clinic_id() or public.auth_is_prisma_team());
+  using (clinic_id = public.auth_clinic_id())
+  with check (clinic_id = public.auth_clinic_id());
 
 create policy "sale_items_all" on public.sale_items for all
   using (exists (
     select 1 from public.sales s
-    where s.id = sale_items.sale_id
-      and (s.clinic_id = public.auth_clinic_id() or public.auth_is_prisma_team())
+    where s.id = sale_items.sale_id and s.clinic_id = public.auth_clinic_id()
   ))
   with check (exists (
     select 1 from public.sales s
-    where s.id = sale_items.sale_id
-      and (s.clinic_id = public.auth_clinic_id() or public.auth_is_prisma_team())
+    where s.id = sale_items.sale_id and s.clinic_id = public.auth_clinic_id()
   ));
 
 create policy "dashboard_notes_all" on public.dashboard_notes for all
-  using (clinic_id = public.auth_clinic_id() or public.auth_is_prisma_team())
-  with check (clinic_id = public.auth_clinic_id() or public.auth_is_prisma_team());
+  using (clinic_id = public.auth_clinic_id())
+  with check (clinic_id = public.auth_clinic_id());
 
 create policy "plan_templates_all" on public.plan_templates for all
   using (clinic_id = public.auth_clinic_id() or public.auth_is_prisma_team())
@@ -823,6 +925,37 @@ create policy "commission_tiers_select" on public.commission_tiers for select
 create policy "commission_tiers_write" on public.commission_tiers for all
   using (public.auth_is_prisma_team() or (clinic_id = public.auth_clinic_id() and public.auth_is_admin()))
   with check (public.auth_is_prisma_team() or (clinic_id = public.auth_clinic_id() and public.auth_is_admin()));
+
+-- painel Prisma: as 3 tabelas abaixo são operadas só pela equipe Prisma
+-- (controle interno de acesso/cobrança/relacionamento com o cliente).
+alter table public.clinic_payments enable row level security;
+alter table public.clinic_signup_requests enable row level security;
+alter table public.clinic_shoutouts enable row level security;
+
+create policy "clinic_payments_all" on public.clinic_payments for all
+  using (public.auth_is_prisma_team())
+  with check (public.auth_is_prisma_team());
+
+-- clinic_signup_requests: inserção pública (o único ponto do sistema que
+-- aceita escrita sem login -- é a porta de entrada de quem ainda não é
+-- cliente), leitura restrita ao próprio pedido ou à equipe Prisma.
+create policy "clinic_signup_requests_insert_public" on public.clinic_signup_requests for insert
+  to anon, authenticated
+  with check (true);
+
+create policy "clinic_signup_requests_select_own" on public.clinic_signup_requests for select
+  using (
+    public.auth_is_prisma_team()
+    or (requester_auth_user_id is not null and requester_auth_user_id = auth.uid())
+  );
+
+create policy "clinic_signup_requests_update_prisma" on public.clinic_signup_requests for update
+  using (public.auth_is_prisma_team())
+  with check (public.auth_is_prisma_team());
+
+create policy "clinic_shoutouts_all" on public.clinic_shoutouts for all
+  using (public.auth_is_prisma_team())
+  with check (public.auth_is_prisma_team());
 
 -- ============================================================================
 -- STORAGE: bucket para fotos de evolução dos pacientes
