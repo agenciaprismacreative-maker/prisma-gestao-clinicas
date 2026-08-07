@@ -33,6 +33,7 @@ function topbarApp() {
     results: [],
     searching: false,
     showResults: false,
+    activeResultIndex: -1,
 
     reminders: [],
     showReminders: false,
@@ -79,6 +80,7 @@ function topbarApp() {
     },
 
     async onSearchInput() {
+      this.activeResultIndex = -1;
       const q = this.query.trim();
       if (q.length < 2) {
         this.results = [];
@@ -96,6 +98,25 @@ function topbarApp() {
         .limit(8);
       this.results = data || [];
       this.searching = false;
+    },
+
+    // Navegação da busca por teclado (seta cima/baixo + Enter), pra quem
+    // não usa mouse conseguir escolher um paciente também -- antes só
+    // dava pra selecionar clicando (@mousedown no resultado).
+    moveResultSelection(delta) {
+      if (!this.showResults || this.results.length === 0) return;
+      const max = this.results.length - 1;
+      let next = this.activeResultIndex + delta;
+      if (next < 0) next = max;
+      if (next > max) next = 0;
+      this.activeResultIndex = next;
+    },
+
+    selectActiveResult() {
+      if (!this.showResults || this.results.length === 0) return;
+      const idx = this.activeResultIndex >= 0 ? this.activeResultIndex : 0;
+      const patient = this.results[idx];
+      if (patient) this.goToPatient(patient);
     },
 
     goToPatient(p) {

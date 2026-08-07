@@ -127,8 +127,8 @@
                     <template x-for="(src, i) in photoPreviews" :key="i">
                       <div style="position:relative;">
                         <img :src="src" style="width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:var(--radius-md);border:1px solid var(--color-border);">
-                        <button type="button" @click="removePhoto(i)" title="Remover"
-                          style="position:absolute;top:6px;right:6px;width:24px;height:24px;border-radius:50%;background:rgba(31,51,47,.75);color:#fff;border:none;display:flex;align-items:center;justify-content:center;font-size:15px;line-height:1;cursor:pointer;">×</button>
+                        <button type="button" @click="removePhoto(i)" title="Remover" aria-label="Remover foto"
+                          style="position:absolute;top:6px;right:6px;width:32px;height:32px;border-radius:50%;background:rgba(31,51,47,.75);color:#fff;border:none;display:flex;align-items:center;justify-content:center;font-size:17px;line-height:1;cursor:pointer;">×</button>
                       </div>
                     </template>
                   </div>

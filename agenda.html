@@ -36,11 +36,11 @@
 
         <div class="agenda-toolbar flex items-center justify-between" style="flex-wrap:wrap;gap:12px;">
           <div class="flex items-center gap-3">
-            <button class="icon-btn" type="button" style="width:32px;height:32px;" @click="navPrev()">
+            <button class="icon-btn" type="button" aria-label="Período anterior" @click="navPrev()">
               <svg class="icon" style="width:16px;height:16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
             </button>
             <strong class="text-sm" x-text="periodLabel()" style="min-width:170px;"></strong>
-            <button class="icon-btn" type="button" style="width:32px;height:32px;" @click="navNext()">
+            <button class="icon-btn" type="button" aria-label="Próximo período" @click="navNext()">
               <svg class="icon" style="width:16px;height:16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
             </button>
           </div>

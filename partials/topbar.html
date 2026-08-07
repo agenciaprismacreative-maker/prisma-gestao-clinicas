@@ -12,7 +12,7 @@
       </svg>
     </button>
     <div class="topbar-title">
-      <h1 x-text="greeting">Olá!</h1>
+      <p class="topbar-greeting" x-text="greeting">Olá!</p>
       <span class="text-muted" x-text="todaySummary"></span>
     </div>
   </div>
@@ -22,13 +22,13 @@
       <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
         <circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>
       </svg>
-      <input type="text" placeholder="Buscar paciente pelo nome…" aria-label="Buscar paciente pelo nome" x-model="query" @input="onSearchInput()" @focus="showResults = query.trim().length >= 2" @blur="closeSearchDelayed()">
+      <input type="text" placeholder="Buscar paciente pelo nome…" aria-label="Buscar paciente pelo nome" role="combobox" aria-expanded="showResults" aria-autocomplete="list" x-model="query" @input="onSearchInput()" @focus="showResults = query.trim().length >= 2" @blur="closeSearchDelayed()" @keydown.down.prevent="moveResultSelection(1)" @keydown.up.prevent="moveResultSelection(-1)" @keydown.enter.prevent="selectActiveResult()" @keydown.escape="showResults = false">
 
-      <div x-show="showResults" x-cloak class="card card-shadow" style="position:absolute;top:calc(100% + 6px);left:0;width:280px;padding:8px;z-index:70;max-height:320px;overflow-y:auto;">
+      <div x-show="showResults" x-cloak class="card card-shadow" style="position:absolute;top:calc(100% + 6px);left:0;width:280px;padding:8px;z-index:70;max-height:320px;overflow-y:auto;" role="listbox">
         <div x-show="searching" class="text-xs text-muted" style="padding:8px;">Buscando…</div>
         <div x-show="!searching && results.length === 0" class="text-xs text-muted" style="padding:8px;">Nenhum paciente encontrado.</div>
-        <template x-for="p in results" :key="p.id">
-          <div @mousedown.prevent="goToPatient(p)" style="padding:8px;border-radius:var(--radius-md);cursor:pointer;" class="topbar-search-result">
+        <template x-for="(p, i) in results" :key="p.id">
+          <div @mousedown.prevent="goToPatient(p)" @mouseenter="activeResultIndex = i" role="option" :aria-selected="i === activeResultIndex" style="padding:8px;border-radius:var(--radius-md);cursor:pointer;" class="topbar-search-result" :class="i === activeResultIndex ? 'is-active' : ''">
             <div class="text-sm" x-text="p.full_name" style="font-weight:600;"></div>
             <div class="text-xs text-muted" x-text="p.phone || 'sem telefone'"></div>
           </div>
@@ -54,7 +54,7 @@
               <span class="text-sm" :style="'color:' + severityColor(r.severity) + ';font-weight:600;'" x-text="r.label"></span>
               <div class="text-xs text-muted mt-1" x-show="r.sublabel" x-text="r.sublabel"></div>
             </a>
-            <button type="button" class="btn btn-ghost btn-sm mt-1" x-show="r.completable" @click.prevent="completeReminder(r)" style="padding:2px 8px;height:auto;font-size:11px;">Marcar como concluído</button>
+            <button type="button" class="btn btn-ghost btn-sm mt-1" x-show="r.completable" @click.prevent="completeReminder(r)" style="padding:8px 10px;font-size:12px;">Marcar como concluído</button>
           </div>
         </template>
       </div>

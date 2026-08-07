@@ -121,6 +121,14 @@ html[data-theme="escuro"] {
 html[data-theme="escuro"] .podium-place.rank-2 { background: #232A2F; border-color: #3E4A52; }
 html[data-theme="escuro"] .podium-place.rank-3 { background: #2E2620; border-color: #5C4530; }
 
+/* Visível só para leitor de tela -- pra dar texto a indicadores que hoje
+   são só uma cor (bolinha de pendência, badges de status etc.), sem
+   alterar nada do visual pra quem enxerga. */
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+}
+
 * { box-sizing: border-box; }
 html, body { height: 100%; }
 body {
@@ -159,7 +167,7 @@ svg.icon { width: 20px; height: 20px; flex-shrink: 0; }
    .sidebar-inner tem largura fixa (a cheia); quem anima é só o "recorte"
    do .sidebar por fora, e o texto some/aparece com opacidade — assim o
    ícone nunca fica cortado no meio, some por completo. */
-.sidebar:hover { width: var(--sidebar-width); box-shadow: var(--shadow-lg); }
+.sidebar:hover, .sidebar:focus-within { width: var(--sidebar-width); box-shadow: var(--shadow-lg); }
 .sidebar-inner {
   display: flex; flex-direction: column; height: 100%;
   width: var(--sidebar-width);
@@ -178,7 +186,11 @@ svg.icon { width: 20px; height: 20px; flex-shrink: 0; }
 .sidebar:hover .logo-text,
 .sidebar:hover .sidebar-group-label,
 .sidebar:hover .sidebar-user,
-.sidebar:hover .nav-item > span:not([data-slot]) {
+.sidebar:hover .nav-item > span:not([data-slot]),
+.sidebar:focus-within .logo-text,
+.sidebar:focus-within .sidebar-group-label,
+.sidebar:focus-within .sidebar-user,
+.sidebar:focus-within .nav-item > span:not([data-slot]) {
   opacity: 1;
   transition: opacity .2s ease .06s;
 }
@@ -230,7 +242,7 @@ svg.icon { width: 20px; height: 20px; flex-shrink: 0; }
 .sidebar-user { display: flex; flex-direction: column; line-height: 1.25; flex: 1; min-width: 0; }
 .sidebar-user strong { font-size: 13.5px; font-weight: 600; }
 .sidebar-user span { font-size: 11.5px; color: rgba(255,255,255,.5); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.sidebar-logout { color: rgba(255,255,255,.55); padding: 6px; border-radius: var(--radius-sm); background: none; border: none; cursor: pointer; flex-shrink: 0; }
+.sidebar-logout { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; color: rgba(255,255,255,.55); border-radius: var(--radius-sm); background: none; border: none; cursor: pointer; flex-shrink: 0; }
 .sidebar-logout:hover { color: #fff; background: rgba(255,255,255,.08); }
 
 .main { margin-left: var(--sidebar-collapsed-width); flex: 1; display: flex; flex-direction: column; min-width: 0; }
@@ -244,7 +256,7 @@ svg.icon { width: 20px; height: 20px; flex-shrink: 0; }
   position: sticky; top: 0; z-index: 30;
   gap: var(--space-4);
 }
-.topbar-title h1 { font-size: 19px; }
+.topbar-title .topbar-greeting { font-size: 19px; font-weight: 600; letter-spacing: -.01em; }
 .topbar-title span { font-size: 12.5px; color: var(--color-text-muted); }
 .topbar-actions { display: flex; align-items: center; gap: var(--space-3); }
 .topbar-search {
@@ -255,9 +267,9 @@ svg.icon { width: 20px; height: 20px; flex-shrink: 0; }
 .topbar-search input { border: none; background: transparent; outline: none; font-size: 13.5px; width: 100%; font-family: inherit; color: var(--color-text); }
 .topbar-search svg { color: var(--color-text-soft); }
 .topbar-search-result { transition: background .12s ease, box-shadow .12s ease; }
-.topbar-search-result:hover { background: var(--color-primary-light); box-shadow: inset 3px 0 0 0 var(--color-primary); }
+.topbar-search-result:hover, .topbar-search-result.is-active { background: var(--color-primary-light); box-shadow: inset 3px 0 0 0 var(--color-primary); }
 .icon-btn {
-  width: 38px; height: 38px; border-radius: var(--radius-md);
+  width: 44px; height: 44px; border-radius: var(--radius-md);
   display: flex; align-items: center; justify-content: center;
   background: var(--color-surface-alt); color: var(--color-text-muted); position: relative; border: 1px solid transparent;
 }
@@ -272,7 +284,7 @@ svg.icon { width: 20px; height: 20px; flex-shrink: 0; }
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
   padding: 10px 18px; border-radius: var(--radius-md); font-weight: 500; font-size: 14px;
-  border: 1px solid transparent; transition: all .15s ease; white-space: nowrap;
+  border: 1px solid transparent; transition: background-color .15s ease, border-color .15s ease, color .15s ease, box-shadow .15s ease; white-space: nowrap;
 }
 .btn-primary { background: var(--color-primary); color: var(--color-primary-contrast); }
 .btn-primary:hover { background: var(--color-primary-dark); color: #fff; }
@@ -339,7 +351,7 @@ svg.icon { width: 20px; height: 20px; flex-shrink: 0; }
   background: var(--glow-tint-strong, var(--color-surface-alt)); color: var(--glow-color, var(--color-text-muted));
 }
 .admin-stat-label { font-size: 12.5px; color: var(--color-text-muted); font-weight: 500; }
-.admin-stat-value { font-size: 27px; font-weight: 700; margin-top: 4px; letter-spacing: -.02em; }
+.admin-stat-value { font-size: 28px; font-weight: 700; margin-top: 4px; letter-spacing: -.02em; }
 .admin-stat-sub { font-size: 12px; color: var(--color-text-muted); margin-top: 4px; }
 
 .admin-stat-card.tone-success { --glow-color: var(--color-success); --glow-shadow: rgba(79,162,121,.28); --glow-tint: rgba(79,162,121,.16); --glow-tint-strong: rgba(79,162,121,.2); }
@@ -386,6 +398,36 @@ svg.icon { width: 20px; height: 20px; flex-shrink: 0; }
 textarea.input { resize: vertical; min-height: 80px; }
 .input:focus { outline: none; border-color: var(--color-primary); box-shadow: 0 0 0 3px var(--color-primary-light); }
 .input-hint { font-size: 12px; color: var(--color-text-soft); margin-top: 5px; }
+
+/* ---------- acessibilidade: foco de teclado ----------
+   :focus-visible só aparece pra navegação por teclado (Tab), não em
+   clique de mouse -- evita depender do outline nativo do navegador,
+   que varia de aparência e pode ficar com baixo contraste sobre o
+   sidebar escuro. Cobre todo elemento interativo que não tinha
+   indicador de foco próprio antes (.input já tinha, acima). */
+.btn:focus-visible,
+.icon-btn:focus-visible,
+.nav-item:focus-visible,
+.sidebar-logout:focus-visible,
+.segmented-btn:focus-visible,
+.agenda-view-switch button:focus-visible,
+.context-menu button:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+/* dentro do sidebar (overflow:hidden pra animar o recolher/expandir), um
+   anel "pra fora" do item seria cortado -- por isso o offset negativo,
+   o anel fica visível para dentro do próprio item. */
+.sidebar .nav-item:focus-visible { outline-offset: -2px; }
+.topbar-search:focus-within { box-shadow: 0 0 0 3px var(--color-primary-light); border-color: var(--color-primary); }
+
+/* Quem prefere menos movimento (configuração do sistema operacional) não
+   deve ver as transições de hover/abrir-fechar do sistema -- reduz pra
+   praticamente instantâneo sem remover a mudança de estado em si. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; }
+}
 .input-icon-wrap { position: relative; }
 .input-icon-wrap svg { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--color-text-soft); }
 .input-icon-wrap .input { padding-left: 42px; }
@@ -425,7 +467,7 @@ textarea.input { resize: vertical; min-height: 80px; }
 .mt-1 { margin-top: var(--space-1); } .mt-2 { margin-top: var(--space-2); } .mt-3 { margin-top: var(--space-3); } .mt-4 { margin-top: var(--space-4); } .mt-5 { margin-top: var(--space-5); }
 .mb-1 { margin-bottom: var(--space-1); } .mb-2 { margin-bottom: var(--space-2); } .mb-3 { margin-bottom: var(--space-3); } .mb-4 { margin-bottom: var(--space-4); } .mb-5 { margin-bottom: var(--space-5); }
 .page-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: var(--space-6); gap: var(--space-4); flex-wrap: wrap; }
-.page-header h2 { font-size: 22px; }
+.page-header h1, .page-header h2 { font-size: 22px; }
 .page-header p { font-size: 13.5px; color: var(--color-text-muted); margin-top: 4px; }
 .empty-note {
   border: 1px dashed var(--color-border); border-radius: var(--radius-lg); padding: var(--space-6);
@@ -564,7 +606,7 @@ textarea.input { resize: vertical; min-height: 80px; }
 .agenda-event.status-pendente { background: #EFEDE7; border-color: var(--color-text-soft); color: var(--color-text-muted); }
 
 /* ---------- agenda: alternância de visão (dia / semana / mês) ---------- */
-.agenda-view-switch { display: flex; gap: 2px; background: var(--color-surface-alt); border-radius: var(--radius-md); padding: 3px; }
+.agenda-view-switch { display: flex; gap: 4px; background: var(--color-surface-alt); border-radius: var(--radius-md); padding: 3px; }
 .agenda-view-switch button {
   border: none; background: transparent; padding: 6px 14px; border-radius: var(--radius-sm);
   font-size: 12.5px; font-weight: 500; color: var(--color-text-muted);

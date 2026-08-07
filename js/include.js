@@ -37,7 +37,12 @@ async function loadIncludes() {
 function markActivePage() {
   const current = document.body.getAttribute('data-page');
   document.querySelectorAll('.nav-item[data-page]').forEach((item) => {
-    item.classList.toggle('active', item.getAttribute('data-page') === current);
+    const isActive = item.getAttribute('data-page') === current;
+    item.classList.toggle('active', isActive);
+    // aria-current avisa leitor de tela qual item corresponde à página
+    // atual -- a classe .active sozinha só comunica isso visualmente.
+    if (isActive) item.setAttribute('aria-current', 'page');
+    else item.removeAttribute('aria-current');
   });
 }
 
