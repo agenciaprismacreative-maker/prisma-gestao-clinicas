@@ -25,7 +25,7 @@
           <input type="file" accept=".csv" x-ref="csvInput" @change="importCsv($event)" style="display:none;">
           <button class="btn btn-secondary" type="button" @click="$refs.csvInput.click()" title="Aceita CSV com colunas como nome, telefone, e-mail, nascimento e CPF, em qualquer ordem, com vírgula ou ponto e vírgula.">Importar lista de clientes</button>
           <button class="btn btn-secondary" type="button" @click="exportCsv()" title="Exporta a lista de pacientes em .csv, útil para migração ou atualização em outra base de dados.">Exportar lista (.csv)</button>
-          <button class="btn btn-secondary" type="button" @click="toggleEditMode()" x-text="editMode ? 'Cancelar seleção' : 'Editar lista de pacientes'"></button>
+          <button class="btn btn-secondary" type="button" @click="toggleEditMode()" x-show="!editMode">Editar lista de pacientes</button>
           <button class="btn btn-primary" type="button" @click="openNewForm()">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
             Novo paciente
@@ -57,6 +57,7 @@
               <span x-show="!bulkDeleting">Excluir selecionados</span>
               <span x-show="bulkDeleting" x-cloak>Excluindo…</span>
             </button>
+            <button class="btn btn-secondary btn-sm" type="button" @click="toggleEditMode()" :disabled="bulkDeleting">Cancelar seleção</button>
           </div>
         </div>
 
@@ -1618,6 +1619,7 @@ function pacientesApp() {
 <script src="js/auth-guard.js"></script>
 <script src="js/topbar.js"></script>
 <script src="js/masks.js"></script>
+<script src="js/confirm-dialog.js"></script>
 <script src="js/include.js" defer></script>
 </body>
 </html>
