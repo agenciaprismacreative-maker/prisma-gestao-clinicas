@@ -422,7 +422,13 @@ create table public.sale_items (
   id uuid primary key default gen_random_uuid(),
   sale_id uuid not null references public.sales (id) on delete cascade,
   service_id uuid references public.services (id),
-  product_id uuid references public.products (id) on delete restrict,
+  -- on delete set null (não restrict): remover um produto do estoque não
+  -- pode travar por causa de vendas antigas. product_name guarda o nome no
+  -- momento da venda, então o histórico continua legível mesmo depois que
+  -- o produto some do cadastro (mesmo raciocínio de transactions/tasks/
+  -- communications_log.patient_id, seção "exclusão de paciente" acima).
+  product_id uuid references public.products (id) on delete set null,
+  product_name text,
   quantity integer not null default 1,
   unit_price numeric(10, 2) not null default 0,
   discount_percentage numeric(5, 2) not null default 0,
@@ -430,9 +436,11 @@ create table public.sale_items (
   line_total numeric(10, 2) not null default 0,
   package_id uuid references public.packages (id) on delete set null,
   created_at timestamptz not null default now(),
+  -- service_id XOR (product_id ou product_name): uma linha de produto
+  -- continua identificável mesmo depois que product_id vira null.
   constraint sale_items_service_or_product_check check (
-    (service_id is not null and product_id is null) or
-    (service_id is null and product_id is not null)
+    (service_id is not null and product_id is null and product_name is null) or
+    (service_id is null and (product_id is not null or product_name is not null))
   )
 );
 

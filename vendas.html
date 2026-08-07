@@ -621,7 +621,7 @@ function vendasApp() {
     async loadAllSaleItems() {
       const { data, error } = await supabaseClient
         .from('sale_items')
-        .select('id, sale_id, service_id, product_id, quantity, unit_price, discount_percentage, is_courtesy, line_total, services ( name ), products ( name )');
+        .select('id, sale_id, service_id, product_id, product_name, quantity, unit_price, discount_percentage, is_courtesy, line_total, services ( name ), products ( name )');
       if (error) return;
       const map = {};
       (data || []).forEach(item => {
@@ -657,7 +657,7 @@ function vendasApp() {
       if (this.saleItemsBySale[saleId]) return this.saleItemsBySale[saleId];
       const { data, error } = await supabaseClient
         .from('sale_items')
-        .select('id, service_id, product_id, quantity, unit_price, discount_percentage, is_courtesy, line_total, services ( name ), products ( name )')
+        .select('id, service_id, product_id, product_name, quantity, unit_price, discount_percentage, is_courtesy, line_total, services ( name ), products ( name )')
         .eq('sale_id', saleId);
       const items = error ? [] : (data || []);
       this.saleItemsBySale[saleId] = items;
@@ -740,8 +740,14 @@ function vendasApp() {
     },
 
     saleItemName(item) {
-      if (item.product_id) return (item.products ? item.products.name : this.productName(item.product_id));
-      return (item.services ? item.services.name : this.serviceName(item.service_id));
+      // service_id/product_id são mutuamente exclusivos (constraint no
+      // banco), mas product_id pode ter virado null se o produto foi
+      // removido do estoque depois da venda -- por isso o item de produto
+      // é identificado por "não é serviço", não por "tem product_id", e o
+      // nome cai para o snapshot gravado na hora da venda (product_name)
+      // quando o produto já não existe mais para o JOIN trazer o nome.
+      if (item.service_id) return (item.services ? item.services.name : this.serviceName(item.service_id));
+      return item.products ? item.products.name : (item.product_name || this.productName(item.product_id) || 'Produto removido');
     },
 
     enforceDiscountCap(value) {
@@ -948,6 +954,9 @@ function vendasApp() {
         sale_id: sale.id,
         service_id: item.product_id ? null : item.service_id,
         product_id: item.product_id || null,
+        // snapshot do nome no momento da venda -- se o produto for removido
+        // do estoque depois, o item continua legível no histórico.
+        product_name: item.product_id ? this.productName(item.product_id) : null,
         quantity: item.quantity || 1,
         unit_price: parseCurrencyToNumber(item.unit_price) || 0,
         discount_percentage: item.discount_percentage || 0,
@@ -1020,7 +1029,12 @@ function vendasApp() {
         // revenda, não há sessão: desconta do estoque em vez disso, nunca
         // deixando a quantidade ficar negativa.
         for (const item of items) {
-          if (item.product_id) {
+          // item de produto é identificado por "não tem service_id" (não
+          // por "tem product_id"): se o produto já foi removido do estoque
+          // depois da venda, product_id vira null, mas a linha continua
+          // sendo de produto (ver saleItemName acima pro mesmo raciocínio).
+          if (!item.service_id) {
+            if (!item.product_id) continue; // produto removido antes da aprovação -- nada para descontar
             const { data: product, error: productFetchError } = await supabaseClient
               .from('products')
               .select('stock_quantity')
@@ -1224,7 +1238,7 @@ function vendasApp() {
           doc.setFillColor(250, 248, 245);
           doc.rect(marginX, y, contentWidth, rowHeight, 'F');
         }
-        const unitLabel = item.product_id ? 'un.' : 'sessão(ões)';
+        const unitLabel = item.service_id ? 'sessão(ões)' : 'un.';
         doc.setFontSize(9);
         doc.setTextColor(textColor[0], textColor[1], textColor[2]);
         const name = this.saleItemName(item) + (item.is_courtesy ? ' (cortesia)' : '');
@@ -1336,7 +1350,7 @@ function vendasApp() {
       const items = this.saleItemsBySale[sale.id];
       if (!items) return 'Ver detalhes';
       const serviceCount = items.filter(i => i.service_id).length;
-      const productCount = items.filter(i => i.product_id).length;
+      const productCount = items.filter(i => !i.service_id).length;
       const parts = [];
       if (serviceCount > 0) parts.push(serviceCount + ' serviço(s)');
       if (productCount > 0) parts.push(productCount + ' produto(s)');
