@@ -807,7 +807,7 @@ function adminClinicasApp() {
 
     async init() {
       const { data: { user } } = await supabaseClient.auth.getUser();
-      if (!user) { window.location.href = 'index.html'; return; }
+      if (!user) { window.location.href = 'acesso-administrativo.html'; return; }
       this.currentUserId = user.id;
       const { data: profile } = await supabaseClient.from('users').select('role').eq('id', user.id).single();
       if (!profile || profile.role !== 'equipe_prisma') {

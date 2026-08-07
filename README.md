@@ -41,7 +41,9 @@ Cada página trava o acesso por `data-allowed-roles` no `<body>`, o menu lateral
 ## Estrutura de pastas
 
 ```
-index.html            tela de login (autenticação real via Supabase Auth)
+index.html            tela de login das clínicas (autenticação real via Supabase Auth); nunca autentica o papel equipe_prisma, mesmo com credenciais corretas
+acesso-administrativo.html  porta separada e discreta (link no rodapé do login), exclusiva do papel equipe_prisma -- único caminho que leva ao admin-clinicas.html
+redefinir-senha.html    destino do e-mail de "esqueci minha senha", compartilhado pelas duas telas de login acima
 dashboard.html         painel com indicadores reais da clínica, menu rápido, anotações e aniversariantes (administrador)
 pacientes.html          ficha completa de pacientes: documentos, contato, endereço, origem do lead (inclusive indicação por integrante da equipe), anamnese, pacotes contratados e retorno financeiro (administrador, atendente)
 agenda.html            agenda com visão dia / semana / mês, menu de clique direito, bloqueio de horário, vínculo a pacote e ficha rápida do agendamento

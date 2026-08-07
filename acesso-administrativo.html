@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Acesso administrativo · Prisma</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="css/styles.css">
+<script>
+  // Porta separada do login das clínicas -- sempre em tema escuro e sem
+  // depender de platform_branding (personalização visual que a própria
+  // equipe Prisma define para o login dos clientes). Isso evita qualquer
+  // confusão visual entre as duas telas: uma é da clínica, a outra é da
+  // gestão da plataforma.
+  document.documentElement.setAttribute('data-theme', 'escuro');
+</script>
+</head>
+<body data-page="acesso-administrativo">
+
+<div class="auth-screen" x-data="adminLoginForm()" x-init="init()">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <div class="logo-mark">P</div>
+      <h1>Acesso administrativo</h1>
+      <p>Restrito à equipe Prisma · gestão da plataforma</p>
+    </div>
+
+    <div x-show="step === 'login'" x-cloak>
+      <form @submit.prevent="submit()">
+        <div class="form-group">
+          <label class="label" for="email">E-mail</label>
+          <input class="input" type="email" id="email" x-model="email" placeholder="voce@prismacreative.com.br" required>
+        </div>
+
+        <div class="form-group">
+          <label class="label" for="senha">Senha</label>
+          <div style="position:relative;">
+            <input class="input" :type="showPass ? 'text' : 'password'" id="senha" x-model="password" placeholder="••••••••" required style="padding-right:56px;">
+            <button type="button" @click="showPass = !showPass" class="text-xs text-muted" style="position:absolute;right:14px;top:50%;transform:translateY(-50%);background:none;border:none;">
+              <span x-text="showPass ? 'ocultar' : 'ver'"></span>
+            </button>
+          </div>
+          <div class="flex justify-end mt-1">
+            <a href="#" class="text-xs" style="color:var(--color-text-soft);" @click.prevent="openForgotPassword()">Esqueci minha senha</a>
+          </div>
+        </div>
+
+        <p x-show="errorMsg" x-cloak class="text-sm mb-3" style="color:var(--color-danger);" x-text="errorMsg"></p>
+
+        <button class="btn btn-primary btn-block mt-2" type="submit" :disabled="loading">
+          <span x-show="!loading">Entrar</span>
+          <span x-show="loading" x-cloak>Entrando…</span>
+        </button>
+      </form>
+
+      <div class="auth-footer">
+        <a href="index.html" class="text-xs" style="color:var(--color-text-soft);">← Voltar para o login de clínicas</a>
+      </div>
+    </div>
+
+    <div x-show="step === 'forgot'" x-cloak>
+      <h2 style="font-size:16px;margin-bottom:4px;">Redefinir senha</h2>
+      <p class="text-sm text-muted mb-4">Informe seu e-mail de acesso administrativo. Se ele existir, você recebe um link para criar uma nova senha.</p>
+      <form @submit.prevent="sendResetLink()">
+        <div class="form-group">
+          <label class="label" for="forgot-email">E-mail</label>
+          <input class="input" type="email" id="forgot-email" x-model="forgotEmail" placeholder="voce@prismacreative.com.br" required>
+        </div>
+        <p x-show="forgotError" x-cloak class="text-sm mb-3" style="color:var(--color-danger);" x-text="forgotError"></p>
+        <button class="btn btn-primary btn-block mt-2" type="submit" :disabled="forgotLoading">
+          <span x-show="!forgotLoading">Enviar link de redefinição</span>
+          <span x-show="forgotLoading" x-cloak>Enviando…</span>
+        </button>
+      </form>
+      <div class="text-center mt-3">
+        <a href="#" class="text-xs" style="color:var(--color-text-soft);" @click.prevent="backToLogin()">Voltar</a>
+      </div>
+    </div>
+
+    <div x-show="step === 'forgot-sent'" x-cloak class="text-center">
+      <h2 style="font-size:16px;margin-bottom:8px;">Verifique seu e-mail</h2>
+      <p class="text-sm text-muted mb-4">Se <strong x-text="forgotEmail"></strong> tiver acesso administrativo, um link para redefinir a senha chega em instantes.</p>
+      <button class="btn btn-secondary btn-block" type="button" @click="backToLogin()">Voltar para o login</button>
+    </div>
+  </div>
+</div>
+
+<script>
+function adminLoginForm() {
+  return {
+    email: '',
+    password: '',
+    loading: false,
+    showPass: false,
+    errorMsg: '',
+
+    step: 'login', // 'login' | 'forgot' | 'forgot-sent'
+    forgotEmail: '',
+    forgotLoading: false,
+    forgotError: '',
+
+    async init() {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('desativado') === '1') {
+        this.errorMsg = 'Este acesso foi desativado.';
+      }
+      // Sessão já válida de equipe_prisma (aba antiga, link direto etc.)
+      // pula direto pro painel, sem pedir login de novo.
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      if (session) await this.routeAfterAuth(session.user);
+    },
+
+    async submit() {
+      this.errorMsg = '';
+      this.loading = true;
+      const { data, error } = await supabaseClient.auth.signInWithPassword({
+        email: this.email,
+        password: this.password
+      });
+      if (error) {
+        this.errorMsg = translateAuthError(error);
+        this.loading = false;
+        return;
+      }
+      await this.routeAfterAuth(data.user);
+      this.loading = false;
+    },
+
+    // Porta exclusiva da equipe Prisma: qualquer conta que não seja
+    // equipe_prisma é barrada e deslogada aqui, mesmo com a senha certa.
+    // Nenhuma clínica entra no painel administrativo por essa tela --
+    // essa regra é fixa e não depende de nenhuma configuração.
+    async routeAfterAuth(user) {
+      if (!user) return;
+      const { data: profile } = await supabaseClient.from('users').select('role, is_active').eq('id', user.id).maybeSingle();
+      if (!profile || profile.role !== 'equipe_prisma') {
+        await supabaseClient.auth.signOut();
+        this.errorMsg = 'Este acesso é exclusivo da equipe Prisma.';
+        return;
+      }
+      if (profile.is_active === false) {
+        await supabaseClient.auth.signOut();
+        this.errorMsg = 'Este acesso foi desativado.';
+        return;
+      }
+      window.location.href = 'admin-clinicas.html';
+    },
+
+    openForgotPassword() {
+      this.forgotEmail = this.email || '';
+      this.forgotError = '';
+      this.step = 'forgot';
+    },
+
+    backToLogin() {
+      this.step = 'login';
+      this.errorMsg = '';
+      this.forgotError = '';
+    },
+
+    async sendResetLink() {
+      if (!this.forgotEmail || !this.forgotEmail.trim()) {
+        this.forgotError = 'Informe seu e-mail.';
+        return;
+      }
+      this.forgotLoading = true;
+      this.forgotError = '';
+      const redirectTo = window.location.href.split('?')[0].replace(/acesso-administrativo\.html$/, '') + 'redefinir-senha.html';
+      const { error } = await supabaseClient.auth.resetPasswordForEmail(this.forgotEmail.trim(), { redirectTo });
+      this.forgotLoading = false;
+      if (error && error.status !== 400) {
+        this.forgotError = 'Não foi possível enviar o link agora. Tente novamente em instantes.';
+        return;
+      }
+      this.step = 'forgot-sent';
+    }
+  };
+}
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="js/supabase-client.js"></script>
+<script src="js/include.js" defer></script>
+</body>
+</html>

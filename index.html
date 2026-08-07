@@ -88,28 +88,16 @@
       <button class="btn btn-secondary btn-block" type="button" @click="backToLogin()">Voltar para o login</button>
     </div>
   </div>
+
+  <!-- Acesso restrito à equipe Prisma (gestão do SaaS) -- de propósito
+       discreto e fora do cartão de login, pra não competir visualmente com
+       o login da clínica nem sugerir que faz parte do mesmo fluxo. -->
+  <a href="acesso-administrativo.html" class="text-center mt-3" style="display:block;font-size:11px;color:rgba(255,255,255,0.55);text-decoration:none;">Acesso administrativo</a>
 </div>
 
 <script>
-// Traduz os erros mais comuns do Supabase Auth para uma mensagem em
-// PT-BR que não soa técnica nem exp e-mail/senha errado de propósito
-// (mensagem genérica, sem dizer qual dos dois está errado).
-function translateAuthError(error) {
-  const msg = ((error && error.message) || '').toLowerCase();
-  if (msg.includes('invalid login credentials') || msg.includes('user not found')) {
-    return 'Ops, parece que alguma das informações de acesso está incorreta. Confira o e-mail e a senha e tente de novo.';
-  }
-  if (msg.includes('email not confirmed')) {
-    return 'Seu e-mail ainda não foi confirmado. Verifique sua caixa de entrada.';
-  }
-  if (msg.includes('too many requests') || msg.includes('rate limit')) {
-    return 'Muitas tentativas seguidas. Aguarde um instante e tente de novo.';
-  }
-  if (msg.includes('failed to fetch') || msg.includes('network')) {
-    return 'Não foi possível conectar agora. Verifique sua internet e tente de novo.';
-  }
-  return 'Não foi possível entrar agora. Tente novamente em instantes.';
-}
+// translateAuthError() agora mora em js/supabase-client.js (compartilhada
+// com acesso-administrativo.html).
 
 function loginForm() {
   return {
@@ -166,6 +154,15 @@ function loginForm() {
       if (profile.is_active === false) {
         await supabaseClient.auth.signOut();
         this.errorMsg = 'Este acesso foi desativado. Fale com a administração da clínica.';
+        return;
+      }
+      // Login de clínica nunca abre o painel administrativo da Prisma, nem
+      // com a sessão/credenciais corretas -- esse papel tem porta própria
+      // (acesso-administrativo.html). A sessão continua válida, só o
+      // destino muda; quem cair aqui é encaminhado pra lá sem precisar
+      // digitar a senha de novo.
+      if (profile.role === 'equipe_prisma') {
+        window.location.href = 'acesso-administrativo.html';
         return;
       }
       window.location.href = window.homeForRole(profile.role);

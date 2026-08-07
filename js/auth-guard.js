@@ -6,9 +6,15 @@
    =================================================================== */
 
 (async function () {
+  // admin-clinicas.html tem porta de entrada própria (acesso-administrativo.html),
+  // separada do login das clínicas -- uma sessão expirada ali deve voltar
+  // para essa porta, não para o login de clínicas.
+  const isAdminConsole = document.body.getAttribute('data-page') === 'admin-clinicas';
+  const loginPage = isAdminConsole ? 'acesso-administrativo.html' : 'index.html';
+
   const { data: { session } } = await supabaseClient.auth.getSession();
   if (!session) {
-    window.location.href = 'index.html';
+    window.location.href = loginPage;
     return;
   }
 
@@ -33,7 +39,7 @@
 
   if (profile && profile.is_active === false) {
     await supabaseClient.auth.signOut();
-    window.location.href = 'index.html?desativado=1';
+    window.location.href = loginPage + '?desativado=1';
     return;
   }
 
