@@ -93,25 +93,48 @@
         <!-- ===================== INSUMOS ===================== -->
         <div x-show="tab==='insumos'">
           <p class="text-xs text-soft mb-3">Insumos são de uso clínico interno (consumidos em procedimentos) e não aparecem para venda direta ao paciente.</p>
-          <div class="flex items-center gap-2 mb-3" x-show="insumoBrands.length > 0">
-            <label class="text-xs text-muted">Marca:</label>
-            <select class="input" style="max-width:220px;" x-model="brandFilter">
-              <option value="">Todas as marcas</option>
-              <template x-for="b in insumoBrands" :key="b">
-                <option :value="b" x-text="b"></option>
-              </template>
-            </select>
+          <div class="flex items-center justify-between mb-3" style="flex-wrap:wrap;gap:10px;">
+            <div class="flex items-center gap-2" x-show="insumoBrands.length > 0">
+              <label class="text-xs text-muted">Marca:</label>
+              <select class="input" style="max-width:220px;" x-model="brandFilter">
+                <option value="">Todas as marcas</option>
+                <template x-for="b in insumoBrands" :key="b">
+                  <option :value="b" x-text="b"></option>
+                </template>
+              </select>
+            </div>
+            <button class="btn btn-secondary btn-sm" type="button" @click="toggleEditMode()" x-show="!editMode">Editar lista</button>
           </div>
+
+          <div class="card mb-3" style="padding:12px 16px;" x-show="editMode" x-cloak>
+            <div class="flex items-center justify-between" style="flex-wrap:wrap;gap:10px;">
+              <label class="flex items-center gap-2 text-sm" style="cursor:pointer;">
+                <input type="checkbox" :checked="allActiveSelected" @change="toggleSelectAll()">
+                Selecionar todos
+                <span class="text-muted" x-text="'(' + selectedIds.length + ' selecionado(s))'"></span>
+              </label>
+              <div class="flex gap-2">
+                <button class="btn btn-danger btn-sm" type="button" @click="bulkDeleteSelected()" :disabled="selectedIds.length === 0 || bulkDeleting">
+                  <span x-show="!bulkDeleting">Excluir selecionados</span><span x-show="bulkDeleting" x-cloak>Excluindo…</span>
+                </button>
+                <button class="btn btn-secondary btn-sm" type="button" @click="toggleEditMode()" :disabled="bulkDeleting">Cancelar seleção</button>
+              </div>
+            </div>
+          </div>
+
           <div class="card card-shadow" style="padding:0;">
             <div x-show="insumos.length === 0" class="empty-note" style="margin:20px;">
               Nenhum insumo cadastrado ainda. Use "Novo insumo" para começar a controlar o estoque.
             </div>
             <div class="table-wrap" x-show="insumos.length > 0">
               <table class="table">
-                <thead><tr><th>Insumo</th><th>Marca</th><th>Estoque atual</th><th>Mínimo</th><th>Máximo</th><th>Status</th><th>Custo unitário</th><th>Validade</th><th></th></tr></thead>
+                <thead><tr><th x-show="editMode" style="width:36px;"></th><th>Insumo</th><th>Marca</th><th>Estoque atual</th><th>Mínimo</th><th>Máximo</th><th>Status</th><th>Custo unitário</th><th>Validade</th><th></th></tr></thead>
                 <tbody>
                   <template x-for="p in insumos" :key="p.id">
-                    <tr>
+                    <tr :class="editMode && selectedIds.includes(p.id) ? 'row-selected' : ''">
+                      <td x-show="editMode" @click.stop>
+                        <input type="checkbox" :checked="selectedIds.includes(p.id)" @change="toggleSelectProduct(p.id)">
+                      </td>
                       <td>
                         <strong x-text="p.name"></strong>
                         <div class="text-xs text-muted" x-show="p.description" x-text="p.description"></div>
@@ -146,25 +169,48 @@
         <!-- ===================== PRODUTOS (REVENDA) ===================== -->
         <div x-show="tab==='produtos'" x-cloak>
           <p class="text-xs text-soft mb-3">Produtos de revenda podem ser vendidos diretamente ao paciente (ex.: sérum, protetor solar, cinta modeladora). Aparecem como item avulso na tela de Vendas.</p>
-          <div class="flex items-center gap-2 mb-3" x-show="produtoBrands.length > 0">
-            <label class="text-xs text-muted">Marca:</label>
-            <select class="input" style="max-width:220px;" x-model="brandFilter">
-              <option value="">Todas as marcas</option>
-              <template x-for="b in produtoBrands" :key="b">
-                <option :value="b" x-text="b"></option>
-              </template>
-            </select>
+          <div class="flex items-center justify-between mb-3" style="flex-wrap:wrap;gap:10px;">
+            <div class="flex items-center gap-2" x-show="produtoBrands.length > 0">
+              <label class="text-xs text-muted">Marca:</label>
+              <select class="input" style="max-width:220px;" x-model="brandFilter">
+                <option value="">Todas as marcas</option>
+                <template x-for="b in produtoBrands" :key="b">
+                  <option :value="b" x-text="b"></option>
+                </template>
+              </select>
+            </div>
+            <button class="btn btn-secondary btn-sm" type="button" @click="toggleEditMode()" x-show="!editMode">Editar lista</button>
           </div>
+
+          <div class="card mb-3" style="padding:12px 16px;" x-show="editMode" x-cloak>
+            <div class="flex items-center justify-between" style="flex-wrap:wrap;gap:10px;">
+              <label class="flex items-center gap-2 text-sm" style="cursor:pointer;">
+                <input type="checkbox" :checked="allActiveSelected" @change="toggleSelectAll()">
+                Selecionar todos
+                <span class="text-muted" x-text="'(' + selectedIds.length + ' selecionado(s))'"></span>
+              </label>
+              <div class="flex gap-2">
+                <button class="btn btn-danger btn-sm" type="button" @click="bulkDeleteSelected()" :disabled="selectedIds.length === 0 || bulkDeleting">
+                  <span x-show="!bulkDeleting">Excluir selecionados</span><span x-show="bulkDeleting" x-cloak>Excluindo…</span>
+                </button>
+                <button class="btn btn-secondary btn-sm" type="button" @click="toggleEditMode()" :disabled="bulkDeleting">Cancelar seleção</button>
+              </div>
+            </div>
+          </div>
+
           <div class="card card-shadow" style="padding:0;">
             <div x-show="produtosRevenda.length === 0" class="empty-note" style="margin:20px;">
               Nenhum produto de revenda cadastrado ainda. Use "Novo produto" para cadastrar itens vendáveis ao paciente.
             </div>
             <div class="table-wrap" x-show="produtosRevenda.length > 0">
               <table class="table">
-                <thead><tr><th>Produto</th><th>Marca</th><th>Estoque atual</th><th>Mínimo</th><th>Status</th><th>Custo</th><th>Preço de venda</th><th>Margem</th><th>Validade</th><th></th></tr></thead>
+                <thead><tr><th x-show="editMode" style="width:36px;"></th><th>Produto</th><th>Marca</th><th>Estoque atual</th><th>Mínimo</th><th>Status</th><th>Custo</th><th>Preço de venda</th><th>Margem</th><th>Validade</th><th></th></tr></thead>
                 <tbody>
                   <template x-for="p in produtosRevenda" :key="p.id">
-                    <tr>
+                    <tr :class="editMode && selectedIds.includes(p.id) ? 'row-selected' : ''">
+                      <td x-show="editMode" @click.stop>
+                        <input type="checkbox" :checked="selectedIds.includes(p.id)" @change="toggleSelectProduct(p.id)">
+                      </td>
                       <td>
                         <strong x-text="p.name"></strong>
                         <div class="text-xs text-muted" x-show="p.description" x-text="p.description"></div>
@@ -416,6 +462,9 @@ function estoqueApp() {
     currentUserId: null,
     tab: 'insumos',
     brandFilter: '',
+    editMode: false,
+    selectedIds: [],
+    bulkDeleting: false,
     products: [],
     movements: [],
     services: [],
@@ -459,6 +508,74 @@ function estoqueApp() {
     setTab(name) {
       this.tab = name;
       this.brandFilter = '';
+      this.editMode = false;
+      this.selectedIds = [];
+    },
+
+    toggleEditMode() {
+      this.editMode = !this.editMode;
+      this.selectedIds = [];
+    },
+
+    toggleSelectProduct(id) {
+      const idx = this.selectedIds.indexOf(id);
+      if (idx === -1) this.selectedIds.push(id);
+      else this.selectedIds.splice(idx, 1);
+    },
+
+    // lista "ativa" para fins de seleção em massa: a aba de produto que
+    // está sendo exibida agora (Insumos ou Produtos). Fora dessas duas
+    // abas não há seleção em massa, então retorna vazio.
+    get activeList() {
+      if (this.tab === 'produtos') return this.produtosRevenda;
+      if (this.tab === 'insumos') return this.insumos;
+      return [];
+    },
+
+    get allActiveSelected() {
+      return this.activeList.length > 0 && this.activeList.every(p => this.selectedIds.includes(p.id));
+    },
+
+    toggleSelectAll() {
+      const activeIds = this.activeList.map(p => p.id);
+      if (this.allActiveSelected) {
+        this.selectedIds = this.selectedIds.filter(id => !activeIds.includes(id));
+      } else {
+        this.selectedIds = Array.from(new Set([...this.selectedIds, ...activeIds]));
+      }
+    },
+
+    async bulkDeleteSelected() {
+      const ids = this.selectedIds.slice();
+      if (ids.length === 0) return;
+      const plural = ids.length > 1;
+      const ok = await confirmDialog(
+        'Você tem certeza que deseja excluir ' + ids.length + (plural ? ' itens' : ' item') + ' do estoque? ' +
+        'A ação é permanente e não pode ser restaurada. O histórico de movimentações associado a ' +
+        (plural ? 'esses itens' : 'esse item') + ' também será perdido.',
+        { danger: true, confirmLabel: 'Sim, quero excluir' }
+      );
+      if (!ok) return;
+      this.bulkDeleting = true;
+      try {
+        const { error } = await supabaseClient.from('products').delete().in('id', ids);
+        if (error) {
+          if (error.code === '23503') {
+            this.showFeedback('error', 'Não foi possível excluir todos os itens selecionados: algum deles ainda está vinculado a um serviço ou a uma venda.');
+          } else {
+            this.showFeedback('error', 'Erro ao excluir: ' + error.message);
+          }
+          return;
+        }
+        this.showFeedback('success', ids.length + (plural ? ' itens excluídos' : ' item excluído') + ' permanentemente.');
+        this.selectedIds = [];
+        this.editMode = false;
+        await Promise.all([this.loadProducts(), this.loadMovements()]);
+      } catch (err) {
+        this.showFeedback('error', 'Erro inesperado ao excluir: ' + err.message);
+      } finally {
+        this.bulkDeleting = false;
+      }
     },
 
     async loadMovements() {
