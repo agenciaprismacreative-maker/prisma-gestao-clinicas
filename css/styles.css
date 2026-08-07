@@ -185,8 +185,13 @@ svg.icon { width: 20px; height: 20px; flex-shrink: 0; }
    empurrar o .main, que já fica com margem fixa na largura recolhida.
    .sidebar-inner tem largura fixa (a cheia); quem anima é só o "recorte"
    do .sidebar por fora, e o texto some/aparece com opacidade — assim o
-   ícone nunca fica cortado no meio, some por completo. */
-.sidebar:hover, .sidebar:focus-within { width: var(--sidebar-width); box-shadow: var(--shadow-lg); }
+   ícone nunca fica cortado no meio, some por completo.
+   .force-collapsed é a válvula de escape usada por páginas de seção única
+   (ex.: admin-clinicas.html): ao clicar num item do menu o mouse continua
+   fisicamente sobre a sidebar, então :hover sozinho manteria tudo expandido
+   por cima do conteúdo mesmo depois do clique -- essa classe (controlada
+   por JS, removida no mouseleave) força o recolhimento imediato. */
+.sidebar:hover:not(.force-collapsed), .sidebar:focus-within:not(.force-collapsed) { width: var(--sidebar-width); box-shadow: var(--shadow-lg); }
 .sidebar-inner {
   display: flex; flex-direction: column; height: 100%;
   width: var(--sidebar-width);
@@ -202,14 +207,14 @@ svg.icon { width: 20px; height: 20px; flex-shrink: 0; }
   opacity: 0;
   transition: opacity .12s ease;
 }
-.sidebar:hover .logo-text,
-.sidebar:hover .sidebar-group-label,
-.sidebar:hover .sidebar-user,
-.sidebar:hover .nav-item > span:not([data-slot]),
-.sidebar:focus-within .logo-text,
-.sidebar:focus-within .sidebar-group-label,
-.sidebar:focus-within .sidebar-user,
-.sidebar:focus-within .nav-item > span:not([data-slot]) {
+.sidebar:hover:not(.force-collapsed) .logo-text,
+.sidebar:hover:not(.force-collapsed) .sidebar-group-label,
+.sidebar:hover:not(.force-collapsed) .sidebar-user,
+.sidebar:hover:not(.force-collapsed) .nav-item > span:not([data-slot]),
+.sidebar:focus-within:not(.force-collapsed) .logo-text,
+.sidebar:focus-within:not(.force-collapsed) .sidebar-group-label,
+.sidebar:focus-within:not(.force-collapsed) .sidebar-user,
+.sidebar:focus-within:not(.force-collapsed) .nav-item > span:not([data-slot]) {
   opacity: 1;
   transition: opacity .2s ease .06s;
 }

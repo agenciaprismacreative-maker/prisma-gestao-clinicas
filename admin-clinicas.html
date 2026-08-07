@@ -20,7 +20,7 @@
 <div class="app-shell" x-data="adminClinicasApp()" x-init="init()">
 
   <div class="sidebar-backdrop" :class="{ 'is-open': sidebarOpen }" @click="sidebarOpen = false"></div>
-  <aside class="sidebar" :class="{ 'is-open': sidebarOpen }">
+  <aside class="sidebar" :class="{ 'is-open': sidebarOpen, 'force-collapsed': sidebarForceCollapsed }" @mouseleave="sidebarForceCollapsed = false">
     <div class="sidebar-inner">
 
       <div class="sidebar-logo">
@@ -34,7 +34,7 @@
       <nav class="sidebar-nav">
         <div class="sidebar-group-label">Principal</div>
 
-        <a href="#" class="nav-item" :class="activeSection === 'dashboard' ? 'active' : ''" @click.prevent="activeSection = 'dashboard'; sidebarOpen = false;">
+        <a href="#" class="nav-item" :class="activeSection === 'dashboard' ? 'active' : ''" @click.prevent="activeSection = 'dashboard'; sidebarOpen = false; sidebarForceCollapsed = true;">
           <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
             <rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/>
             <rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/>
@@ -44,7 +44,7 @@
 
         <div class="sidebar-group-label">Gestão</div>
 
-        <a href="#" class="nav-item" :class="activeSection === 'clinicas' ? 'active' : ''" @click.prevent="activeSection = 'clinicas'; selectedClinic = null; sidebarOpen = false;">
+        <a href="#" class="nav-item" :class="activeSection === 'clinicas' ? 'active' : ''" @click.prevent="activeSection = 'clinicas'; selectedClinic = null; sidebarOpen = false; sidebarForceCollapsed = true;">
           <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
             <rect x="4" y="3" width="10" height="18" rx="1"/><rect x="14" y="9" width="6" height="12" rx="1"/>
             <path d="M7.5 7h.01M7.5 11h.01M7.5 15h.01M17 13h.01M17 17h.01"/>
@@ -53,7 +53,7 @@
           <span class="nav-badge" x-show="signupRequests.length > 0" x-text="signupRequests.length"></span>
         </a>
 
-        <a href="#" class="nav-item" :class="activeSection === 'planos' ? 'active' : ''" @click.prevent="activeSection = 'planos'; sidebarOpen = false;">
+        <a href="#" class="nav-item" :class="activeSection === 'planos' ? 'active' : ''" @click.prevent="activeSection = 'planos'; sidebarOpen = false; sidebarForceCollapsed = true;">
           <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
             <rect x="2.5" y="5.5" width="19" height="14" rx="2"/><path d="M2.5 10h19"/><path d="M6 15h4"/>
           </svg>
@@ -63,7 +63,7 @@
 
         <div class="sidebar-group-label">Configuração</div>
 
-        <a href="#" class="nav-item" :class="activeSection === 'personalizacao' ? 'active' : ''" @click.prevent="activeSection = 'personalizacao'; sidebarOpen = false;">
+        <a href="#" class="nav-item" :class="activeSection === 'personalizacao' ? 'active' : ''" @click.prevent="activeSection = 'personalizacao'; sidebarOpen = false; sidebarForceCollapsed = true;">
           <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
             <path d="M12 3a9 9 0 1 0 0 18c1.4 0 2-.8 2-1.8 0-.5-.2-.9-.5-1.3-.3-.4-.5-.8-.5-1.3 0-.9.7-1.6 1.6-1.6H16a4 4 0 0 0 4-4c0-4.4-3.6-8-8-8z"/>
             <circle cx="7.3" cy="10.8" r="1" fill="currentColor" stroke="none"/>
@@ -897,6 +897,12 @@ function adminClinicasApp() {
     currentUserId: null,
     activeSection: 'dashboard',
     sidebarOpen: false,
+    // Forca a sidebar recolhida logo apos um clique num item do menu --
+    // sem isso, como a troca de secao acontece sem sair da pagina, o
+    // mouse continua sobre a sidebar e :hover a mantem aberta por cima
+    // do conteudo. Volta a false no mouseleave, liberando o hover normal
+    // na proxima vez que a pessoa passar o mouse pra navegar.
+    sidebarForceCollapsed: false,
     branding: {},
     brandingLoading: true,
     savingBranding: false,
