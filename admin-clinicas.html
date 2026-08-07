@@ -369,16 +369,25 @@
             </div>
 
             <div class="card card-shadow">
-              <div class="card-header"><div><h3>Acessos da clínica</h3><p x-text="clinicUsers.length + ' conta(s)'"></p></div></div>
+              <div class="card-header">
+                <div><h3>Acessos da clínica</h3><p x-text="clinicUsers.length + ' conta(s)'"></p></div>
+                <button class="btn btn-secondary btn-sm" type="button" @click="openAddAccessModal()">+ Adicionar acesso</button>
+              </div>
               <div x-show="clinicUsers.length === 0" class="text-sm text-muted">Nenhum acesso cadastrado ainda.</div>
               <div class="flex" style="flex-direction:column;gap:10px;">
                 <template x-for="u in clinicUsers" :key="u.id">
-                  <div class="flex items-center justify-between">
-                    <div>
+                  <div class="flex items-center justify-between" style="gap:10px;flex-wrap:wrap;">
+                    <div style="min-width:0;">
                       <strong class="text-sm" x-text="u.full_name"></strong>
                       <div class="text-xs text-muted" x-text="u.email + ' · ' + roleLabel(u.role)"></div>
                     </div>
-                    <span class="badge" :class="u.is_active === false ? 'badge-neutral' : 'badge-success'" x-text="u.is_active === false ? 'Inativo' : 'Ativo'"></span>
+                    <div class="flex items-center gap-2">
+                      <span class="badge" :class="u.is_active === false ? 'badge-neutral' : 'badge-success'" x-text="u.is_active === false ? 'Inativo' : 'Ativo'"></span>
+                      <button class="btn btn-ghost btn-sm" type="button" @click="toggleUserActive(u)" :disabled="togglingUserId === u.id">
+                        <span x-text="u.is_active === false ? 'Ativar' : 'Desativar'"></span>
+                      </button>
+                      <button class="btn btn-ghost btn-sm" type="button" @click="openResetPasswordModal(u)">Redefinir senha</button>
+                    </div>
                   </div>
                 </template>
               </div>
@@ -651,6 +660,62 @@
     </div>
   </div>
 
+  <!-- ===================== MODAL: ADICIONAR ACESSO ===================== -->
+  <div x-show="showAddAccessModal" x-cloak class="modal-overlay" @click.self="showAddAccessModal=false">
+    <div class="card card-shadow-sm modal-card" style="margin:auto;">
+      <div class="card-header"><h3>Adicionar acesso</h3><button class="btn btn-ghost btn-sm" @click="showAddAccessModal=false">Fechar</button></div>
+      <p class="text-sm mb-3" x-show="addAccessError" x-cloak style="color:var(--color-danger);" x-text="addAccessError"></p>
+      <p class="text-xs text-soft mb-3">Cria uma nova conta de acesso vinculada a <strong x-text="selectedClinic ? selectedClinic.name : ''"></strong>.</p>
+
+      <div class="form-group">
+        <label class="label">Nome completo</label>
+        <input class="input" type="text" x-model="newAccess.full_name" required>
+      </div>
+      <div class="form-group">
+        <label class="label">E-mail</label>
+        <input class="input" type="email" x-model="newAccess.email" required>
+      </div>
+      <div class="form-group">
+        <label class="label">Senha inicial</label>
+        <input class="input" type="text" x-model="newAccess.password" placeholder="Mín. 6 caracteres" required>
+      </div>
+      <div class="form-group">
+        <label class="label">Papel</label>
+        <select class="input" x-model="newAccess.role">
+          <option value="administrador">Administrador</option>
+          <option value="atendente">Atendente</option>
+          <option value="esteticista">Esteticista</option>
+        </select>
+      </div>
+
+      <div class="flex justify-end gap-2 mt-3">
+        <button class="btn btn-secondary btn-sm" type="button" @click="showAddAccessModal=false">Cancelar</button>
+        <button class="btn btn-primary btn-sm" type="button" @click="addAccess()" :disabled="savingAddAccess">Criar acesso</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== MODAL: REDEFINIR SENHA ===================== -->
+  <div x-show="showResetPasswordModal" x-cloak class="modal-overlay" @click.self="showResetPasswordModal=false">
+    <div class="card card-shadow-sm modal-card" style="margin:auto;">
+      <div class="card-header"><h3>Redefinir senha</h3><button class="btn btn-ghost btn-sm" @click="showResetPasswordModal=false">Fechar</button></div>
+      <p class="text-sm mb-3" x-show="resetPasswordError" x-cloak style="color:var(--color-danger);" x-text="resetPasswordError"></p>
+      <p class="text-xs text-soft mb-3">Define uma nova senha para <strong x-text="resettingUser ? resettingUser.full_name : ''"></strong> (<span x-text="resettingUser ? resettingUser.email : ''"></span>). A pessoa passa a usar essa senha no próximo login.</p>
+
+      <div class="form-group">
+        <label class="label">Nova senha</label>
+        <input class="input" type="text" x-model="resetPasswordInput" placeholder="Mín. 6 caracteres" required>
+      </div>
+
+      <div class="flex justify-end gap-2 mt-3">
+        <button class="btn btn-secondary btn-sm" type="button" @click="showResetPasswordModal=false">Cancelar</button>
+        <button class="btn btn-primary btn-sm" type="button" @click="confirmResetPassword()" :disabled="savingResetPassword">
+          <span x-show="!savingResetPassword">Redefinir senha</span><span x-show="savingResetPassword" x-cloak>Salvando…</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- ===================== MODAL: PARABENIZAR ===================== -->
   <div x-show="showCongratsModal" x-cloak class="modal-overlay" @click.self="showCongratsModal=false">
     <div class="card card-shadow-sm modal-card" style="margin:auto;">
@@ -719,6 +784,19 @@ function adminClinicasApp() {
     showPaymentModal: false,
     newPayment: { amount_input: '', due_date: '', status: 'pendente', payment_method: '', reference: '' },
     savingPayment: false,
+
+    showAddAccessModal: false,
+    newAccess: { full_name: '', email: '', password: '', role: 'atendente' },
+    savingAddAccess: false,
+    addAccessError: '',
+
+    togglingUserId: null,
+
+    showResetPasswordModal: false,
+    resettingUser: null,
+    resetPasswordInput: '',
+    savingResetPassword: false,
+    resetPasswordError: '',
 
     showCongratsModal: false,
     congratsTarget: null,
@@ -1108,6 +1186,104 @@ function adminClinicasApp() {
       const { error } = await supabaseClient.from('clinic_payments').update({ status: 'pago', paid_at: new Date().toISOString() }).eq('id', payment.id);
       if (error) { this.showFeedback('error', 'Erro: ' + error.message); return; }
       await this.selectClinic(this.selectedClinic);
+    },
+
+    // ---------------------------------------------------------------------
+    // Acessos da clínica: adicionar, ativar/desativar, redefinir senha
+    // ---------------------------------------------------------------------
+    openAddAccessModal() {
+      this.newAccess = { full_name: '', email: '', password: '', role: 'atendente' };
+      this.addAccessError = '';
+      this.showAddAccessModal = true;
+    },
+
+    async addAccess() {
+      const f = this.newAccess;
+      if (!f.full_name.trim() || !f.email.trim() || !f.password.trim()) {
+        this.addAccessError = 'Preencha nome, e-mail e senha.';
+        return;
+      }
+      if (f.password.length < 6) {
+        this.addAccessError = 'A senha precisa ter pelo menos 6 caracteres.';
+        return;
+      }
+      this.savingAddAccess = true;
+      this.addAccessError = '';
+
+      const ephemeral = createEphemeralClient();
+      const { data: signUpData, error: signUpError } = await ephemeral.auth.signUp({ email: f.email, password: f.password });
+      if (signUpError || !signUpData.user) {
+        this.savingAddAccess = false;
+        this.addAccessError = 'Erro ao criar o acesso: ' + (signUpError ? signUpError.message : 'tente novamente.');
+        return;
+      }
+
+      const { error: userError } = await supabaseClient.from('users').insert({
+        id: signUpData.user.id, clinic_id: this.selectedClinic.id, full_name: f.full_name, email: f.email, role: f.role
+      });
+      this.savingAddAccess = false;
+      if (userError) {
+        this.addAccessError = 'Acesso criado, mas houve erro ao vincular à clínica: ' + userError.message;
+        return;
+      }
+
+      this.showAddAccessModal = false;
+      this.showFeedback('success', 'Acesso criado para ' + f.full_name + '.');
+      await this.selectClinic(this.selectedClinic);
+    },
+
+    async toggleUserActive(u) {
+      const goingActive = u.is_active === false;
+      const ok = await confirmDialog(
+        (goingActive ? 'Reativar' : 'Desativar') + ' o acesso de "' + u.full_name + '"?' +
+        (goingActive ? '' : ' A pessoa não vai mais conseguir entrar no sistema até ser reativada novamente.'),
+        { danger: !goingActive, confirmLabel: goingActive ? 'Reativar' : 'Desativar' }
+      );
+      if (!ok) return;
+      this.togglingUserId = u.id;
+      const { error } = await supabaseClient.from('users').update({ is_active: goingActive }).eq('id', u.id);
+      this.togglingUserId = null;
+      if (error) { this.showFeedback('error', 'Erro: ' + error.message); return; }
+      this.showFeedback('success', goingActive ? 'Acesso reativado.' : 'Acesso desativado.');
+      await this.selectClinic(this.selectedClinic);
+    },
+
+    openResetPasswordModal(u) {
+      this.resettingUser = u;
+      this.resetPasswordInput = '';
+      this.resetPasswordError = '';
+      this.showResetPasswordModal = true;
+    },
+
+    async confirmResetPassword() {
+      if (!this.resetPasswordInput || this.resetPasswordInput.length < 6) {
+        this.resetPasswordError = 'A nova senha precisa ter pelo menos 6 caracteres.';
+        return;
+      }
+      this.savingResetPassword = true;
+      this.resetPasswordError = '';
+      try {
+        const { error } = await supabaseClient.functions.invoke('admin-reset-password', {
+          body: { user_id: this.resettingUser.id, new_password: this.resetPasswordInput }
+        });
+        if (error) {
+          let message = error.message || 'Erro ao redefinir a senha.';
+          if (error.context && typeof error.context.json === 'function') {
+            try {
+              const body = await error.context.json();
+              if (body && body.error) message = body.error;
+            } catch (_) { /* usa a mensagem padrão acima */ }
+          }
+          this.resetPasswordError = message;
+          return;
+        }
+        this.showResetPasswordModal = false;
+        this.showFeedback('success', 'Senha redefinida para ' + this.resettingUser.full_name + '.');
+      } catch (err) {
+        this.resetPasswordError = 'Erro inesperado: ' + err.message;
+      } finally {
+        this.savingResetPassword = false;
+      }
     },
 
     // ---------------------------------------------------------------------
