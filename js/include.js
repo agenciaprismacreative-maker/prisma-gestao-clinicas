@@ -258,11 +258,26 @@ async function applyClinicSettings(clinicId, role) {
     // a página, o tema e as cores certas já aparecem antes mesmo dessa
     // consulta ao Supabase terminar, sem o "rastro" de cor padrão.
     try {
-      localStorage.setItem('prisma_theme_cache', JSON.stringify({
+      const cachePayload = {
         theme: settings && settings.theme === 'escuro' ? 'escuro' : 'claro',
         primary_color: settings ? settings.primary_color || null : null,
         accent_color: settings ? settings.accent_color || null : null
-      }));
+      };
+      // Guarda também os tons derivados (mesmos cálculos de applyBrandColors
+      // acima) -- cachear só a cor base não bastava: o "rastro" continuava
+      // aparecendo em tudo que usa --color-primary-dark/-light/-contrast
+      // (fundo do menu lateral, hovers, contraste de texto), porque esses
+      // ficavam com o valor padrão do CSS até essa consulta terminar de novo.
+      if (cachePayload.primary_color) {
+        cachePayload.primary_dark = ensureDarkEnough(cachePayload.primary_color, 0.35);
+        cachePayload.primary_light = shadeColor(cachePayload.primary_color, 0.86);
+        cachePayload.primary_contrast = contrastTextColor(cachePayload.primary_color);
+      }
+      if (cachePayload.accent_color) {
+        cachePayload.accent_light = shadeColor(cachePayload.accent_color, 0.86);
+        cachePayload.accent_contrast = contrastTextColor(cachePayload.accent_color);
+      }
+      localStorage.setItem('prisma_theme_cache', JSON.stringify(cachePayload));
     } catch (err) {
       // localStorage indisponível -- sem cache dessa vez, sem quebrar nada.
     }
