@@ -156,13 +156,14 @@ function loginForm() {
         this.errorMsg = 'Este acesso foi desativado. Fale com a administração da clínica.';
         return;
       }
-      // Login de clínica nunca abre o painel administrativo da Prisma, nem
-      // com a sessão/credenciais corretas -- esse papel tem porta própria
-      // (acesso-administrativo.html). A sessão continua válida, só o
-      // destino muda; quem cair aqui é encaminhado pra lá sem precisar
-      // digitar a senha de novo.
+      // Login de clínica nunca autentica o papel equipe_prisma, nem com a
+      // senha correta -- essa porta é só para clínicas. O acesso
+      // administrativo da Prisma tem entrada própria (botão dedicado no
+      // rodapé desta tela, que leva a acesso-administrativo.html); por
+      // isso aqui a sessão é encerrada em vez de redirecionada.
       if (profile.role === 'equipe_prisma') {
-        window.location.href = 'acesso-administrativo.html';
+        await supabaseClient.auth.signOut();
+        this.errorMsg = 'Este acesso é exclusivo para clínicas. Use o botão "Acesso administrativo" abaixo.';
         return;
       }
       window.location.href = window.homeForRole(profile.role);
