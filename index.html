@@ -17,50 +17,100 @@
       <p x-text="branding.login_subtitle || 'Acesse o painel da sua clínica'"></p>
     </div>
 
-    <form @submit.prevent="submit()">
-      <div class="form-group">
-        <label class="label" for="email">E-mail</label>
-        <input class="input" type="email" id="email" x-model="email" placeholder="voce@clinica.com.br" required>
-      </div>
-
-      <div class="form-group">
-        <label class="label" for="senha">Senha</label>
-        <div style="position:relative;">
-          <input class="input" :type="showPass ? 'text' : 'password'" id="senha" x-model="password" placeholder="••••••••" required style="padding-right:56px;">
-          <button type="button" @click="showPass = !showPass" class="text-xs text-muted" style="position:absolute;right:14px;top:50%;transform:translateY(-50%);background:none;border:none;">
-            <span x-text="showPass ? 'ocultar' : 'ver'"></span>
-          </button>
+    <div x-show="step === 'login'" x-cloak>
+      <form @submit.prevent="submit()">
+        <div class="form-group">
+          <label class="label" for="email">E-mail</label>
+          <input class="input" type="email" id="email" x-model="email" placeholder="voce@clinica.com.br" required>
         </div>
+
+        <div class="form-group">
+          <label class="label" for="senha">Senha</label>
+          <div style="position:relative;">
+            <input class="input" :type="showPass ? 'text' : 'password'" id="senha" x-model="password" placeholder="••••••••" required style="padding-right:56px;">
+            <button type="button" @click="showPass = !showPass" class="text-xs text-muted" style="position:absolute;right:14px;top:50%;transform:translateY(-50%);background:none;border:none;">
+              <span x-text="showPass ? 'ocultar' : 'ver'"></span>
+            </button>
+          </div>
+          <div class="flex justify-end mt-1">
+            <a href="#" class="text-xs" style="color:var(--color-text-soft);" @click.prevent="openForgotPassword()">Esqueci minha senha</a>
+          </div>
+        </div>
+
+        <p x-show="errorMsg" x-cloak class="text-sm mb-3" style="color:var(--color-danger);" x-text="errorMsg"></p>
+
+        <button class="btn btn-primary btn-block mt-2" type="submit" :disabled="loading">
+          <span x-show="!loading">Entrar</span>
+          <span x-show="loading" x-cloak>Entrando…</span>
+        </button>
+      </form>
+
+      <div class="flex items-center gap-3 my-3" style="color:var(--color-text-soft);font-size:12px;">
+        <div style="flex:1;height:1px;background:var(--color-border);"></div>
+        ou
+        <div style="flex:1;height:1px;background:var(--color-border);"></div>
       </div>
 
-      <p x-show="errorMsg" x-cloak class="text-sm mb-3" style="color:var(--color-danger);" x-text="errorMsg"></p>
-
-      <button class="btn btn-primary btn-block mt-2" type="submit" :disabled="loading">
-        <span x-show="!loading">Entrar</span>
-        <span x-show="loading" x-cloak>Entrando…</span>
+      <button type="button" class="btn btn-secondary btn-block" @click="loginWithGoogle()">
+        <svg viewBox="0 0 48 48" style="width:16px;height:16px;margin-right:6px;vertical-align:-3px;"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.9 32.5 29.4 35.5 24 35.5c-6.4 0-11.6-5.2-11.6-11.5S17.6 12.5 24 12.5c3 0 5.6 1.1 7.7 2.9l5.7-5.7C34.1 6.7 29.3 4.5 24 4.5 13.2 4.5 4.5 13.2 4.5 24S13.2 43.5 24 43.5 43.5 34.8 43.5 24c0-1.2-.1-2.4-.3-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 15.9 18.9 12.5 24 12.5c3 0 5.6 1.1 7.7 2.9l5.7-5.7C34.1 6.7 29.3 4.5 24 4.5c-7.7 0-14.4 4.4-17.7 10.2z"/><path fill="#4CAF50" d="M24 43.5c5.2 0 9.9-2 13.5-5.2l-6.2-5.3C29.3 34.6 26.8 35.5 24 35.5c-5.4 0-9.9-3.4-11.6-8.1l-6.5 5C9.5 39 16.2 43.5 24 43.5z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.1-4.1 5.5l6.2 5.3C41 35.6 43.5 30.3 43.5 24c0-1.2-.1-2.4-.3-3.5z"/></svg>
+        Continuar com Google
       </button>
-    </form>
 
-    <div class="flex items-center gap-3 my-3" style="color:var(--color-text-soft);font-size:12px;">
-      <div style="flex:1;height:1px;background:var(--color-border);"></div>
-      ou
-      <div style="flex:1;height:1px;background:var(--color-border);"></div>
+      <div class="auth-footer">
+        <span x-text="branding.support_message || 'Esqueceu a senha? Fale com a administração da clínica.'"></span><br>
+        <span x-text="branding.footer_text || 'Sistema interno · Prisma Creative'"></span><br>
+        <a href="solicitar-acesso.html" class="text-xs" style="color:var(--color-text-soft);">Ainda não tem acesso? Solicite aqui</a>
+      </div>
     </div>
 
-    <button type="button" class="btn btn-secondary btn-block" @click="loginWithGoogle()">
-      <svg viewBox="0 0 48 48" style="width:16px;height:16px;margin-right:6px;vertical-align:-3px;"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.9 32.5 29.4 35.5 24 35.5c-6.4 0-11.6-5.2-11.6-11.5S17.6 12.5 24 12.5c3 0 5.6 1.1 7.7 2.9l5.7-5.7C34.1 6.7 29.3 4.5 24 4.5 13.2 4.5 4.5 13.2 4.5 24S13.2 43.5 24 43.5 43.5 34.8 43.5 24c0-1.2-.1-2.4-.3-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 15.9 18.9 12.5 24 12.5c3 0 5.6 1.1 7.7 2.9l5.7-5.7C34.1 6.7 29.3 4.5 24 4.5c-7.7 0-14.4 4.4-17.7 10.2z"/><path fill="#4CAF50" d="M24 43.5c5.2 0 9.9-2 13.5-5.2l-6.2-5.3C29.3 34.6 26.8 35.5 24 35.5c-5.4 0-9.9-3.4-11.6-8.1l-6.5 5C9.5 39 16.2 43.5 24 43.5z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.1-4.1 5.5l6.2 5.3C41 35.6 43.5 30.3 43.5 24c0-1.2-.1-2.4-.3-3.5z"/></svg>
-      Continuar com Google
-    </button>
+    <div x-show="step === 'forgot'" x-cloak>
+      <h2 style="font-size:16px;margin-bottom:4px;">Redefinir senha</h2>
+      <p class="text-sm text-muted mb-4">Informe seu e-mail de acesso. Se ele existir no sistema, você recebe um link para criar uma nova senha.</p>
+      <form @submit.prevent="sendResetLink()">
+        <div class="form-group">
+          <label class="label" for="forgot-email">E-mail</label>
+          <input class="input" type="email" id="forgot-email" x-model="forgotEmail" placeholder="voce@clinica.com.br" required>
+        </div>
+        <p x-show="forgotError" x-cloak class="text-sm mb-3" style="color:var(--color-danger);" x-text="forgotError"></p>
+        <button class="btn btn-primary btn-block mt-2" type="submit" :disabled="forgotLoading">
+          <span x-show="!forgotLoading">Enviar link de redefinição</span>
+          <span x-show="forgotLoading" x-cloak>Enviando…</span>
+        </button>
+      </form>
+      <div class="text-center mt-3">
+        <a href="#" class="text-xs" style="color:var(--color-text-soft);" @click.prevent="backToLogin()">Voltar para o login</a>
+      </div>
+    </div>
 
-    <div class="auth-footer">
-      <span x-text="branding.support_message || 'Esqueceu a senha? Fale com a administração da clínica.'"></span><br>
-      <span x-text="branding.footer_text || 'Sistema interno · Prisma Creative'"></span><br>
-      <a href="solicitar-acesso.html" class="text-xs" style="color:var(--color-text-soft);">Ainda não tem acesso? Solicite aqui</a>
+    <div x-show="step === 'forgot-sent'" x-cloak class="text-center">
+      <h2 style="font-size:16px;margin-bottom:8px;">Verifique seu e-mail</h2>
+      <p class="text-sm text-muted mb-4">Se <strong x-text="forgotEmail"></strong> tiver uma conta no sistema, um link para redefinir a senha chega em instantes. Confira também a caixa de spam.</p>
+      <button class="btn btn-secondary btn-block" type="button" @click="backToLogin()">Voltar para o login</button>
     </div>
   </div>
 </div>
 
 <script>
+// Traduz os erros mais comuns do Supabase Auth para uma mensagem em
+// PT-BR que não soa técnica nem exp e-mail/senha errado de propósito
+// (mensagem genérica, sem dizer qual dos dois está errado).
+function translateAuthError(error) {
+  const msg = ((error && error.message) || '').toLowerCase();
+  if (msg.includes('invalid login credentials') || msg.includes('user not found')) {
+    return 'Ops, parece que alguma das informações de acesso está incorreta. Confira o e-mail e a senha e tente de novo.';
+  }
+  if (msg.includes('email not confirmed')) {
+    return 'Seu e-mail ainda não foi confirmado. Verifique sua caixa de entrada.';
+  }
+  if (msg.includes('too many requests') || msg.includes('rate limit')) {
+    return 'Muitas tentativas seguidas. Aguarde um instante e tente de novo.';
+  }
+  if (msg.includes('failed to fetch') || msg.includes('network')) {
+    return 'Não foi possível conectar agora. Verifique sua internet e tente de novo.';
+  }
+  return 'Não foi possível entrar agora. Tente novamente em instantes.';
+}
+
 function loginForm() {
   return {
     email: '',
@@ -69,6 +119,11 @@ function loginForm() {
     showPass: false,
     errorMsg: '',
     branding: {},
+
+    step: 'login', // 'login' | 'forgot' | 'forgot-sent'
+    forgotEmail: '',
+    forgotLoading: false,
+    forgotError: '',
 
     async init() {
       const params = new URLSearchParams(window.location.search);
@@ -143,12 +198,44 @@ function loginForm() {
         password: this.password
       });
       if (error) {
-        this.errorMsg = error.message || 'E-mail ou senha incorretos.';
+        this.errorMsg = translateAuthError(error);
         this.loading = false;
         return;
       }
       await this.routeAfterAuth(data.user);
       this.loading = false;
+    },
+
+    openForgotPassword() {
+      this.forgotEmail = this.email || '';
+      this.forgotError = '';
+      this.step = 'forgot';
+    },
+
+    backToLogin() {
+      this.step = 'login';
+      this.errorMsg = '';
+      this.forgotError = '';
+    },
+
+    // Sempre mostra a mesma tela de "verifique seu e-mail" ao final, exista
+    // ou não uma conta com esse e-mail -- evita que alguém use esse
+    // formulário para descobrir quais e-mails têm cadastro no sistema.
+    async sendResetLink() {
+      if (!this.forgotEmail || !this.forgotEmail.trim()) {
+        this.forgotError = 'Informe seu e-mail.';
+        return;
+      }
+      this.forgotLoading = true;
+      this.forgotError = '';
+      const redirectTo = window.location.href.split('?')[0].replace(/index\.html$/, '') + 'redefinir-senha.html';
+      const { error } = await supabaseClient.auth.resetPasswordForEmail(this.forgotEmail.trim(), { redirectTo });
+      this.forgotLoading = false;
+      if (error && error.status !== 400) {
+        this.forgotError = 'Não foi possível enviar o link agora. Tente novamente em instantes.';
+        return;
+      }
+      this.step = 'forgot-sent';
     }
   };
 }
