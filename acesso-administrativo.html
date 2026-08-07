@@ -58,7 +58,7 @@
     </div>
 
     <div x-show="step === 'forgot'" x-cloak>
-      <h2 style="font-size:16px;margin-bottom:4px;">Redefinir senha</h2>
+      <h2 style="font-size:var(--font-size-7);margin-bottom:4px;">Redefinir senha</h2>
       <p class="text-sm text-muted mb-4">Informe seu e-mail de acesso administrativo. Se ele existir, você recebe um link para criar uma nova senha.</p>
       <form @submit.prevent="sendResetLink()">
         <div class="form-group">
@@ -77,7 +77,7 @@
     </div>
 
     <div x-show="step === 'forgot-sent'" x-cloak class="text-center">
-      <h2 style="font-size:16px;margin-bottom:8px;">Verifique seu e-mail</h2>
+      <h2 style="font-size:var(--font-size-7);margin-bottom:8px;">Verifique seu e-mail</h2>
       <p class="text-sm text-muted mb-4">Se <strong x-text="forgotEmail"></strong> tiver acesso administrativo, um link para redefinir a senha chega em instantes.</p>
       <button class="btn btn-secondary btn-block" type="button" @click="backToLogin()">Voltar para o login</button>
     </div>

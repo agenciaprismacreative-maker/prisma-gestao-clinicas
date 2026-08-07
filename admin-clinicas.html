@@ -170,7 +170,7 @@
         <div class="panel-section-head"><span class="panel-section-dot"></span><h3>🏆 Ranking de faturamento entre clínicas</h3></div>
         <div class="card card-shadow">
           <div class="card-header">
-            <div><h3 style="font-size:15px;">Top clínicas</h3><p x-text="currentMonthLabel"></p></div>
+            <div><h3 class="section-title">Top clínicas</h3><p x-text="currentMonthLabel"></p></div>
           </div>
           <p class="text-xs text-soft mb-3">Só o total somado por clínica -- nenhum dado de paciente ou transação individual é exibido aqui (ver LGPD no README).</p>
           <div x-show="!loadingRanking && ranking.length === 0" class="text-sm text-muted">Nenhum faturamento registrado neste mês ainda.</div>
@@ -296,7 +296,7 @@
             <h2 x-text="selectedClinic.name"></h2>
             <p>Cadastrada em <span x-text="formatDate(selectedClinic.created_at)"></span></p>
           </div>
-          <span class="badge" :class="statusBadgeClass(selectedClinic.status)" style="font-size:13px;padding:6px 12px;"><span class="badge-dot"></span><span x-text="statusLabel(selectedClinic.status)"></span></span>
+          <span class="badge" :class="statusBadgeClass(selectedClinic.status)" style="font-size:var(--font-size-4);padding:6px 12px;"><span class="badge-dot"></span><span x-text="statusLabel(selectedClinic.status)"></span></span>
         </div>
 
         <div class="grid grid-2 gap-3 mb-5">
@@ -401,7 +401,7 @@
           <div class="panel-section-head"><span class="panel-section-dot"></span><h3>Pagamentos da assinatura</h3></div>
           <div class="card card-shadow">
             <div class="card-header">
-              <div><h3 style="font-size:15px;">Histórico</h3><p>Registro manual, controlado pela Prisma</p></div>
+              <div><h3 class="section-title">Histórico</h3><p>Registro manual, controlado pela Prisma</p></div>
               <button class="btn btn-secondary btn-sm" type="button" @click="openPaymentModal()">+ Registrar pagamento</button>
             </div>
             <div x-show="clinicPayments.length === 0" class="text-sm text-muted">Nenhum pagamento registrado ainda.</div>
@@ -563,11 +563,11 @@
                 <img x-show="branding.logo_url" :src="branding.logo_url" style="width:100%;height:100%;object-fit:cover;">
                 <span x-show="!branding.logo_url" style="font-weight:700;" :style="'color:' + contrastTextColor(branding.accent_color || '#B8912F') + ';'">P</span>
               </div>
-              <strong style="font-size:14px;display:block;" :style="'color:' + (branding.card_style === 'escuro' ? '#ECEAE5' : '#262624') + ';'" x-text="branding.login_title || 'Prisma · Gestão de Clínicas'"></strong>
+              <strong style="font-size:var(--font-size-5);display:block;" :style="'color:' + (branding.card_style === 'escuro' ? '#ECEAE5' : '#262624') + ';'" x-text="branding.login_title || 'Prisma · Gestão de Clínicas'"></strong>
               <p class="text-xs mt-1 mb-3" :style="'color:' + (branding.card_style === 'escuro' ? '#A9A69F' : '#726F68') + ';'" x-text="branding.login_subtitle || 'Acesse o painel da sua clínica'"></p>
               <div style="height:30px;border-radius:var(--radius-md);margin-bottom:8px;" :style="'border:1px solid ' + (branding.card_style === 'escuro' ? '#383B3D' : '#E6E2D9') + ';'"></div>
               <div style="height:30px;border-radius:var(--radius-md);margin-bottom:12px;" :style="'border:1px solid ' + (branding.card_style === 'escuro' ? '#383B3D' : '#E6E2D9') + ';'"></div>
-              <div style="height:34px;border-radius:var(--radius-md);display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:600;"
+              <div style="height:34px;border-radius:var(--radius-md);display:flex;align-items:center;justify-content:center;font-size:var(--font-size-3);font-weight:600;"
                    :style="'background:' + (branding.primary_color || '#2F4A45') + ';color:' + contrastTextColor(branding.primary_color || '#2F4A45') + ';'">Entrar</div>
             </div>
           </div>

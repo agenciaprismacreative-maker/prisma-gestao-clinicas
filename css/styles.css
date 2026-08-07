@@ -323,6 +323,10 @@ svg.icon { width: 20px; height: 20px; flex-shrink: 0; }
 .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-4); }
 .card-header h3 { font-size: var(--font-size-6); }
 .card-header p { font-size: var(--font-size-3); color: var(--color-text-muted); margin-top: 2px; }
+/* Mesmo papel de .card-header h3 (título de seção/bloco), para quando o
+   h3 não está dentro de um .card-header -- substitui o padrão repetido
+   style="font-size:15px;" que existia solto em cerca de 30 lugares. */
+.section-title { font-size: var(--font-size-6); }
 
 .grid { display: grid; gap: var(--space-5); }
 .grid-4 { grid-template-columns: repeat(4, 1fr); }

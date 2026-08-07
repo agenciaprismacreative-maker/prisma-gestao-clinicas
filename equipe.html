@@ -98,7 +98,7 @@
             <button class="btn btn-ghost btn-sm" @click="selectedTask = null">Fechar</button>
           </div>
           <template x-if="selectedTask">
-            <div style="display:flex;flex-direction:column;gap:10px;font-size:13.5px;">
+            <div style="display:flex;flex-direction:column;gap:10px;font-size:var(--font-size-4);">
               <div><span class="text-xs text-muted">Responsável</span><br><strong x-text="selectedTask.users ? selectedTask.users.full_name : 'Sem responsável'"></strong></div>
               <div x-show="selectedTask.patients"><span class="text-xs text-muted">Paciente</span><br><strong x-text="selectedTask.patients ? selectedTask.patients.full_name : ''"></strong></div>
               <div x-show="selectedTask.due_date"><span class="text-xs text-muted">Prazo</span><br><strong x-text="formatDate(selectedTask.due_date)"></strong></div>
@@ -182,9 +182,9 @@
               <input class="input" type="text" x-model="taskPatientSearch" @focus="taskPatientDropdownOpen = true" @input="taskPatientDropdownOpen = true; newTask.patient_id = ''" placeholder="Digite o nome do paciente" autocomplete="off">
               <div x-show="taskPatientDropdownOpen" x-cloak @click.away="taskPatientDropdownOpen = false"
                    style="position:absolute;z-index:10;top:100%;left:0;right:0;background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-md);box-shadow:var(--shadow-md);max-height:200px;overflow-y:auto;margin-top:4px;">
-                <div @click="newTask.patient_id = ''; taskPatientSearch = ''; taskPatientDropdownOpen = false" class="patient-option" style="padding:9px 14px;cursor:pointer;font-size:13.5px;">Nenhum</div>
+                <div @click="newTask.patient_id = ''; taskPatientSearch = ''; taskPatientDropdownOpen = false" class="patient-option" style="padding:9px 14px;cursor:pointer;font-size:var(--font-size-4);">Nenhum</div>
                 <template x-for="p in filteredPatientsFor(taskPatientSearch)" :key="p.id">
-                  <div @click="newTask.patient_id = p.id; taskPatientSearch = p.full_name; taskPatientDropdownOpen = false" class="patient-option" style="padding:9px 14px;cursor:pointer;font-size:13.5px;" x-text="p.full_name"></div>
+                  <div @click="newTask.patient_id = p.id; taskPatientSearch = p.full_name; taskPatientDropdownOpen = false" class="patient-option" style="padding:9px 14px;cursor:pointer;font-size:var(--font-size-4);" x-text="p.full_name"></div>
                 </template>
               </div>
             </div>

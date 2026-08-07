@@ -54,7 +54,7 @@
               <span class="text-sm" :style="'color:' + severityColor(r.severity) + ';font-weight:600;'" x-text="r.label"></span>
               <div class="text-xs text-muted mt-1" x-show="r.sublabel" x-text="r.sublabel"></div>
             </a>
-            <button type="button" class="btn btn-ghost btn-sm mt-1" x-show="r.completable" @click.prevent="completeReminder(r)" style="padding:8px 10px;font-size:12px;">Marcar como concluído</button>
+            <button type="button" class="btn btn-ghost btn-sm mt-1" x-show="r.completable" @click.prevent="completeReminder(r)" style="padding:8px 10px;font-size:var(--font-size-3);">Marcar como concluído</button>
           </div>
         </template>
       </div>

@@ -94,7 +94,7 @@
       <!-- PACOTES -->
       <div x-show="tab==='pacotes'" x-cloak>
         <div class="page-header" style="margin-bottom:20px;">
-          <div><h3 style="font-size:16px;">Modelos de pacote</h3><p class="text-sm text-muted">Descreva o que cada pacote oferece (serviços e quantidades). Esses modelos ficam disponíveis para montar o carrinho rápido em Vendas.</p></div>
+          <div><h3 style="font-size:var(--font-size-7);">Modelos de pacote</h3><p class="text-sm text-muted">Descreva o que cada pacote oferece (serviços e quantidades). Esses modelos ficam disponíveis para montar o carrinho rápido em Vendas.</p></div>
           <button class="btn btn-primary btn-sm" type="button" @click="openNewTemplateForm()">Cadastrar pacote</button>
         </div>
 
@@ -122,7 +122,7 @@
           </div>
         </div>
 
-        <h3 style="font-size:16px;" class="mb-3">Pacotes vendidos (histórico)</h3>
+        <h3 style="font-size:var(--font-size-7);" class="mb-3">Pacotes vendidos (histórico)</h3>
         <div class="card card-shadow" style="padding:0;">
           <div x-show="packages.length === 0" class="empty-note" style="margin:20px;">Nenhum pacote vendido ainda. Vendas de plano são feitas na aba Vendas.</div>
           <div class="table-wrap" x-show="packages.length > 0">

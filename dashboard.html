@@ -85,10 +85,10 @@
           <div>
             <p class="text-xs text-muted" style="margin-bottom:2px;">Faturamento estimado de hoje</p>
             <div class="flex items-center" style="gap:10px;flex-wrap:wrap;">
-              <span style="font-size:30px;font-weight:700;letter-spacing:-.02em;"
+              <span style="font-size:var(--font-size-11);font-weight:700;letter-spacing:-.02em;"
                     :style="revenueToday.status === 'abaixo' ? 'color:var(--color-danger);' : (revenueToday.status === 'acima' ? 'color:var(--color-info);' : '')"
                     x-text="formatCurrency(revenueToday.realizado)"></span>
-              <span style="font-size:19px;" x-show="revenueToday.status === 'acima'" title="Acima da média dos últimos 30 dias">🚀</span>
+              <span style="font-size:var(--font-size-9);" x-show="revenueToday.status === 'acima'" title="Acima da média dos últimos 30 dias">🚀</span>
               <span class="text-sm text-muted">realizado de <strong x-text="formatCurrency(revenueToday.previsto)"></strong> previstos (marcados hoje)</span>
             </div>
             <p class="text-xs text-muted mt-1" x-show="revenueToday.avgDaily > 0" x-text="'Média dos últimos 30 dias: ' + formatCurrency(revenueToday.avgDaily) + '/dia'"></p>
@@ -209,7 +209,7 @@
           <div class="card card-shadow">
             <div class="card-header">
               <div>
-                <h3 style="font-size:15px;">Anotações</h3>
+                <h3 class="section-title">Anotações</h3>
                 <p>Bloco de notas rápido</p>
               </div>
             </div>
@@ -243,7 +243,7 @@
           <div class="card card-shadow" style="flex:1;display:flex;flex-direction:column;">
             <div class="card-header">
               <div>
-                <h3 style="font-size:15px;">🏆 Ranking do mês</h3>
+                <h3 class="section-title">🏆 Ranking do mês</h3>
                 <p x-text="currentMonthLabel"></p>
               </div>
             </div>

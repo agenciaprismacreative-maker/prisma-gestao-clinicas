@@ -128,7 +128,7 @@
                       <div style="position:relative;">
                         <img :src="src" style="width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:var(--radius-md);border:1px solid var(--color-border);">
                         <button type="button" @click="removePhoto(i)" title="Remover" aria-label="Remover foto"
-                          style="position:absolute;top:6px;right:6px;width:32px;height:32px;border-radius:50%;background:rgba(31,51,47,.75);color:#fff;border:none;display:flex;align-items:center;justify-content:center;font-size:17px;line-height:1;cursor:pointer;">×</button>
+                          style="position:absolute;top:6px;right:6px;width:32px;height:32px;border-radius:50%;background:rgba(31,51,47,.75);color:#fff;border:none;display:flex;align-items:center;justify-content:center;font-size:var(--font-size-8);line-height:1;cursor:pointer;">×</button>
                       </div>
                     </template>
                   </div>
@@ -149,7 +149,7 @@
 
           <div class="flex" style="flex-direction:column;gap:24px;">
             <div class="card card-shadow">
-              <h3 class="mb-3" style="font-size:15px;">Antes de começar</h3>
+              <h3 class="mb-3 section-title">Antes de começar</h3>
               <h4 class="text-xs text-muted mb-2">Pontos de atenção clínica</h4>
               <div x-show="patientFlags.length === 0" class="text-sm text-muted mb-3">Nenhum ponto de atenção marcado.</div>
               <template x-for="(f, i) in patientFlags" :key="i">
@@ -162,7 +162,7 @@
             </div>
 
             <div class="card card-shadow">
-              <h3 class="mb-3" style="font-size:15px;">Histórico anterior</h3>
+              <h3 class="mb-3 section-title">Histórico anterior</h3>
               <div x-show="historyLoading" class="text-sm text-muted">Carregando…</div>
               <div x-show="!historyLoading && history.length === 0" class="text-sm text-muted">Nenhum atendimento anterior.</div>
               <template x-for="(h, i) in history" :key="i">

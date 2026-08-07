@@ -83,7 +83,7 @@
         </div>
 
         <div class="card card-shadow mb-5" x-show="leaderboard.length > 0">
-          <h3 class="mb-2" style="font-size:15px;">🏆 Ranking do mês</h3>
+          <h3 class="mb-2 section-title">🏆 Ranking do mês</h3>
           <p class="text-xs text-soft mb-3">Sua posição entre a equipe em <span x-text="currentMonthLabel"></span>, pelo valor realizado. Serve como referência de competitividade, não substitui a avaliação de qualidade do atendimento.</p>
 
           <div class="podium">
@@ -103,7 +103,7 @@
             <template x-for="row in leaderboard.slice(3)" :key="row.userId">
               <div class="leaderboard-row" :class="row.userId === currentUserId ? 'is-me' : ''">
                 <span class="leaderboard-rank" x-text="row.rank + 'º'"></span>
-                <div class="avatar" style="width:30px;height:30px;font-size:11px;" x-text="getInitials(row.name)"></div>
+                <div class="avatar" style="width:30px;height:30px;font-size:var(--font-size-2);" x-text="getInitials(row.name)"></div>
                 <div style="flex:1;">
                   <strong class="text-sm" x-text="row.name + (row.userId === currentUserId ? ' (você)' : '')"></strong>
                   <div class="text-xs text-muted" x-text="row.salesCount + ' venda(s) · ' + row.clientsAttended + ' cliente(s) atendido(s)'"></div>
@@ -115,7 +115,7 @@
         </div>
 
         <div class="card card-shadow">
-          <h3 class="mb-2" style="font-size:15px;">Indicações de novos pacientes (este mês)</h3>
+          <h3 class="mb-2 section-title">Indicações de novos pacientes (este mês)</h3>
           <p class="text-sm text-muted">Você indicou <strong x-text="myReferrals"></strong> novo(s) paciente(s) este mês.</p>
         </div>
       </div>
@@ -132,7 +132,7 @@
             <template x-for="c in myClientsThisMonthList" :key="c.patientId">
               <a :href="'pacientes.html?patient_id=' + c.patientId" class="flex items-center justify-between" style="padding:10px 2px;border-bottom:1px solid var(--color-border);text-decoration:none;color:inherit;">
                 <div class="flex items-center gap-3">
-                  <div class="avatar" style="width:32px;height:32px;font-size:12px;" x-text="getInitials(c.name)"></div>
+                  <div class="avatar" style="width:32px;height:32px;font-size:var(--font-size-3);" x-text="getInitials(c.name)"></div>
                   <div>
                     <strong class="text-sm" x-text="c.name"></strong>
                     <div class="text-xs text-muted" x-text="c.service"></div>
@@ -182,7 +182,7 @@
             <div class="stat-card"><div class="stat-label">Conversão de agenda (30 dias)</div><div class="stat-value" x-text="conversionRate + '%'"></div></div>
           </div>
           <div class="card card-shadow mb-5">
-            <h3 class="mb-4" style="font-size:15px;">Origem dos pacientes</h3>
+            <h3 class="mb-4 section-title">Origem dos pacientes</h3>
             <div x-show="leadSourceBreakdown.length === 0" class="text-sm text-muted">Nenhum dado de origem registrado ainda.</div>
             <template x-for="row in leadSourceBreakdown" :key="row.key">
               <div class="mb-3">
@@ -195,7 +195,7 @@
             </template>
           </div>
           <div class="card card-shadow">
-            <h3 class="mb-4" style="font-size:15px;">Novos pacientes mês a mês (últimos 6 meses)</h3>
+            <h3 class="mb-4 section-title">Novos pacientes mês a mês (últimos 6 meses)</h3>
             <div style="position:relative;height:240px;">
               <canvas id="chartPatientsMonths"></canvas>
             </div>
@@ -216,7 +216,7 @@
           <div class="card card-shadow">
             <div class="flex items-center justify-between">
               <div>
-                <h3 style="font-size:15px;">Controle completo de estoque</h3>
+                <h3 class="section-title">Controle completo de estoque</h3>
                 <p class="text-sm text-muted">Cadastro de insumos, entradas e saídas, alertas de mínimo/máximo e custo por procedimento.</p>
               </div>
               <a href="estoque.html" class="btn btn-primary btn-sm">Abrir Estoque</a>
@@ -232,7 +232,7 @@
             <div class="stat-card"><div class="stat-label">Taxa de comparecimento (30 dias)</div><div class="stat-value" x-text="attendanceRate === null ? '—' : attendanceRate + '%'"></div></div>
           </div>
           <div class="card card-shadow" style="padding:0;">
-            <div style="padding:20px 20px 0;"><h3 style="font-size:15px;">Pacientes elegíveis à reativação</h3></div>
+            <div style="padding:20px 20px 0;"><h3 class="section-title">Pacientes elegíveis à reativação</h3></div>
             <div x-show="reactivationCandidates.length === 0" class="empty-note" style="margin:20px;">Nenhum paciente no intervalo de retorno ainda.</div>
             <div class="table-wrap" x-show="reactivationCandidates.length > 0">
               <table class="table">
@@ -261,7 +261,7 @@
             <div class="stat-card"><div class="stat-label">Pacotes ativos</div><div class="stat-value" x-text="activePackages"></div></div>
           </div>
           <div class="card card-shadow mb-5">
-            <h3 class="mb-4" style="font-size:15px;">Faturamento por forma de pagamento (30 dias)</h3>
+            <h3 class="mb-4 section-title">Faturamento por forma de pagamento (30 dias)</h3>
             <div x-show="paymentMethodBreakdown.length === 0" class="text-sm text-muted">Nenhum lançamento no período.</div>
             <template x-for="row in paymentMethodBreakdown" :key="row.key">
               <div class="mb-3">
@@ -274,7 +274,7 @@
             </template>
           </div>
           <div class="card card-shadow mb-5">
-            <h3 class="mb-4" style="font-size:15px;">Faturamento mês a mês (últimos 6 meses)</h3>
+            <h3 class="mb-4 section-title">Faturamento mês a mês (últimos 6 meses)</h3>
             <div style="position:relative;height:240px;">
               <canvas id="chartRevenueMonths"></canvas>
             </div>
@@ -284,7 +284,7 @@
           <div class="card card-shadow mb-5">
             <div class="flex items-center justify-between mb-4" style="flex-wrap:wrap;gap:10px;">
               <div>
-                <h3 style="font-size:15px;">Custos, folha e lucro — <span x-text="currentMonthLabel"></span></h3>
+                <h3 class="section-title">Custos, folha e lucro — <span x-text="currentMonthLabel"></span></h3>
                 <p class="text-xs text-soft">Despesas cadastradas em Financeiro &gt; Despesas fixas, somadas ao salário de cada integrante (Equipe).</p>
               </div>
               <button class="btn btn-secondary btn-sm" type="button" @click="generateMonthReport()">📄 Gerar relatório do mês</button>
@@ -313,11 +313,11 @@
             <div class="grid grid-2 mb-4">
               <div class="card" style="background:var(--color-surface-alt);">
                 <p class="text-xs text-muted mb-1">Retorno por procedimentos (mês)</p>
-                <p class="text-sm" style="font-weight:700;font-size:16px;" x-text="formatCurrency(revenueByItemTypeThisMonth.servicos)"></p>
+                <p class="text-sm" style="font-weight:700;font-size:var(--font-size-7);" x-text="formatCurrency(revenueByItemTypeThisMonth.servicos)"></p>
               </div>
               <div class="card" style="background:var(--color-surface-alt);">
                 <p class="text-xs text-muted mb-1">Retorno por produtos (mês)</p>
-                <p class="text-sm" style="font-weight:700;font-size:16px;" x-text="formatCurrency(revenueByItemTypeThisMonth.produtos)"></p>
+                <p class="text-sm" style="font-weight:700;font-size:var(--font-size-7);" x-text="formatCurrency(revenueByItemTypeThisMonth.produtos)"></p>
               </div>
             </div>
 
@@ -336,7 +336,7 @@
             <div class="stat-card"><div class="stat-label">Novos pacientes (30 dias)</div><div class="stat-value" x-text="newPatients30d"></div></div>
           </div>
           <div class="card card-shadow mb-5">
-            <h3 class="mb-4" style="font-size:15px;">Origem dos pacientes</h3>
+            <h3 class="mb-4 section-title">Origem dos pacientes</h3>
             <div x-show="leadSourceBreakdown.length === 0" class="text-sm text-muted">Nenhum dado de origem registrado ainda.</div>
             <template x-for="row in leadSourceBreakdown" :key="'mkt-' + row.key">
               <div class="mb-3">
@@ -350,7 +350,7 @@
           </div>
           <div class="card card-shadow">
             <div class="flex items-center justify-between mb-2">
-              <h3 style="font-size:15px;">Integração com Meta Ads</h3>
+              <h3 class="section-title">Integração com Meta Ads</h3>
               <span class="badge badge-neutral">Funcionalidade futura</span>
             </div>
             <p class="text-sm text-muted">Em breve será possível conectar a conta de anúncios do Meta (Facebook e Instagram Ads) para acompanhar aqui investimento, alcance, cliques e custo por lead das campanhas, cruzando automaticamente esses dados com a origem dos pacientes cadastrados nesta clínica.</p>
@@ -366,7 +366,7 @@
             <div class="stat-card"><div class="stat-label">Bloqueios ativos (30 dias)</div><div class="stat-value" x-text="blocksCount"></div></div>
           </div>
           <div class="card card-shadow" style="padding:0;">
-            <div style="padding:20px 20px 0;"><h3 style="font-size:15px;">Atendimentos por profissional (30 dias)</h3></div>
+            <div style="padding:20px 20px 0;"><h3 class="section-title">Atendimentos por profissional (30 dias)</h3></div>
             <div x-show="appointmentsByProfessional.length === 0" class="empty-note" style="margin:20px;">Nenhum agendamento no período.</div>
             <div class="table-wrap" x-show="appointmentsByProfessional.length > 0">
               <table class="table">
@@ -390,7 +390,7 @@
           <p class="text-sm text-muted mb-4">Duas trilhas de meta totalmente independentes: <strong>individual</strong> (uma meta por profissional) e <strong>coletiva</strong> (uma meta só para a unidade). Elas nunca se somam nem se misturam, cada uma tem seu próprio valor-alvo e sua própria régua de comissão.</p>
 
           <div class="card card-shadow mb-5">
-            <h3 class="mb-2" style="font-size:15px;">Trilhas de meta</h3>
+            <h3 class="mb-2 section-title">Trilhas de meta</h3>
             <p class="text-xs text-soft mb-3">Ligue uma, a outra, ou as duas ao mesmo tempo. Desligar uma trilha só esconde os cards dela, aqui e na visão da equipe: nenhum valor é apagado, e tudo volta a aparecer se você ligar de novo.</p>
             <div class="flex" style="flex-direction:column;gap:10px;">
               <label class="text-sm flex items-center gap-2">
@@ -413,7 +413,7 @@
             </div>
 
             <div class="card card-shadow mb-4">
-              <h3 class="mb-1" style="font-size:15px;">Progresso da equipe em <span x-text="currentMonthLabel"></span></h3>
+              <h3 class="mb-1 section-title">Progresso da equipe em <span x-text="currentMonthLabel"></span></h3>
               <p class="text-xs text-soft mb-3">Soma da meta de cada integrante contra o que a equipe já faturou no mês (pagamentos e vendas de pacote lançados no nome de cada pessoa, ao aprovar uma venda em Vendas ou concluir um atendimento).</p>
               <div class="goal-meter-stats">
                 <div class="goal-meter-stat">
@@ -440,7 +440,7 @@
             </div>
 
             <div class="card card-shadow mb-4">
-              <h3 class="mb-2" style="font-size:15px;">Definir a meta de cada integrante</h3>
+              <h3 class="mb-2 section-title">Definir a meta de cada integrante</h3>
               <p class="text-xs text-soft mb-3">Informe o faturamento total esperado da equipe (ex.: R$ 120.000) para dividir igualmente entre todos, ou preencha direto o valor de cada pessoa na tabela mais abaixo. Depois de dividir, ajuste manualmente quem precisar de uma meta diferente (por exemplo, alguém com desempenho historicamente maior) e clique em salvar.</p>
               <div class="flex items-end gap-2" style="flex-wrap:wrap;">
                 <div class="form-group" style="margin:0;">
@@ -454,7 +454,7 @@
             </div>
 
             <div class="card card-shadow mb-4">
-              <h3 class="mb-1" style="font-size:15px;">Régua de comissão</h3>
+              <h3 class="mb-1 section-title">Régua de comissão</h3>
               <p class="text-xs text-soft mb-2">Cada pessoa é avaliada pela própria meta, não pela da equipe. Exemplo: se a meta de Maria é R$ 15.000,00 e a primeira faixa começa em 100%, assim que ela faturar R$ 15.000,00 no mês, toda a comissão dela passa a valer o percentual dessa faixa sobre tudo o que ela vendeu. Se ela avançar para a faixa seguinte, o percentual sobe para o novo valor. Antes de bater a primeira faixa, ainda não há comissão.</p>
               <p class="text-xs text-muted mb-3">O número ao lado de cada faixa mostra quantos integrantes da equipe estão nela agora.</p>
 
@@ -484,7 +484,7 @@
             </div>
 
             <div class="card card-shadow" style="padding:0;">
-              <div style="padding:20px 20px 0;"><h3 style="font-size:15px;">Metas e realizado por integrante</h3></div>
+              <div style="padding:20px 20px 0;"><h3 class="section-title">Metas e realizado por integrante</h3></div>
               <div class="table-wrap">
                 <table class="table">
                   <thead><tr><th>Integrante</th><th>Meta do mês</th><th>Realizado</th><th>% atingido</th><th>Comissão sugerida</th><th>Clientes atendidos</th><th>Indicações (mês)</th><th></th></tr></thead>
@@ -528,7 +528,7 @@
             </div>
 
             <div class="card card-shadow mb-4">
-              <h3 class="mb-1" style="font-size:15px;">Progresso da unidade em <span x-text="currentMonthLabel"></span></h3>
+              <h3 class="mb-1 section-title">Progresso da unidade em <span x-text="currentMonthLabel"></span></h3>
               <p class="text-xs text-soft mb-3">Um único alvo para a clínica inteira, contra o faturamento de toda a equipe somado. Não importa quem atendeu ou vendeu.</p>
               <div class="goal-meter-stats">
                 <div class="goal-meter-stat">
@@ -557,7 +557,7 @@
             </div>
 
             <div class="card card-shadow mb-4">
-              <h3 class="mb-2" style="font-size:15px;">Definir a meta coletiva</h3>
+              <h3 class="mb-2 section-title">Definir a meta coletiva</h3>
               <p class="text-xs text-soft mb-3">Diferente da individual, aqui é um valor só para a clínica inteira no mês. Não é dividido entre ninguém.</p>
               <div class="flex items-end gap-2" style="flex-wrap:wrap;">
                 <div class="form-group" style="margin:0;">
@@ -569,7 +569,7 @@
             </div>
 
             <div class="card card-shadow">
-              <h3 class="mb-1" style="font-size:15px;">Régua de comissão coletiva</h3>
+              <h3 class="mb-1 section-title">Régua de comissão coletiva</h3>
               <p class="text-xs text-soft mb-3">Aqui o número é um só: o faturamento de toda a equipe somado. Assim que esse total bate uma faixa da meta coletiva, o percentual dela passa a valer sobre o faturamento inteiro do mês, e não sobre a venda de uma pessoa. Essa régua nunca se soma com a individual, elas funcionam em paralelo. A faixa destacada abaixo é a que está valendo agora.</p>
 
               <div x-show="collectiveCommissionTiers.length === 0" class="text-sm text-muted mb-3">Nenhuma faixa cadastrada ainda para a meta coletiva.</div>
@@ -601,7 +601,7 @@
 
           <div class="grid grid-2 gap-3 mb-5">
             <div class="card card-shadow" x-show="leaderboard.length > 0">
-              <h3 class="mb-2" style="font-size:15px;">🏆 Ranking do mês</h3>
+              <h3 class="mb-2 section-title">🏆 Ranking do mês</h3>
               <p class="text-xs text-soft mb-3">Quem mais faturou em <span x-text="currentMonthLabel"></span>. Referência de competitividade, não substitui a avaliação de qualidade do atendimento.</p>
 
               <div class="podium">
@@ -621,7 +621,7 @@
                 <template x-for="row in leaderboard.slice(3)" :key="row.userId">
                   <div class="leaderboard-row">
                     <span class="leaderboard-rank" x-text="row.rank + 'º'"></span>
-                    <div class="avatar" style="width:30px;height:30px;font-size:11px;" x-text="getInitials(row.name)"></div>
+                    <div class="avatar" style="width:30px;height:30px;font-size:var(--font-size-2);" x-text="getInitials(row.name)"></div>
                     <div style="flex:1;">
                       <strong class="text-sm" x-text="row.name"></strong>
                       <div class="text-xs text-muted" x-text="row.salesCount + ' venda(s) · ' + row.clientsAttended + ' cliente(s) atendido(s)'"></div>
@@ -633,7 +633,7 @@
             </div>
 
             <div class="card card-shadow">
-              <h3 class="mb-2" style="font-size:15px;">Procedimentos mais executados</h3>
+              <h3 class="mb-2 section-title">Procedimentos mais executados</h3>
               <p class="text-xs text-soft mb-3">Volume de atendimentos concluídos em <span x-text="currentMonthLabel"></span>, do mais para o menos executado.</p>
               <div x-show="topProcedures.length === 0" class="text-sm text-muted">Nenhum atendimento concluído ainda.</div>
               <template x-for="(proc, idx) in topProcedures" :key="proc.name">

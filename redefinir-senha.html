@@ -22,7 +22,7 @@
     </div>
 
     <div x-show="step === 'invalid'" x-cloak class="text-center">
-      <h2 style="font-size:16px;margin-bottom:8px;">Link inválido ou expirado</h2>
+      <h2 style="font-size:var(--font-size-7);margin-bottom:8px;">Link inválido ou expirado</h2>
       <p class="text-sm text-muted mb-4">Esse link de redefinição não é mais válido. Volte para o login e solicite um novo link em "Esqueci minha senha".</p>
       <a href="index.html" class="btn btn-primary btn-block">Voltar para o login</a>
     </div>
@@ -55,7 +55,7 @@
     </div>
 
     <div x-show="step === 'done'" x-cloak class="text-center">
-      <h2 style="font-size:16px;margin-bottom:8px;">Senha redefinida</h2>
+      <h2 style="font-size:var(--font-size-7);margin-bottom:8px;">Senha redefinida</h2>
       <p class="text-sm text-muted mb-4">Sua senha foi alterada com sucesso. Agora é só entrar com a nova senha.</p>
       <a href="index.html" class="btn btn-primary btn-block">Ir para o login</a>
     </div>

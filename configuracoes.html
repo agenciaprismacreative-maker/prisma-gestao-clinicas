@@ -44,7 +44,7 @@
       <!-- GERAL -->
       <div x-show="!loading && tab==='geral'" class="flex" style="flex-direction:column;gap:20px;max-width:640px;">
         <div class="card card-shadow">
-          <h3 class="mb-3" style="font-size:15px;">Identidade da clínica</h3>
+          <h3 class="mb-3 section-title">Identidade da clínica</h3>
           <div class="form-group">
             <label class="label">Nome da clínica</label>
             <input class="input" x-model="clinicName">
@@ -62,7 +62,7 @@
         </div>
 
         <div class="card card-shadow">
-          <h3 class="mb-3" style="font-size:15px;">Dados fiscais</h3>
+          <h3 class="mb-3 section-title">Dados fiscais</h3>
           <p class="text-xs text-muted mb-3">Usados no comprovante de venda em PDF gerado para o paciente.</p>
           <div class="form-group">
             <label class="label">Razão social</label>
@@ -93,7 +93,7 @@
         </div>
 
         <div class="card card-shadow">
-          <h3 class="mb-3" style="font-size:15px;">Aparência</h3>
+          <h3 class="mb-3 section-title">Aparência</h3>
           <div class="form-group">
             <label class="label">Tema</label>
             <div class="flex gap-4 mt-1">
@@ -126,9 +126,9 @@
             <div class="flex items-center gap-2 mb-3" style="flex-wrap:wrap;">
               <button type="button" class="btn btn-primary btn-sm">Botão primário</button>
               <button type="button" class="btn btn-secondary btn-sm">Botão secundário</button>
-              <span class="badge" style="background:var(--color-accent);color:var(--color-accent-contrast);padding:5px 10px;border-radius:var(--radius-full);font-size:12px;font-weight:600;">Destaque</span>
+              <span class="badge" style="background:var(--color-accent);color:var(--color-accent-contrast);padding:5px 10px;border-radius:var(--radius-full);font-size:var(--font-size-3);font-weight:600;">Destaque</span>
             </div>
-            <div style="background:var(--color-primary-dark);color:#fff;padding:12px 14px;border-radius:var(--radius-md);font-size:13px;">
+            <div style="background:var(--color-primary-dark);color:#fff;padding:12px 14px;border-radius:var(--radius-md);font-size:var(--font-size-4);">
               Assim fica o menu lateral. O fundo escurece automaticamente o quanto for preciso para o texto continuar legível.
             </div>
           </div>
@@ -138,7 +138,7 @@
       <!-- AGENDAMENTO -->
       <div x-show="!loading && tab==='agendamento'" class="flex" style="flex-direction:column;gap:20px;max-width:640px;">
         <div class="card card-shadow">
-          <h3 class="mb-3" style="font-size:15px;">Regras da agenda</h3>
+          <h3 class="mb-3 section-title">Regras da agenda</h3>
           <div class="form-group flex items-center gap-2">
             <input type="checkbox" x-model="settings.prevent_double_booking" id="dbl" style="width:auto;">
             <label for="dbl" class="text-sm" style="margin:0;">Impedir agendar dois pacientes no mesmo horário para o mesmo profissional</label>
@@ -157,7 +157,7 @@
       <!-- SEGURANÇA -->
       <div x-show="!loading && tab==='seguranca'" class="flex" style="flex-direction:column;gap:20px;max-width:640px;">
         <div class="card card-shadow">
-          <h3 class="mb-3" style="font-size:15px;">Senha do gerente</h3>
+          <h3 class="mb-3 section-title">Senha do gerente</h3>
           <p class="text-xs text-muted mb-3">
             Usada para autorizar ações sensíveis na hora da venda. Como o sistema não tem um servidor próprio, trate essa senha como uma trava operacional para a equipe (evitar desconto/cortesia sem autorização), não como segurança de dados: ela não substitui o login de cada pessoa.
           </p>
@@ -187,7 +187,7 @@
       <!-- DESEMPENHO -->
       <div x-show="!loading && tab==='desempenho'" class="flex" style="flex-direction:column;gap:20px;max-width:640px;">
         <div class="card card-shadow">
-          <h3 class="mb-3" style="font-size:15px;">Permissões de visualização</h3>
+          <h3 class="mb-3 section-title">Permissões de visualização</h3>
           <div class="form-group flex items-center gap-2">
             <input type="checkbox" x-model="settings.show_performance_to_staff" id="showperf" style="width:auto;">
             <label for="showperf" class="text-sm" style="margin:0;">Atendente e Esteticista podem ver a aba Desempenho (a própria meta, comissão e o ranking da equipe)</label>

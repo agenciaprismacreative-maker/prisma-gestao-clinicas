@@ -45,7 +45,7 @@
         </button>
       </form>
 
-      <div class="flex items-center gap-3 my-3" style="color:var(--color-text-soft);font-size:12px;">
+      <div class="flex items-center gap-3 mt-3 mb-3" style="color:var(--color-text-soft);font-size:var(--font-size-3);">
         <div style="flex:1;height:1px;background:var(--color-border);"></div>
         ou
         <div style="flex:1;height:1px;background:var(--color-border);"></div>
@@ -64,7 +64,7 @@
     </div>
 
     <div x-show="step === 'forgot'" x-cloak>
-      <h2 style="font-size:16px;margin-bottom:4px;">Redefinir senha</h2>
+      <h2 style="font-size:var(--font-size-7);margin-bottom:4px;">Redefinir senha</h2>
       <p class="text-sm text-muted mb-4">Informe seu e-mail de acesso. Se ele existir no sistema, você recebe um link para criar uma nova senha.</p>
       <form @submit.prevent="sendResetLink()">
         <div class="form-group">
@@ -83,7 +83,7 @@
     </div>
 
     <div x-show="step === 'forgot-sent'" x-cloak class="text-center">
-      <h2 style="font-size:16px;margin-bottom:8px;">Verifique seu e-mail</h2>
+      <h2 style="font-size:var(--font-size-7);margin-bottom:8px;">Verifique seu e-mail</h2>
       <p class="text-sm text-muted mb-4">Se <strong x-text="forgotEmail"></strong> tiver uma conta no sistema, um link para redefinir a senha chega em instantes. Confira também a caixa de spam.</p>
       <button class="btn btn-secondary btn-block" type="button" @click="backToLogin()">Voltar para o login</button>
     </div>
@@ -92,7 +92,7 @@
   <!-- Acesso restrito à equipe Prisma (gestão do SaaS) -- de propósito
        discreto e fora do cartão de login, pra não competir visualmente com
        o login da clínica nem sugerir que faz parte do mesmo fluxo. -->
-  <a href="acesso-administrativo.html" class="text-center mt-3" style="display:block;font-size:11px;color:rgba(255,255,255,0.55);text-decoration:none;">Acesso administrativo</a>
+  <a href="acesso-administrativo.html" class="text-center mt-3" style="display:block;font-size:var(--font-size-2);color:rgba(255,255,255,0.55);text-decoration:none;">Acesso administrativo</a>
 </div>
 
 <script>
