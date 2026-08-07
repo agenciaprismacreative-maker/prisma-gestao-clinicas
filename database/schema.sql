@@ -987,6 +987,21 @@ create table public.platform_branding (
   login_subtitle text not null default 'Acesse o painel da sua clínica',
   support_message text not null default 'Esqueceu a senha? Fale com a administração da clínica.',
   footer_text text not null default 'Sistema interno · Prisma Creative',
+  -- Tipo de fundo da tela de login: imagem (background_url), cor sólida
+  -- (background_color) ou gradiente customizado (gradient_from/gradient_to).
+  -- Guardado explicitamente porque não dá pra inferir só de background_url
+  -- estar preenchido -- a pessoa pode ter enviado uma imagem antes e trocado
+  -- pra cor sólida depois, sem apagar a URL antiga.
+  background_type text not null default 'gradiente'
+    constraint platform_branding_background_type_check
+    check (background_type in ('imagem', 'solida', 'gradiente')),
+  background_color text,
+  gradient_from text,
+  gradient_to text,
+  -- Cartão de login claro (padrão) ou escuro, independente do fundo.
+  card_style text not null default 'claro'
+    constraint platform_branding_card_style_check
+    check (card_style in ('claro', 'escuro')),
   updated_at timestamptz not null default now(),
   updated_by uuid references public.users (id) on delete set null
 );

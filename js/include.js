@@ -203,6 +203,27 @@ function applyBrandColors(primary, accent) {
     root.setProperty('--color-accent-contrast', contrastTextColor(accent));
   }
 }
+// Monta o CSS de fundo da tela de login (.auth-screen) a partir da
+// personalização definida no painel Prisma (platform_branding). Usada em
+// index.html e redefinir-senha.html via :style="authScreenBackgroundStyle(branding)".
+// Se nada estiver configurado ainda (branding vazio, migration não
+// aplicada etc.), retorna string vazia e a página cai no gradiente fixo
+// já definido em .auth-screen no CSS -- nunca fica sem fundo nenhum.
+function authScreenBackgroundStyle(b) {
+  if (!b) return '';
+  const type = b.background_type || (b.background_url ? 'imagem' : 'gradiente');
+  if (type === 'imagem' && b.background_url) {
+    return "background-image:url('" + b.background_url + "');background-size:cover;background-position:center;";
+  }
+  if (type === 'solida' && b.background_color) {
+    return 'background:' + b.background_color + ';';
+  }
+  if (type === 'gradiente' && b.gradient_from && b.gradient_to) {
+    return 'background:linear-gradient(160deg, ' + b.gradient_from + ', ' + b.gradient_to + ' 100%);';
+  }
+  return '';
+}
+window.authScreenBackgroundStyle = authScreenBackgroundStyle;
 window.shadeColor = shadeColor;
 window.hexToRgb = hexToRgb;
 window.relativeLuminance = relativeLuminance;

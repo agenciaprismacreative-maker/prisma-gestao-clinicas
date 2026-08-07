@@ -8,8 +8,8 @@
 </head>
 <body data-page="login">
 
-<div class="auth-screen" x-data="loginForm()" x-init="init()" :style="branding.background_url ? ('background-image:url(\'' + branding.background_url + '\');background-size:cover;background-position:center;') : ''">
-  <div class="auth-card">
+<div class="auth-screen" x-data="loginForm()" x-init="init()" :style="authScreenBackgroundStyle(branding)">
+  <div class="auth-card" :class="branding.card_style === 'escuro' ? 'card-dark' : ''">
     <div class="auth-logo">
       <img x-show="branding.logo_url" x-cloak :src="branding.logo_url" alt="" style="width:48px;height:48px;border-radius:var(--radius-md);object-fit:cover;">
       <div class="logo-mark" x-show="!branding.logo_url" style="background:var(--color-accent);color:var(--color-primary-dark);">P</div>

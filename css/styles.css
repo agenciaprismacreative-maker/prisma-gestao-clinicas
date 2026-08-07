@@ -503,6 +503,31 @@ textarea.input { resize: vertical; min-height: 80px; }
 .auth-logo p { font-size: 13px; color: var(--color-text-muted); text-align: center; }
 .auth-footer { text-align: center; margin-top: var(--space-5); font-size: 12.5px; color: var(--color-text-soft); }
 
+/* Cartão de login no modo escuro (platform_branding.card_style) -- reaproveita
+   os mesmos tons de html[data-theme="escuro"], só que restritos ao cartão,
+   já que o resto da página (fundo) é controlado à parte pela personalização
+   de fundo. Como .input/.label/.auth-footer já usam var(--color-*), a troca
+   das variáveis aqui dentro é suficiente para adaptar tudo por dentro. */
+.auth-card.card-dark {
+  --color-surface: #1F2224;
+  --color-text: #ECEAE5;
+  --color-text-muted: #A9A69F;
+  --color-text-soft: #75726B;
+  --color-border: #383B3D;
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+/* ---------- seletor segmentado (usado na Personalização do painel Prisma) ---------- */
+.segmented { display: inline-flex; gap: 4px; padding: 3px; background: var(--color-surface-alt); border: 1px solid var(--color-border); border-radius: var(--radius-md); }
+.segmented-btn {
+  border: none; background: transparent; color: var(--color-text-muted);
+  font-size: 12.5px; font-weight: 500; padding: 7px 13px; border-radius: calc(var(--radius-md) - 3px);
+  cursor: pointer; transition: background .15s, color .15s;
+}
+.segmented-btn.is-active { background: var(--color-primary); color: var(--color-primary-contrast); }
+.segmented-btn:not(.is-active):hover { color: var(--color-text); }
+
 /* ---------- agenda ---------- */
 .agenda-toolbar { padding: var(--space-4) var(--space-5); border-bottom: 1px solid var(--color-border); }
 .agenda-legend { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
