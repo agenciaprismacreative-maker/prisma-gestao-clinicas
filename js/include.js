@@ -227,6 +227,20 @@ async function applyClinicSettings(clinicId, role) {
       applyBrandColors(settings.primary_color, settings.accent_color);
     }
 
+    // Atualiza o cache lido por js/theme-cache.js (script síncrono no
+    // <head>) -- assim, da próxima vez que a pessoa navegar ou recarregar
+    // a página, o tema e as cores certas já aparecem antes mesmo dessa
+    // consulta ao Supabase terminar, sem o "rastro" de cor padrão.
+    try {
+      localStorage.setItem('prisma_theme_cache', JSON.stringify({
+        theme: settings && settings.theme === 'escuro' ? 'escuro' : 'claro',
+        primary_color: settings ? settings.primary_color || null : null,
+        accent_color: settings ? settings.accent_color || null : null
+      }));
+    } catch (err) {
+      // localStorage indisponível -- sem cache dessa vez, sem quebrar nada.
+    }
+
     if (settings && settings.logo_url) {
       const logoImg = document.querySelector('[data-slot="clinic-logo"]');
       const logoMark = document.querySelector('[data-slot="logo-mark"]');
