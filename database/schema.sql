@@ -1003,6 +1003,13 @@ create policy "platform_branding_write" on public.platform_branding for all
   using (public.auth_is_prisma_team())
   with check (public.auth_is_prisma_team());
 
+-- RLS por si só não basta -- sem o grant de privilégio na tabela em si,
+-- toda consulta esbarra em 401 antes mesmo da policy ser avaliada (foi
+-- exatamente o que faltou quando esta tabela foi criada, quebrando a
+-- personalização na tela de login para quem ainda não tinha sessão).
+grant select on public.platform_branding to anon, authenticated;
+grant insert, update, delete on public.platform_branding to authenticated;
+
 -- ============================================================================
 -- STORAGE: bucket para fotos de evolução dos pacientes
 -- ============================================================================
