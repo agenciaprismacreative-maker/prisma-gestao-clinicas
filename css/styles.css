@@ -310,6 +310,45 @@ svg.icon { width: 20px; height: 20px; flex-shrink: 0; }
 .stat-trend.down { color: var(--color-danger); }
 .stat-card .stat-icon { width: 34px; height: 34px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; }
 
+/* ---------- painel Prisma (admin-clinicas.html): cards com brilho ----------
+   Versão mais dramática do .stat-card, só para o console interno da equipe
+   Prisma (que roda sempre em tema escuro, fixo). Cada "tom" define as 4
+   variáveis de cor que o resto da regra usa -- não mexe em .stat-card nem
+   em nenhuma outra página. */
+.admin-stat-card {
+  position: relative; overflow: hidden;
+  background: var(--color-surface); border: 1px solid var(--glow-color, var(--color-border));
+  border-radius: var(--radius-lg); padding: var(--space-5);
+  box-shadow: 0 10px 28px -8px var(--glow-shadow, transparent);
+}
+.admin-stat-card::before {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(130% 130% at 0% 0%, var(--glow-tint, transparent), transparent 65%);
+}
+.admin-stat-card > * { position: relative; z-index: 1; }
+.admin-stat-icon {
+  width: 38px; height: 38px; border-radius: var(--radius-md);
+  display: flex; align-items: center; justify-content: center;
+  background: var(--glow-color, var(--color-surface-alt)); color: #fff; margin-bottom: var(--space-3);
+}
+.admin-stat-icon svg { width: 19px; height: 19px; }
+.admin-stat-badge {
+  position: absolute; top: var(--space-5); right: var(--space-5);
+  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+  padding: 3px 9px; border-radius: var(--radius-full);
+  background: var(--glow-tint-strong, var(--color-surface-alt)); color: var(--glow-color, var(--color-text-muted));
+}
+.admin-stat-label { font-size: 12.5px; color: var(--color-text-muted); font-weight: 500; }
+.admin-stat-value { font-size: 27px; font-weight: 700; margin-top: 4px; letter-spacing: -.02em; }
+.admin-stat-sub { font-size: 12px; color: var(--color-text-muted); margin-top: 4px; }
+
+.admin-stat-card.tone-success { --glow-color: var(--color-success); --glow-shadow: rgba(79,162,121,.28); --glow-tint: rgba(79,162,121,.16); --glow-tint-strong: rgba(79,162,121,.2); }
+.admin-stat-card.tone-danger  { --glow-color: var(--color-danger);  --glow-shadow: rgba(212,100,100,.28); --glow-tint: rgba(212,100,100,.16); --glow-tint-strong: rgba(212,100,100,.2); }
+.admin-stat-card.tone-accent  { --glow-color: var(--color-accent);  --glow-shadow: rgba(212,175,82,.3);   --glow-tint: rgba(212,175,82,.17);  --glow-tint-strong: rgba(212,175,82,.22); }
+.admin-stat-card.tone-info    { --glow-color: var(--color-info);    --glow-shadow: rgba(92,147,201,.28);  --glow-tint: rgba(92,147,201,.16);  --glow-tint-strong: rgba(92,147,201,.2); }
+
+.admin-chart-card canvas { max-height: 220px; }
+
 /* ---------- dashboard: menu rápido ---------- */
 .quick-links { display: flex; flex-wrap: wrap; gap: 6px; }
 .quick-link {
