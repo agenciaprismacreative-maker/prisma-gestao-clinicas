@@ -43,6 +43,7 @@ Cada página trava o acesso por `data-allowed-roles` no `<body>`, o menu lateral
 ```
 index.html            tela de login das clínicas (autenticação real via Supabase Auth); nunca autentica o papel equipe_prisma, mesmo com credenciais corretas
 acesso-administrativo.html  porta separada e discreta (link no rodapé do login), exclusiva do papel equipe_prisma -- único caminho que leva ao admin-clinicas.html
+admin-clinicas.html    console interno da Prisma (papel equipe_prisma): cadastro e ciclo de vida das clínicas clientes, acessos por clínica, personalização da tela de login e a aba Planos e pagamentos (assinatura por clínica, cobrança manual com os campos já prontos para integração futura com o Asaas)
 redefinir-senha.html    destino do e-mail de "esqueci minha senha", compartilhado pelas duas telas de login acima
 dashboard.html         painel com indicadores reais da clínica, menu rápido, anotações e aniversariantes (administrador)
 pacientes.html          ficha completa de pacientes: documentos, contato, endereço, origem do lead (inclusive indicação por integrante da equipe), anamnese, pacotes contratados e retorno financeiro (administrador, atendente)

@@ -53,6 +53,14 @@
           <span class="nav-badge" x-show="signupRequests.length > 0" x-text="signupRequests.length"></span>
         </a>
 
+        <a href="#" class="nav-item" :class="activeSection === 'planos' ? 'active' : ''" @click.prevent="activeSection = 'planos'; sidebarOpen = false;">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2.5" y="5.5" width="19" height="14" rx="2"/><path d="M2.5 10h19"/><path d="M6 15h4"/>
+          </svg>
+          <span>Planos e pagamentos</span>
+          <span class="nav-badge" x-show="overduePayments.length > 0" x-text="overduePayments.length"></span>
+        </a>
+
         <div class="sidebar-group-label">Configuração</div>
 
         <a href="#" class="nav-item" :class="activeSection === 'personalizacao' ? 'active' : ''" @click.prevent="activeSection = 'personalizacao'; sidebarOpen = false;">
@@ -431,6 +439,96 @@
       </template>
     </div>
 
+    <!-- ===================== PLANOS E PAGAMENTOS ===================== -->
+    <div x-show="!loading && activeSection === 'planos'" x-cloak>
+
+      <div class="page-header">
+        <div>
+          <h2>Planos e pagamentos</h2>
+          <p>Assinatura de cada clínica na plataforma -- cobrança ainda manual, com os campos já prontos para a futura integração com o Asaas.</p>
+        </div>
+        <button class="btn btn-primary" type="button" @click="openPaymentModal()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+          Registrar pagamento
+        </button>
+      </div>
+
+      <div class="grid grid-4 gap-3 mb-5">
+        <div class="admin-stat-card tone-accent">
+          <span class="admin-stat-badge">MRR</span>
+          <div class="admin-stat-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg>
+          </div>
+          <div class="admin-stat-label">Receita recorrente mensal</div>
+          <div class="admin-stat-value" x-text="formatCurrency(stats.mrr)"></div>
+          <div class="admin-stat-sub">Soma dos planos ativos</div>
+        </div>
+        <div class="admin-stat-card tone-success">
+          <span class="admin-stat-badge">Mês</span>
+          <div class="admin-stat-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+          </div>
+          <div class="admin-stat-label">Recebido este mês</div>
+          <div class="admin-stat-value" x-text="formatCurrency(paymentsOverview.recebidoMes)"></div>
+          <div class="admin-stat-sub">Pagamentos confirmados</div>
+        </div>
+        <div class="admin-stat-card tone-info">
+          <span class="admin-stat-badge">7 dias</span>
+          <div class="admin-stat-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18"/><path d="M8 3v4"/><path d="M16 3v4"/></svg>
+          </div>
+          <div class="admin-stat-label">A vencer em 7 dias</div>
+          <div class="admin-stat-value" x-text="paymentsOverview.aVencerCount"></div>
+          <div class="admin-stat-sub">Pendentes, ainda no prazo</div>
+        </div>
+        <div class="admin-stat-card tone-danger">
+          <span class="admin-stat-badge">Atenção</span>
+          <div class="admin-stat-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 3.9L2.5 18a1.8 1.8 0 0 0 1.6 2.7h15.8a1.8 1.8 0 0 0 1.6-2.7L13.7 3.9a1.8 1.8 0 0 0-3.4 0z"/></svg>
+          </div>
+          <div class="admin-stat-label">Atrasados</div>
+          <div class="admin-stat-value" x-text="paymentsOverview.atrasadosCount"></div>
+          <div class="admin-stat-sub" x-text="formatCurrency(paymentsOverview.atrasadosTotal)"></div>
+        </div>
+      </div>
+
+      <div class="card card-shadow" style="padding:0;">
+        <div style="padding:16px 18px 0;">
+          <div class="segmented mb-4">
+            <button type="button" class="segmented-btn" :class="paymentsStatusFilter==='todos' ? 'is-active' : ''" @click="paymentsStatusFilter='todos'">Todos</button>
+            <button type="button" class="segmented-btn" :class="paymentsStatusFilter==='pendente' ? 'is-active' : ''" @click="paymentsStatusFilter='pendente'">Pendentes</button>
+            <button type="button" class="segmented-btn" :class="paymentsStatusFilter==='atrasado' ? 'is-active' : ''" @click="paymentsStatusFilter='atrasado'">Atrasados</button>
+            <button type="button" class="segmented-btn" :class="paymentsStatusFilter==='pago' ? 'is-active' : ''" @click="paymentsStatusFilter='pago'">Pagos</button>
+          </div>
+        </div>
+        <div x-show="!loadingPayments && filteredPayments.length === 0" class="empty-note" style="margin:0 18px 18px;">Nenhum pagamento nessa categoria ainda.</div>
+        <div class="table-wrap" x-show="!loadingPayments && filteredPayments.length > 0">
+          <table class="table">
+            <thead><tr><th>Clínica</th><th>Vencimento</th><th>Valor</th><th>Status</th><th>Método</th><th>Asaas</th><th></th></tr></thead>
+            <tbody>
+              <template x-for="p in filteredPayments" :key="p.id">
+                <tr>
+                  <td><strong x-text="p.clinics ? p.clinics.name : '—'"></strong></td>
+                  <td x-text="p.due_date ? formatDate(p.due_date) : '—'"></td>
+                  <td x-text="formatCurrency(p.amount)"></td>
+                  <td><span class="badge" :class="paymentBadgeClass(p.status)" x-text="paymentStatusLabel(p.status)"></span></td>
+                  <td x-text="p.payment_method || '—'"></td>
+                  <td>
+                    <a x-show="p.asaas_invoice_url" :href="p.asaas_invoice_url" target="_blank" rel="noopener" class="text-xs" style="color:var(--color-info);">Ver cobrança ↗</a>
+                    <span x-show="!p.asaas_invoice_url" class="text-xs text-soft">Manual</span>
+                  </td>
+                  <td>
+                    <button class="btn btn-ghost btn-sm" type="button" @click="markPaid(p)" x-show="p.status !== 'pago'">Marcar como pago</button>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
     <!-- ===================== PERSONALIZAÇÃO DA TELA DE LOGIN ===================== -->
     <div x-show="!loading && activeSection === 'personalizacao'" x-cloak>
       <div class="page-header">
@@ -664,6 +762,15 @@
   <div x-show="showPaymentModal" x-cloak class="modal-overlay" @click.self="showPaymentModal=false">
     <div class="card card-shadow-sm modal-card" style="margin:auto;">
       <div class="card-header"><h3>Registrar pagamento</h3><button class="btn btn-ghost btn-sm" @click="showPaymentModal=false">Fechar</button></div>
+      <div class="form-group" x-show="!selectedClinic">
+        <label class="label">Clínica</label>
+        <select class="input" x-model="newPayment.clinic_id">
+          <option value="">Selecione…</option>
+          <template x-for="c in clinics" :key="c.id">
+            <option :value="c.id" x-text="c.name"></option>
+          </template>
+        </select>
+      </div>
       <div class="form-group">
         <label class="label">Valor</label>
         <input class="input" type="text" inputmode="decimal" x-model="newPayment.amount_input" @input="newPayment.amount_input = maskCurrencyInput($event.target.value)" placeholder="R$ 0,00">
@@ -820,8 +927,12 @@ function adminClinicasApp() {
     savingApprove: false,
     approveError: '',
 
+    allPayments: [],
+    loadingPayments: true,
+    paymentsStatusFilter: 'todos',
+
     showPaymentModal: false,
-    newPayment: { amount_input: '', due_date: '', status: 'pendente', payment_method: '', reference: '' },
+    newPayment: { clinic_id: '', amount_input: '', due_date: '', status: 'pendente', payment_method: '', reference: '' },
     savingPayment: false,
 
     showAddAccessModal: false,
@@ -853,7 +964,7 @@ function adminClinicasApp() {
         window.location.href = window.homeForRole ? window.homeForRole(profile ? profile.role : null) : 'index.html';
         return;
       }
-      await Promise.all([this.loadClinics(), this.loadSignupRequests(), this.loadRanking(), this.loadShoutouts(), this.loadBranding()]);
+      await Promise.all([this.loadClinics(), this.loadSignupRequests(), this.loadRanking(), this.loadShoutouts(), this.loadBranding(), this.loadAllPayments()]);
       this.loading = false;
       await this.$nextTick();
       this.renderGrowthChart();
@@ -873,6 +984,48 @@ function adminClinicasApp() {
         this.renderGrowthChart();
         this.renderStatusChart();
       }
+    },
+
+    // ---------------------------------------------------------------------
+    // Planos e pagamentos: visão de todas as clínicas junta (a seção por
+    // clínica em "Clínicas" já existia -- clinicPayments/openPaymentModal/
+    // addPayment/markPaid abaixo são reaproveitados nos dois lugares).
+    // ---------------------------------------------------------------------
+    async loadAllPayments() {
+      this.loadingPayments = true;
+      const { data, error } = await supabaseClient
+        .from('clinic_payments')
+        .select('*, clinics(name)')
+        .order('due_date', { ascending: true });
+      this.allPayments = error ? [] : (data || []);
+      this.loadingPayments = false;
+    },
+    get filteredPayments() {
+      if (this.paymentsStatusFilter === 'todos') return this.allPayments;
+      return this.allPayments.filter((p) => p.status === this.paymentsStatusFilter);
+    },
+    get overduePayments() {
+      return this.allPayments.filter((p) => p.status === 'atrasado');
+    },
+    get paymentsOverview() {
+      const now = new Date();
+      const in7Days = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+      const monthKey = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+      const recebidoMes = this.allPayments
+        .filter((p) => p.status === 'pago' && p.paid_at && p.paid_at.slice(0, 7) === monthKey)
+        .reduce((sum, p) => sum + Number(p.amount), 0);
+      const aVencer = this.allPayments.filter((p) => {
+        if (p.status !== 'pendente' || !p.due_date) return false;
+        const due = new Date(p.due_date + 'T00:00:00');
+        return due >= now && due <= in7Days;
+      });
+      const atrasados = this.allPayments.filter((p) => p.status === 'atrasado');
+      return {
+        recebidoMes,
+        aVencerCount: aVencer.length,
+        atrasadosCount: atrasados.length,
+        atrasadosTotal: atrasados.reduce((sum, p) => sum + Number(p.amount), 0)
+      };
     },
 
     // ---------------------------------------------------------------------
@@ -1198,17 +1351,22 @@ function adminClinicasApp() {
     // ---------------------------------------------------------------------
     // Pagamentos
     // ---------------------------------------------------------------------
+    // Aberto tanto do detalhe de uma clínica (selectedClinic já definido,
+    // campo de clínica fica oculto) quanto da visão global de Planos e
+    // pagamentos (mostra o seletor de clínica no modal).
     openPaymentModal() {
-      this.newPayment = { amount_input: '', due_date: '', status: 'pendente', payment_method: '', reference: '' };
+      this.newPayment = { clinic_id: this.selectedClinic ? this.selectedClinic.id : '', amount_input: '', due_date: '', status: 'pendente', payment_method: '', reference: '' };
       this.showPaymentModal = true;
     },
 
     async addPayment() {
       const amount = parseCurrencyToNumber(this.newPayment.amount_input);
       if (!amount || amount <= 0) { this.showFeedback('error', 'Informe um valor válido.'); return; }
+      const clinicId = this.selectedClinic ? this.selectedClinic.id : this.newPayment.clinic_id;
+      if (!clinicId) { this.showFeedback('error', 'Selecione a clínica.'); return; }
       this.savingPayment = true;
       const payload = {
-        clinic_id: this.selectedClinic.id, amount, due_date: this.newPayment.due_date || null,
+        clinic_id: clinicId, amount, due_date: this.newPayment.due_date || null,
         status: this.newPayment.status, payment_method: this.newPayment.payment_method || null,
         reference: this.newPayment.reference || null, created_by: this.currentUserId
       };
@@ -1218,13 +1376,15 @@ function adminClinicasApp() {
       if (error) { this.showFeedback('error', 'Erro ao registrar: ' + error.message); return; }
       this.showPaymentModal = false;
       this.showFeedback('success', 'Pagamento registrado.');
-      await this.selectClinic(this.selectedClinic);
+      if (this.selectedClinic) await this.selectClinic(this.selectedClinic);
+      await this.loadAllPayments();
     },
 
     async markPaid(payment) {
       const { error } = await supabaseClient.from('clinic_payments').update({ status: 'pago', paid_at: new Date().toISOString() }).eq('id', payment.id);
       if (error) { this.showFeedback('error', 'Erro: ' + error.message); return; }
-      await this.selectClinic(this.selectedClinic);
+      if (this.selectedClinic) await this.selectClinic(this.selectedClinic);
+      await this.loadAllPayments();
     },
 
     // ---------------------------------------------------------------------

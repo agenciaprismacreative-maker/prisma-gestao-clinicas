@@ -28,7 +28,10 @@ create table public.clinics (
   owner_name text,
   owner_email text,
   owner_phone text,
-  notes text
+  notes text,
+  -- integração futura com o Asaas (gateway de pagamento); nulo até a
+  -- integração ser ativada, nenhuma chamada à API é feita hoje.
+  asaas_customer_id text
 );
 
 -- ============================================================================
@@ -559,7 +562,11 @@ create table public.clinic_payments (
   payment_method text,
   reference text,
   created_by uuid references public.users (id) on delete set null,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  -- integração futura com o Asaas: id da cobrança e link da fatura/boleto
+  -- gerados por lá. Nulos para os pagamentos registrados manualmente.
+  asaas_payment_id text,
+  asaas_invoice_url text
 );
 
 -- pedidos de acesso vindos da página pública solicitar-acesso.html
