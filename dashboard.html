@@ -169,7 +169,7 @@
                 <p class="text-xs text-muted mt-1" x-text="lowStockAlertSummary"></p>
               </div>
             </div>
-            <a href="estoque.html" class="btn btn-sm" style="background:var(--color-danger);border-color:var(--color-danger);color:#fff;">Ver estoque</a>
+            <a href="estoque.html" class="btn btn-danger-solid btn-sm">Ver estoque</a>
           </div>
         </div>
       </div>
@@ -371,7 +371,7 @@
               </div>
               <a href="reativacao.html" class="btn btn-ghost btn-sm">Ver todos</a>
             </div>
-            <div x-show="reactivationCandidates.length === 0" class="text-sm text-muted">Nenhum paciente no intervalo de retorno ainda.</div>
+            <div x-show="reactivationCandidates.length === 0" class="empty-note">Nenhum paciente no intervalo de retorno ainda.</div>
             <div class="flex" style="flex-direction:column;gap:14px;">
               <template x-for="c in reactivationCandidates" :key="c.patient_id">
                 <div class="flex items-center justify-between">

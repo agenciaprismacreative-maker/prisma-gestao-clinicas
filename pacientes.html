@@ -54,7 +54,7 @@
           </label>
           <div class="flex items-center gap-3">
             <span class="text-sm text-muted"><span x-text="selectedIds.length"></span> selecionado(s)</span>
-            <button class="btn btn-sm" type="button" @click="bulkDeleteSelected()" :disabled="selectedIds.length === 0 || bulkDeleting" style="background:var(--color-danger);border-color:var(--color-danger);color:#fff;">
+            <button class="btn btn-danger-solid btn-sm" type="button" @click="bulkDeleteSelected()" :disabled="selectedIds.length === 0 || bulkDeleting">
               <span x-show="!bulkDeleting">Excluir selecionados</span>
               <span x-show="bulkDeleting" x-cloak>Excluindo…</span>
             </button>

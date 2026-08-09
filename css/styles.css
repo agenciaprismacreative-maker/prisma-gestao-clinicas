@@ -318,6 +318,12 @@ svg.icon { width: 20px; height: 20px; flex-shrink: 0; }
 .btn-ghost:hover { background: var(--color-surface-alt); color: var(--color-text); }
 .btn-danger { background: var(--color-danger-bg); color: var(--color-danger); }
 .btn-danger:hover { background: var(--color-danger); color: #fff; }
+/* Variante sólida, para ações destrutivas em lote (ex.: excluir vários
+   selecionados de uma vez) que pedem mais peso visual do que o padrão
+   suave de .btn-danger -- substitui o mesmo trio de estilo inline que
+   se repetia em 3 telas diferentes. */
+.btn-danger-solid { background: var(--color-danger); border-color: var(--color-danger); color: #fff; }
+.btn-danger-solid:hover { background: var(--color-danger-bg); border-color: var(--color-danger); color: var(--color-danger); }
 .btn-sm { padding: 7px 13px; font-size: var(--font-size-4); }
 .btn-block { width: 100%; }
 .btn[disabled] { opacity: .5; pointer-events: none; }
