@@ -9,6 +9,17 @@ const SUPABASE_ANON_KEY = 'sb_publishable_DPg9ge8MZ7QIC8jkPQCFYQ_OOPpR7NC';
 
 window.supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+// Guarda o último evento de auth (inclui provider_token/provider_refresh_token
+// logo depois de um redirect OAuth) num lugar acessível de qualquer página.
+// Necessário porque o processamento do retorno do OAuth começa assim que
+// esse client é criado -- se cada página só registrasse o próprio listener
+// dentro do x-init do Alpine (que roda depois), corria o risco de perder o
+// evento. Usado pela conexão com o Google Calendar em agenda.html.
+window.__prismaLastAuthEvent = null;
+window.supabaseClient.auth.onAuthStateChange((event, session) => {
+  window.__prismaLastAuthEvent = { event, session };
+});
+
 // Traduz os erros mais comuns do Supabase Auth para uma mensagem em PT-BR
 // que não soa técnica nem indica de propósito qual dos dois campos está
 // errado (mensagem genérica, evita ajudar tentativa de adivinhação de

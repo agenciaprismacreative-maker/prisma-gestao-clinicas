@@ -45,9 +45,10 @@ index.html            tela de login das clínicas (autenticação real via Supab
 acesso-administrativo.html  porta separada e discreta (link no rodapé do login), exclusiva do papel equipe_prisma -- único caminho que leva ao admin-clinicas.html
 admin-clinicas.html    console interno da Prisma (papel equipe_prisma): cadastro e ciclo de vida das clínicas clientes, acessos por clínica, visão global de usuários entre todas as clínicas, catálogo de planos, planos e pagamentos (assinatura por clínica, cobrança manual com os campos já prontos para integração futura com o Asaas), central de avisos (broadcast para as clínicas, exibido no sino de lembretes) e trilha de auditoria (log das ações administrativas sensíveis), além da personalização da tela de login
 redefinir-senha.html    destino do e-mail de "esqueci minha senha", compartilhado pelas duas telas de login acima
+solicitar-acesso.html   página pública de solicitação de acesso: cria conta com Google ou com e-mail/senha (client Supabase efêmero, sem abrir sessão logada antes da aprovação) e envia a solicitação para análise da equipe Prisma, que decide entre teste grátis ou assinatura direta ao aprovar
 dashboard.html         painel com indicadores reais da clínica, menu rápido, anotações e aniversariantes (administrador)
 pacientes.html          ficha completa de pacientes: documentos, contato, endereço, origem do lead (inclusive indicação por integrante da equipe), anamnese, pacotes contratados e retorno financeiro (administrador, atendente)
-agenda.html            agenda com visão dia / semana / mês, menu de clique direito, bloqueio de horário, vínculo a pacote e ficha rápida do agendamento
+agenda.html            agenda com visão dia / semana / mês, menu de clique direito, bloqueio de horário, vínculo a pacote, ficha rápida do agendamento e sincronização opcional de mão única com o Google Calendar de cada profissional
 atendimento.html        fila de atendimento (por profissional), prontuário, fotos de evolução, remanejamento de horário e de profissional (com motivo quando troca quem atende) e tarefa automática de retorno
 equipe.html            equipe da clínica, qualificação profissional e quadro de tarefas com detalhe por clique (administrador)
 vendas.html            venda de planos: carrinho com múltiplos serviços, desconto e cortesia por item, fluxo pendente → aprovada/cancelada com motivo (administrador, atendente, esteticista)
@@ -71,6 +72,7 @@ database/schema.sql      schema completo com RLS por clínica (fonte da verdade,
 database/grants.sql      permissões de acesso do role authenticated
 database/seed.sql        clínica e usuário de teste
 database/migrations/     alterações incrementais já aplicadas ao banco em produção, em ordem numérica
+supabase/functions/sync-calendar-event/  Edge Function que espelha um agendamento no Google Calendar do profissional responsável (mão única: Prisma -> Google), chamada pela Agenda ao criar/remarcar/cancelar
 docs/                     especificação original, adendo de melhorias e guias de infraestrutura
 ```
 
