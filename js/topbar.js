@@ -24,6 +24,7 @@ const TOPBAR_SUBTITLES = {
 function topbarApp() {
   return {
     clinicId: null,
+    clinicStatus: null,
     currentUserId: null,
     isAdmin: false,
     firstName: '',
@@ -47,9 +48,10 @@ function topbarApp() {
       const { data: { user } } = await supabaseClient.auth.getUser();
       if (!user) return;
       this.currentUserId = user.id;
-      const { data } = await supabaseClient.from('users').select('clinic_id, role, full_name').eq('id', user.id).single();
+      const { data } = await supabaseClient.from('users').select('clinic_id, role, full_name, clinics ( status )').eq('id', user.id).single();
       if (!data) return;
       this.clinicId = data.clinic_id;
+      this.clinicStatus = data.clinics ? data.clinics.status : null;
       this.isAdmin = data.role === 'administrador' || data.role === 'equipe_prisma';
       this.firstName = (data.full_name || '').trim().split(/\s+/)[0] || '';
       await this.loadReminders();
@@ -159,6 +161,16 @@ function topbarApp() {
               .select('id, content, created_at')
               .eq('target_user_id', this.currentUserId)
               .is('dismissed_at', null)
+          : Promise.resolve({ data: [] }),
+        // avisos publicados pela Prisma (central de avisos do painel
+        // admin-clinicas.html) -- ver também dismissals logo abaixo, que
+        // é o que evita o mesmo aviso reaparecer depois de fechado.
+        supabaseClient
+          .from('admin_notices')
+          .select('id, title, message, severity, target_status, starts_at, ends_at')
+          .eq('is_active', true),
+        this.currentUserId
+          ? supabaseClient.from('admin_notice_dismissals').select('notice_id').eq('user_id', this.currentUserId)
           : Promise.resolve({ data: [] })
       ];
 
@@ -181,8 +193,28 @@ function topbarApp() {
         );
       }
 
-      const [tasksRes, apptRes, notesRes, productsRes, salesRes] = await Promise.all(queries);
+      const [tasksRes, apptRes, notesRes, noticesRes, dismissalsRes, productsRes, salesRes] = await Promise.all(queries);
       const items = [];
+
+      // Avisos da Prisma: filtra por vigência (starts_at/ends_at), por
+      // público-alvo (target_status vazio = todas as clínicas) e remove os
+      // já dispensados por este usuário.
+      const dismissedNoticeIds = new Set((dismissalsRes.data || []).map((d) => d.notice_id));
+      (noticesRes.data || []).forEach((n) => {
+        if (dismissedNoticeIds.has(n.id)) return;
+        if (n.starts_at && new Date(n.starts_at) > now) return;
+        if (n.ends_at && new Date(n.ends_at) < now) return;
+        if (n.target_status && n.target_status.length > 0 && !n.target_status.includes(this.clinicStatus)) return;
+        items.push({
+          label: n.title,
+          sublabel: n.message,
+          severity: n.severity,
+          href: null,
+          completable: true,
+          type: 'notice',
+          id: n.id
+        });
+      });
 
       (notesRes.data || []).forEach((n) => {
         const preview = n.content.length > 60 ? n.content.slice(0, 60) + '…' : n.content;
@@ -286,6 +318,9 @@ function topbarApp() {
         if (error) return;
       } else if (r.type === 'note') {
         const { error } = await supabaseClient.from('dashboard_notes').update({ dismissed_at: new Date().toISOString() }).eq('id', r.id);
+        if (error) return;
+      } else if (r.type === 'notice') {
+        const { error } = await supabaseClient.from('admin_notice_dismissals').insert({ notice_id: r.id, user_id: this.currentUserId });
         if (error) return;
       } else {
         return;

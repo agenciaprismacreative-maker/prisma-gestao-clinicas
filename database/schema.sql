@@ -32,6 +32,8 @@ create table public.clinics (
   -- integração futura com o Asaas (gateway de pagamento); nulo até a
   -- integração ser ativada, nenhuma chamada à API é feita hoje.
   asaas_customer_id text
+  -- plan_id (referência a public.plans) é adicionado mais abaixo, via alter
+  -- table, depois que a tabela plans existe (ver seção PAINEL PRISMA).
 );
 
 -- ============================================================================
@@ -600,6 +602,67 @@ create table public.clinic_shoutouts (
   sent_at timestamptz not null default now()
 );
 
+-- catálogo de planos: nome, preço e recursos padronizados. clinics.plan_name/
+-- plan_value continuam sendo o valor efetivamente cobrado (permite preço
+-- personalizado por clínica); plan_id abaixo é só uma referência opcional a
+-- partir de qual plano do catálogo aquele valor foi originado.
+create table public.plans (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  price numeric(10, 2),
+  billing_cycle text not null default 'mensal' check (billing_cycle in ('mensal', 'anual')),
+  description text,
+  features text[] not null default '{}',
+  is_active boolean not null default true,
+  display_order int not null default 0,
+  created_at timestamptz not null default now(),
+  -- dias de teste grátis que este plano oferece. Nulo/zero = sem teste, só
+  -- assinatura direta -- usado na aprovação de solicitação de acesso e na
+  -- criação manual de clínica, para decidir status inicial e vencimento.
+  trial_days integer
+);
+
+alter table public.clinics
+  add column plan_id uuid references public.plans (id) on delete set null;
+
+-- central de avisos: campanhas publicadas pela Prisma e exibidas no sino de
+-- lembretes de cada clínica (js/topbar.js). target_status vazio = todas as
+-- clínicas. Renderizadas sempre como texto puro (x-text), nunca innerHTML.
+create table public.admin_notices (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  message text not null,
+  severity text not null default 'info' check (severity in ('info', 'warning', 'urgent')),
+  target_status text[] not null default '{}',
+  is_active boolean not null default true,
+  starts_at timestamptz,
+  ends_at timestamptz,
+  created_by uuid references public.users (id) on delete set null,
+  created_at timestamptz not null default now()
+);
+
+create table public.admin_notice_dismissals (
+  notice_id uuid not null references public.admin_notices (id) on delete cascade,
+  user_id uuid not null references public.users (id) on delete cascade,
+  dismissed_at timestamptz not null default now(),
+  primary key (notice_id, user_id)
+);
+
+-- trilha de auditoria: somente inserção e leitura, log é append-only por
+-- desenho (sem policy de update/delete). Cobre as ações administrativas
+-- sensíveis do painel Prisma -- ver seção de RLS mais abaixo.
+create table public.admin_audit_log (
+  id uuid primary key default gen_random_uuid(),
+  actor_id uuid references public.users (id) on delete set null,
+  actor_name text,
+  action text not null,
+  target_type text not null,
+  target_id uuid,
+  target_label text,
+  details jsonb,
+  created_at timestamptz not null default now()
+);
+
 -- ============================================================================
 -- ÍNDICES (consultas mais comuns: por clínica e por data)
 -- ============================================================================
@@ -636,6 +699,8 @@ create index idx_dashboard_notes_target on public.dashboard_notes (target_user_i
 create index idx_sales_referred_patient on public.sales (referred_by_patient_id);
 create index idx_sales_referred_user on public.sales (referred_by_user_id);
 create index idx_plan_templates_clinic on public.plan_templates (clinic_id);
+create index idx_admin_audit_log_created_at on public.admin_audit_log (created_at desc);
+create index idx_admin_notices_active on public.admin_notices (is_active);
 create index idx_plan_template_items_template on public.plan_template_items (plan_template_id);
 create unique index idx_clinic_settings_clinic on public.clinic_settings (clinic_id);
 
@@ -976,6 +1041,41 @@ create policy "clinic_signup_requests_update_prisma" on public.clinic_signup_req
 
 create policy "clinic_shoutouts_all" on public.clinic_shoutouts for all
   using (public.auth_is_prisma_team())
+  with check (public.auth_is_prisma_team());
+
+-- catálogo de planos: só a equipe Prisma administra.
+alter table public.plans enable row level security;
+create policy "plans_prisma_all" on public.plans for all
+  using (public.auth_is_prisma_team())
+  with check (public.auth_is_prisma_team());
+
+-- central de avisos: a equipe Prisma administra tudo; qualquer usuário
+-- autenticado (lado da clínica) só enxerga avisos ativos -- é o que
+-- alimenta o sino de lembretes em todas as páginas. Dispensas (leu/fechou)
+-- são só do próprio usuário.
+alter table public.admin_notices enable row level security;
+alter table public.admin_notice_dismissals enable row level security;
+
+create policy "admin_notices_prisma_all" on public.admin_notices for all
+  using (public.auth_is_prisma_team())
+  with check (public.auth_is_prisma_team());
+
+create policy "admin_notices_read_active" on public.admin_notices for select
+  to authenticated
+  using (is_active = true);
+
+create policy "admin_notice_dismissals_own" on public.admin_notice_dismissals for all
+  using (user_id = auth.uid() or public.auth_is_prisma_team())
+  with check (user_id = auth.uid());
+
+-- trilha de auditoria: só a equipe Prisma lê e insere; sem policy de
+-- update/delete (log append-only por desenho).
+alter table public.admin_audit_log enable row level security;
+
+create policy "admin_audit_log_prisma_read" on public.admin_audit_log for select
+  using (public.auth_is_prisma_team());
+
+create policy "admin_audit_log_prisma_insert" on public.admin_audit_log for insert
   with check (public.auth_is_prisma_team());
 
 -- ============================================================================

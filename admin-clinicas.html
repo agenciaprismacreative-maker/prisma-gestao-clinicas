@@ -53,6 +53,13 @@
           <span class="nav-badge" x-show="signupRequests.length > 0" x-text="signupRequests.length"></span>
         </a>
 
+        <a href="#" class="nav-item" :class="activeSection === 'usuarios' ? 'active' : ''" @click.prevent="activeSection = 'usuarios'; sidebarOpen = false; sidebarForceCollapsed = true; loadAllUsers();">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="8" r="3.2"/><path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6"/>
+          </svg>
+          <span>Usuários</span>
+        </a>
+
         <a href="#" class="nav-item" :class="activeSection === 'planos' ? 'active' : ''" @click.prevent="activeSection = 'planos'; sidebarOpen = false; sidebarForceCollapsed = true;">
           <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
             <rect x="2.5" y="5.5" width="19" height="14" rx="2"/><path d="M2.5 10h19"/><path d="M6 15h4"/>
@@ -61,7 +68,23 @@
           <span class="nav-badge" x-show="overduePayments.length > 0" x-text="overduePayments.length"></span>
         </a>
 
-        <div class="sidebar-group-label">Configuração</div>
+        <div class="sidebar-group-label">Comunicação</div>
+
+        <a href="#" class="nav-item" :class="activeSection === 'avisos' ? 'active' : ''" @click.prevent="activeSection = 'avisos'; sidebarOpen = false; sidebarForceCollapsed = true; loadNotices();">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 10v4a1 1 0 0 0 1 1h2l4 3V6L6 9H4a1 1 0 0 0-1 1z"/><path d="M15 9a3 3 0 0 1 0 6"/><path d="M18 6a7 7 0 0 1 0 12"/>
+          </svg>
+          <span>Avisos</span>
+        </a>
+
+        <div class="sidebar-group-label">Sistema</div>
+
+        <a href="#" class="nav-item" :class="activeSection === 'auditoria' ? 'active' : ''" @click.prevent="activeSection = 'auditoria'; sidebarOpen = false; sidebarForceCollapsed = true; loadAuditLog();">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 3.5h6a1 1 0 0 1 1 1V6H8V4.5a1 1 0 0 1 1-1z"/><path d="M9 12l2 2 4-4"/>
+          </svg>
+          <span>Auditoria</span>
+        </a>
 
         <a href="#" class="nav-item" :class="activeSection === 'personalizacao' ? 'active' : ''" @click.prevent="activeSection = 'personalizacao'; sidebarOpen = false; sidebarForceCollapsed = true;">
           <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -322,6 +345,15 @@
                 <option value="cancelado">Cancelado</option>
               </select>
             </div>
+            <div class="form-group" x-show="plans.length > 0">
+              <label class="label">Selecionar do catálogo (opcional)</label>
+              <select class="input" @change="applyPlanToClinic($event.target.value)">
+                <option value="">Preencher manualmente…</option>
+                <template x-for="p in plans.filter(pl => pl.is_active)" :key="p.id">
+                  <option :value="p.id" x-text="p.name + ' · ' + formatCurrency(p.price)"></option>
+                </template>
+              </select>
+            </div>
             <div class="grid grid-2 gap-3">
               <div class="form-group">
                 <label class="label">Plano</label>
@@ -439,20 +471,71 @@
       </template>
     </div>
 
+    <!-- ===================== USUÁRIOS (VISÃO GLOBAL) ===================== -->
+    <div x-show="!loading && activeSection === 'usuarios'" x-cloak>
+
+      <div class="page-header">
+        <div>
+          <h2>Usuários</h2>
+          <p>Todos os acessos de todas as clínicas da plataforma, em um só lugar</p>
+        </div>
+      </div>
+
+      <div class="card card-shadow mb-4" style="padding:14px 18px;">
+        <div class="input-icon-wrap" style="max-width:320px;">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+          <input class="input" type="text" x-model="userSearch" placeholder="Buscar por nome, e-mail ou clínica…">
+        </div>
+      </div>
+
+      <div class="card card-shadow" style="padding:0;">
+        <div x-show="!loadingUsers && filteredAllUsers.length === 0" class="empty-note" style="margin:20px;">Nenhum usuário encontrado.</div>
+        <div class="table-wrap" x-show="!loadingUsers && filteredAllUsers.length > 0">
+          <table class="table">
+            <thead><tr><th>Nome</th><th>E-mail</th><th>Clínica</th><th>Papel</th><th>Status</th><th></th></tr></thead>
+            <tbody>
+              <template x-for="u in filteredAllUsers" :key="u.id">
+                <tr>
+                  <td><strong x-text="u.full_name"></strong></td>
+                  <td x-text="u.email"></td>
+                  <td x-text="u.clinics ? u.clinics.name : '—'"></td>
+                  <td x-text="roleLabel(u.role)"></td>
+                  <td><span class="badge" :class="u.is_active === false ? 'badge-neutral' : 'badge-success'" x-text="u.is_active === false ? 'Inativo' : 'Ativo'"></span></td>
+                  <td><button class="btn btn-ghost btn-sm" type="button" @click="goToUserClinic(u)" x-show="u.clinic_id">Ver clínica</button></td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
     <!-- ===================== PLANOS E PAGAMENTOS ===================== -->
     <div x-show="!loading && activeSection === 'planos'" x-cloak>
 
       <div class="page-header">
         <div>
           <h2>Planos e pagamentos</h2>
-          <p>Assinatura de cada clínica na plataforma -- cobrança ainda manual, com os campos já prontos para a futura integração com o Asaas.</p>
+          <p x-show="plansViewTab === 'cobrancas'">Assinatura de cada clínica na plataforma -- cobrança ainda manual, com os campos já prontos para a futura integração com o Asaas.</p>
+          <p x-show="plansViewTab === 'catalogo'" x-cloak>Planos padronizados, usados como atalho ao definir a assinatura de uma clínica.</p>
         </div>
-        <button class="btn btn-primary" type="button" @click="openPaymentModal()">
+        <button class="btn btn-primary" type="button" @click="openPaymentModal()" x-show="plansViewTab === 'cobrancas'">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
           Registrar pagamento
         </button>
+        <button class="btn btn-primary" type="button" @click="openPlanModal()" x-show="plansViewTab === 'catalogo'" x-cloak>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+          Novo plano
+        </button>
       </div>
 
+      <div class="segmented mb-4">
+        <button type="button" class="segmented-btn" :class="plansViewTab==='cobrancas' ? 'is-active' : ''" @click="plansViewTab='cobrancas'">Cobranças</button>
+        <button type="button" class="segmented-btn" :class="plansViewTab==='catalogo' ? 'is-active' : ''" @click="plansViewTab='catalogo'; loadPlans();">Catálogo de planos</button>
+      </div>
+
+      <div x-show="plansViewTab === 'cobrancas'">
       <div class="grid grid-4 gap-3 mb-5">
         <div class="admin-stat-card tone-accent">
           <span class="admin-stat-badge">MRR</span>
@@ -520,6 +603,108 @@
                   <td>
                     <button class="btn btn-ghost btn-sm" type="button" @click="markPaid(p)" x-show="p.status !== 'pago'">Marcar como pago</button>
                   </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      </div>
+
+      <div x-show="plansViewTab === 'catalogo'" x-cloak>
+        <div class="card card-shadow" style="padding:0;">
+          <div x-show="!loadingPlans && plans.length === 0" class="empty-note" style="margin:20px;">Nenhum plano cadastrado ainda.</div>
+          <div class="table-wrap" x-show="!loadingPlans && plans.length > 0">
+            <table class="table">
+              <thead><tr><th>Nome</th><th>Valor</th><th>Ciclo</th><th>Recursos</th><th>Status</th><th></th></tr></thead>
+              <tbody>
+                <template x-for="p in plans" :key="p.id">
+                  <tr>
+                    <td><strong x-text="p.name"></strong><div class="text-xs text-muted" x-text="p.description || ''"></div></td>
+                    <td x-text="formatCurrency(p.price)"></td>
+                    <td x-text="p.billing_cycle === 'anual' ? 'Anual' : 'Mensal'"></td>
+                    <td class="text-xs text-muted" x-text="(p.features || []).length + ' recurso(s)'"></td>
+                    <td><span class="badge" :class="p.is_active ? 'badge-success' : 'badge-neutral'" x-text="p.is_active ? 'Ativo' : 'Inativo'"></span></td>
+                    <td>
+                      <div class="flex gap-2">
+                        <button class="btn btn-ghost btn-sm" type="button" @click="openPlanModal(p)">Editar</button>
+                        <button class="btn btn-ghost btn-sm" type="button" @click="togglePlanActive(p)" x-text="p.is_active ? 'Desativar' : 'Ativar'"></button>
+                      </div>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ===================== CENTRAL DE AVISOS ===================== -->
+    <div x-show="!loading && activeSection === 'avisos'" x-cloak>
+
+      <div class="page-header">
+        <div>
+          <h2>Central de avisos</h2>
+          <p>Mensagens da Prisma para as clínicas, exibidas no sino de lembretes de cada uma</p>
+        </div>
+        <button class="btn btn-primary" type="button" @click="openNoticeModal()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+          Novo aviso
+        </button>
+      </div>
+
+      <div class="card card-shadow" style="padding:0;">
+        <div x-show="!loadingNotices && notices.length === 0" class="empty-note" style="margin:20px;">Nenhum aviso publicado ainda.</div>
+        <div class="table-wrap" x-show="!loadingNotices && notices.length > 0">
+          <table class="table">
+            <thead><tr><th>Título</th><th>Severidade</th><th>Alcance</th><th>Vigência</th><th>Status</th><th></th></tr></thead>
+            <tbody>
+              <template x-for="n in notices" :key="n.id">
+                <tr>
+                  <td><strong x-text="n.title"></strong><div class="text-xs text-muted" x-text="n.message.length > 70 ? n.message.slice(0,70) + '…' : n.message"></div></td>
+                  <td><span class="badge" :class="noticeSeverityBadgeClass(n.severity)" x-text="noticeSeverityLabel(n.severity)"></span></td>
+                  <td class="text-xs text-muted" x-text="(n.target_status && n.target_status.length > 0) ? n.target_status.map(statusLabel).join(', ') : 'Todas as clínicas'"></td>
+                  <td class="text-xs text-muted" x-text="noticeWindowLabel(n)"></td>
+                  <td><span class="badge" :class="n.is_active ? 'badge-success' : 'badge-neutral'" x-text="n.is_active ? 'Ativo' : 'Inativo'"></span></td>
+                  <td>
+                    <div class="flex gap-2">
+                      <button class="btn btn-ghost btn-sm" type="button" @click="openNoticeModal(n)">Editar</button>
+                      <button class="btn btn-ghost btn-sm" type="button" @click="toggleNoticeActive(n)" x-text="n.is_active ? 'Desativar' : 'Ativar'"></button>
+                    </div>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ===================== TRILHA DE AUDITORIA ===================== -->
+    <div x-show="!loading && activeSection === 'auditoria'" x-cloak>
+
+      <div class="page-header">
+        <div>
+          <h2>Auditoria</h2>
+          <p>Registro das ações administrativas sensíveis feitas neste painel -- não editável</p>
+        </div>
+      </div>
+
+      <div class="card card-shadow" style="padding:0;">
+        <div x-show="!loadingAuditLog && auditLog.length === 0" class="empty-note" style="margin:20px;">Nenhuma ação registrada ainda.</div>
+        <div class="table-wrap" x-show="!loadingAuditLog && auditLog.length > 0">
+          <table class="table">
+            <thead><tr><th>Quando</th><th>Quem</th><th>Ação</th><th>Alvo</th></tr></thead>
+            <tbody>
+              <template x-for="entry in auditLog" :key="entry.id">
+                <tr>
+                  <td class="text-xs text-muted" x-text="formatDateTime(entry.created_at)"></td>
+                  <td x-text="entry.actor_name || '—'"></td>
+                  <td x-text="auditActionLabel(entry.action)"></td>
+                  <td class="text-xs text-muted" x-text="entry.target_label || '—'"></td>
                 </tr>
               </template>
             </tbody>
@@ -699,6 +884,28 @@
           <input class="input" type="text" x-model="newClinic.plan_name" placeholder="Ex.: Profissional">
         </div>
       </div>
+      <div class="form-group" x-show="plans.length > 0">
+        <label class="label">Ou selecionar do catálogo</label>
+        <select class="input" @change="applyPlanToNewClinic($event.target.value)">
+          <option value="">Preencher manualmente…</option>
+          <template x-for="p in plans.filter(pl => pl.is_active)" :key="p.id">
+            <option :value="p.id" x-text="p.name + ' · ' + formatCurrency(p.price)"></option>
+          </template>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="label">Acesso inicial</label>
+        <div class="segmented">
+          <button type="button" class="segmented-btn" :class="newClinic.access_type === 'trial' ? 'is-active' : ''" @click="newClinic.access_type = 'trial'">Teste grátis</button>
+          <button type="button" class="segmented-btn" :class="newClinic.access_type === 'direta' ? 'is-active' : ''" @click="newClinic.access_type = 'direta'">Assinatura direta</button>
+        </div>
+        <div class="form-group mt-2" x-show="newClinic.access_type === 'trial'" x-cloak>
+          <label class="label">Dias de teste</label>
+          <input class="input" type="number" min="1" x-model="newClinic.trial_days">
+        </div>
+        <p class="text-xs text-soft mt-1" x-show="newClinic.access_type === 'direta'" x-cloak>A clínica entra com status "Ativo" imediatamente -- use quando o pagamento já foi combinado por fora.</p>
+      </div>
 
       <p class="text-xs text-soft mb-2 mt-3" style="text-transform:uppercase;font-weight:600;">Primeiro acesso (administrador)</p>
       <div class="form-group">
@@ -737,6 +944,27 @@
       <div class="form-group">
         <label class="label">Especialidade</label>
         <input class="input" type="text" x-model="approveForm.specialty">
+      </div>
+      <div class="form-group" x-show="plans.length > 0">
+        <label class="label">Plano</label>
+        <select class="input" @change="applyPlanToApprove($event.target.value)">
+          <option value="">Preencher manualmente…</option>
+          <template x-for="p in plans.filter(pl => pl.is_active)" :key="p.id">
+            <option :value="p.id" x-text="p.name + ' · ' + formatCurrency(p.price)"></option>
+          </template>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="label">Acesso inicial</label>
+        <div class="segmented">
+          <button type="button" class="segmented-btn" :class="approveForm.access_type === 'trial' ? 'is-active' : ''" @click="approveForm.access_type = 'trial'">Teste grátis</button>
+          <button type="button" class="segmented-btn" :class="approveForm.access_type === 'direta' ? 'is-active' : ''" @click="approveForm.access_type = 'direta'">Assinatura direta</button>
+        </div>
+        <div class="form-group mt-2" x-show="approveForm.access_type === 'trial'" x-cloak>
+          <label class="label">Dias de teste</label>
+          <input class="input" type="number" min="1" x-model="approveForm.trial_days">
+        </div>
+        <p class="text-xs text-soft mt-1" x-show="approveForm.access_type === 'direta'" x-cloak>A clínica entra com status "Ativo" imediatamente -- use quando o pagamento já foi combinado por fora.</p>
       </div>
       <div class="form-group">
         <label class="label">Nome do administrador</label>
@@ -879,6 +1107,116 @@
     </div>
   </div>
 
+  <!-- ===================== MODAL: PLANO DO CATÁLOGO ===================== -->
+  <div x-show="showPlanModal" x-cloak class="modal-overlay" @click.self="showPlanModal=false">
+    <div class="card card-shadow-sm modal-card" style="margin:auto;">
+      <div class="card-header"><h3 x-text="editingPlan.id ? 'Editar plano' : 'Novo plano'"></h3><button class="btn btn-ghost btn-sm" @click="showPlanModal=false">Fechar</button></div>
+      <p class="text-sm mb-3" x-show="planError" x-cloak style="color:var(--color-danger);" x-text="planError"></p>
+
+      <div class="form-group">
+        <label class="label">Nome</label>
+        <input class="input" type="text" x-model="editingPlan.name" placeholder="Ex.: Profissional">
+      </div>
+      <div class="grid grid-2 gap-3">
+        <div class="form-group">
+          <label class="label">Valor</label>
+          <input class="input" type="text" inputmode="decimal" x-model="editingPlan.price_input" @input="editingPlan.price_input = maskCurrencyInput($event.target.value)" placeholder="R$ 0,00">
+        </div>
+        <div class="form-group">
+          <label class="label">Ciclo</label>
+          <select class="input" x-model="editingPlan.billing_cycle">
+            <option value="mensal">Mensal</option>
+            <option value="anual">Anual</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="label">Dias de teste grátis</label>
+        <input class="input" type="number" min="0" x-model="editingPlan.trial_days" placeholder="Deixe vazio para exigir assinatura direta">
+        <p class="text-xs text-soft mt-1">Com dias preenchidos, este plano pode ser oferecido como teste grátis na aprovação de acesso. Vazio = só assinatura direta.</p>
+      </div>
+      <div class="form-group">
+        <label class="label">Descrição</label>
+        <input class="input" type="text" x-model="editingPlan.description" placeholder="Frase curta sobre o plano (opcional)">
+      </div>
+      <div class="form-group">
+        <label class="label">Recursos incluídos</label>
+        <textarea class="input" rows="4" x-model="editingPlan.features_text" placeholder="Um recurso por linha, ex.:&#10;Até 5 usuários&#10;Relatórios de BI&#10;Suporte prioritário"></textarea>
+      </div>
+      <div class="form-group">
+        <label class="label">Status</label>
+        <div class="segmented">
+          <button type="button" class="segmented-btn" :class="editingPlan.is_active ? 'is-active' : ''" @click="editingPlan.is_active = true">Ativo</button>
+          <button type="button" class="segmented-btn" :class="!editingPlan.is_active ? 'is-active' : ''" @click="editingPlan.is_active = false">Inativo</button>
+        </div>
+      </div>
+
+      <div class="flex justify-end gap-2 mt-3">
+        <button class="btn btn-secondary btn-sm" type="button" @click="showPlanModal=false">Cancelar</button>
+        <button class="btn btn-primary btn-sm" type="button" @click="savePlan()" :disabled="savingPlan">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== MODAL: AVISO ===================== -->
+  <div x-show="showNoticeModal" x-cloak class="modal-overlay" @click.self="showNoticeModal=false">
+    <div class="card card-shadow-sm modal-card" style="margin:auto;">
+      <div class="card-header"><h3 x-text="editingNotice.id ? 'Editar aviso' : 'Novo aviso'"></h3><button class="btn btn-ghost btn-sm" @click="showNoticeModal=false">Fechar</button></div>
+      <p class="text-sm mb-3" x-show="noticeError" x-cloak style="color:var(--color-danger);" x-text="noticeError"></p>
+
+      <div class="form-group">
+        <label class="label">Título</label>
+        <input class="input" type="text" x-model="editingNotice.title" placeholder="Ex.: Manutenção programada">
+      </div>
+      <div class="form-group">
+        <label class="label">Mensagem</label>
+        <textarea class="input" rows="3" x-model="editingNotice.message" placeholder="Texto simples -- sem formatação, exibido exatamente como escrito"></textarea>
+      </div>
+      <div class="form-group">
+        <label class="label">Severidade</label>
+        <select class="input" x-model="editingNotice.severity">
+          <option value="info">Informativo</option>
+          <option value="warning">Atenção</option>
+          <option value="urgent">Urgente</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="label">Alcance</label>
+        <p class="text-xs text-soft mb-2">Nenhuma marcada = todas as clínicas.</p>
+        <div class="flex gap-3" style="flex-wrap:wrap;">
+          <template x-for="s in ['trial','ativo','inadimplente','suspenso','cancelado']" :key="s">
+            <label class="flex items-center gap-1 text-sm">
+              <input type="checkbox" :value="s" @change="toggleNoticeTargetStatus(s)" :checked="editingNotice.target_status.includes(s)">
+              <span x-text="statusLabel(s)"></span>
+            </label>
+          </template>
+        </div>
+      </div>
+      <div class="grid grid-2 gap-3">
+        <div class="form-group">
+          <label class="label">Início da vigência (opcional)</label>
+          <input class="input" type="date" x-model="editingNotice.starts_at">
+        </div>
+        <div class="form-group">
+          <label class="label">Fim da vigência (opcional)</label>
+          <input class="input" type="date" x-model="editingNotice.ends_at">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="label">Status</label>
+        <div class="segmented">
+          <button type="button" class="segmented-btn" :class="editingNotice.is_active ? 'is-active' : ''" @click="editingNotice.is_active = true">Ativo</button>
+          <button type="button" class="segmented-btn" :class="!editingNotice.is_active ? 'is-active' : ''" @click="editingNotice.is_active = false">Inativo</button>
+        </div>
+      </div>
+
+      <div class="flex justify-end gap-2 mt-3">
+        <button class="btn btn-secondary btn-sm" type="button" @click="showNoticeModal=false">Cancelar</button>
+        <button class="btn btn-primary btn-sm" type="button" @click="saveNotice()" :disabled="savingNotice">Salvar</button>
+      </div>
+    </div>
+  </div>
+
 </div>
 
 <script>
@@ -895,6 +1233,7 @@ function adminClinicasApp() {
   return {
     loading: true,
     currentUserId: null,
+    currentUserName: null,
     activeSection: 'dashboard',
     sidebarOpen: false,
     // Forca a sidebar recolhida logo apos um clique num item do menu --
@@ -923,13 +1262,13 @@ function adminClinicasApp() {
     savingClinic: false,
 
     showNewClinicModal: false,
-    newClinic: { name: '', specialty: '', plan_name: '', admin_name: '', admin_email: '', admin_password: '' },
+    newClinic: { name: '', specialty: '', plan_name: '', plan_id: null, access_type: 'trial', trial_days: 14, admin_name: '', admin_email: '', admin_password: '' },
     savingNewClinic: false,
     newClinicError: '',
 
     showApproveModal: false,
     approvingRequest: null,
-    approveForm: { name: '', specialty: '', admin_name: '', admin_email: '', admin_password: '' },
+    approveForm: { name: '', specialty: '', plan_id: null, plan_name: '', access_type: 'trial', trial_days: 14, admin_name: '', admin_email: '', admin_password: '' },
     savingApprove: false,
     approveError: '',
 
@@ -959,18 +1298,53 @@ function adminClinicasApp() {
     congratsRank: null,
     congratsMessage: '',
 
+    // ---------------------------------------------------------------------
+    // Catálogo de planos
+    // ---------------------------------------------------------------------
+    plans: [],
+    loadingPlans: true,
+    plansViewTab: 'cobrancas',
+    showPlanModal: false,
+    editingPlan: {},
+    savingPlan: false,
+    planError: '',
+
+    // ---------------------------------------------------------------------
+    // Central de avisos
+    // ---------------------------------------------------------------------
+    notices: [],
+    loadingNotices: true,
+    showNoticeModal: false,
+    editingNotice: {},
+    savingNotice: false,
+    noticeError: '',
+
+    // ---------------------------------------------------------------------
+    // Trilha de auditoria
+    // ---------------------------------------------------------------------
+    auditLog: [],
+    loadingAuditLog: true,
+
+    // ---------------------------------------------------------------------
+    // Usuários (visão global entre clínicas)
+    // ---------------------------------------------------------------------
+    allUsers: [],
+    loadingUsers: true,
+    userSearch: '',
+
     feedback: { type: '', message: '' },
 
     async init() {
       const { data: { user } } = await supabaseClient.auth.getUser();
       if (!user) { window.location.href = 'acesso-administrativo.html'; return; }
       this.currentUserId = user.id;
-      const { data: profile } = await supabaseClient.from('users').select('role').eq('id', user.id).single();
+      const { data: profile } = await supabaseClient.from('users').select('role, full_name').eq('id', user.id).single();
+      this.currentUserName = profile ? profile.full_name : '';
       if (!profile || profile.role !== 'equipe_prisma') {
         window.location.href = window.homeForRole ? window.homeForRole(profile ? profile.role : null) : 'index.html';
         return;
       }
-      await Promise.all([this.loadClinics(), this.loadSignupRequests(), this.loadRanking(), this.loadShoutouts(), this.loadBranding(), this.loadAllPayments()]);
+      await Promise.all([this.loadClinics(), this.loadSignupRequests(), this.loadRanking(), this.loadShoutouts(), this.loadBranding(), this.loadAllPayments(), this.loadPlans()]);
       this.loading = false;
       await this.$nextTick();
       this.renderGrowthChart();
@@ -1169,6 +1543,12 @@ function adminClinicasApp() {
       if (isNaN(d)) return '—';
       return d.toLocaleDateString('pt-BR');
     },
+    formatDateTime(value) {
+      if (!value) return '—';
+      const d = new Date(value);
+      if (isNaN(d)) return '—';
+      return d.toLocaleDateString('pt-BR') + ' às ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    },
 
     showFeedback(type, message) {
       this.feedback = { type, message };
@@ -1176,10 +1556,25 @@ function adminClinicasApp() {
     },
 
     // ---------------------------------------------------------------------
+    // Trilha de auditoria: registra uma ação administrativa sensível. Best-
+    // effort -- se a gravação falhar, não bloqueia nem avisa sobre a ação
+    // original, que já foi concluída com sucesso antes desta chamada.
+    // ---------------------------------------------------------------------
+    async logAudit(action, targetType, targetId, targetLabel, details) {
+      try {
+        await supabaseClient.from('admin_audit_log').insert({
+          actor_id: this.currentUserId, actor_name: this.currentUserName || null,
+          action, target_type: targetType, target_id: targetId || null,
+          target_label: targetLabel || null, details: details || null
+        });
+      } catch (_) { /* não bloqueia a ação original por falha no log */ }
+    },
+
+    // ---------------------------------------------------------------------
     // Nova clínica (manual, direto pelo painel)
     // ---------------------------------------------------------------------
     openNewClinicModal() {
-      this.newClinic = { name: '', specialty: '', plan_name: '', admin_name: '', admin_email: '', admin_password: '' };
+      this.newClinic = { name: '', specialty: '', plan_name: '', plan_id: null, access_type: 'trial', trial_days: 14, admin_name: '', admin_email: '', admin_password: '' };
       this.newClinicError = '';
       this.showNewClinicModal = true;
     },
@@ -1197,9 +1592,10 @@ function adminClinicasApp() {
       this.savingNewClinic = true;
       this.newClinicError = '';
 
+      const accessPayload = this.buildAccessPayload(c.access_type, c.trial_days, c.plan_id);
       const { data: clinicRow, error: clinicError } = await supabaseClient
         .from('clinics')
-        .insert({ name: c.name.trim(), specialty: c.specialty || null, plan_name: c.plan_name || null, status: 'trial' })
+        .insert({ name: c.name.trim(), specialty: c.specialty || null, plan_name: c.plan_name || null, plan_id: c.plan_id || null, ...accessPayload })
         .select('id')
         .single();
       if (clinicError) {
@@ -1236,11 +1632,16 @@ function adminClinicasApp() {
     openApproveModal(req) {
       this.approvingRequest = req;
       this.approveForm = {
-        name: req.clinic_name, specialty: req.specialty || '',
+        name: req.clinic_name, specialty: req.specialty || '', plan_id: null, plan_name: '',
+        access_type: 'trial', trial_days: 14,
         admin_name: req.contact_name, admin_email: req.contact_email, admin_password: ''
       };
       this.approveError = '';
       this.showApproveModal = true;
+    },
+
+    applyPlanToApprove(planId) {
+      this.applyPlanToTarget(this.approveForm, planId);
     },
 
     async approveRequest() {
@@ -1258,9 +1659,13 @@ function adminClinicasApp() {
       this.savingApprove = true;
       this.approveError = '';
 
+      const accessPayload = this.buildAccessPayload(f.access_type, f.trial_days, f.plan_id);
       const { data: clinicRow, error: clinicError } = await supabaseClient
         .from('clinics')
-        .insert({ name: f.name.trim(), specialty: f.specialty || null, status: 'trial', owner_name: f.admin_name, owner_email: f.admin_email })
+        .insert({
+          name: f.name.trim(), specialty: f.specialty || null, plan_id: f.plan_id || null, plan_name: f.plan_name || null,
+          owner_name: f.admin_name, owner_email: f.admin_email, ...accessPayload
+        })
         .select('id')
         .single();
       if (clinicError) {
@@ -1316,7 +1721,7 @@ function adminClinicasApp() {
     async selectClinic(c) {
       this.selectedClinic = c;
       this.editClinic = {
-        status: c.status, plan_name: c.plan_name || '', plan_value_input: c.plan_value ? numberToCurrencyInput(c.plan_value) : '',
+        status: c.status, plan_id: c.plan_id || null, plan_name: c.plan_name || '', plan_value_input: c.plan_value ? numberToCurrencyInput(c.plan_value) : '',
         billing_cycle: c.billing_cycle || 'mensal', next_due_date: c.next_due_date || '', trial_ends_at: c.trial_ends_at ? c.trial_ends_at.slice(0, 10) : '',
         notes: c.notes || '', owner_name: c.owner_name || '', owner_email: c.owner_email || '', owner_phone: c.owner_phone || ''
       };
@@ -1338,7 +1743,7 @@ function adminClinicasApp() {
       this.savingClinic = true;
       const e = this.editClinic;
       const payload = {
-        status: e.status, plan_name: e.plan_name || null, plan_value: e.plan_value_input ? parseCurrencyToNumber(e.plan_value_input) : null,
+        status: e.status, plan_id: e.plan_id || null, plan_name: e.plan_name || null, plan_value: e.plan_value_input ? parseCurrencyToNumber(e.plan_value_input) : null,
         billing_cycle: e.billing_cycle, next_due_date: e.next_due_date || null,
         trial_ends_at: e.trial_ends_at ? new Date(e.trial_ends_at + 'T00:00:00').toISOString() : null,
         notes: e.notes || null, owner_name: e.owner_name || null, owner_email: e.owner_email || null, owner_phone: e.owner_phone || null
@@ -1346,10 +1751,17 @@ function adminClinicasApp() {
       if (e.status === 'ativo' && this.selectedClinic.status !== 'ativo') {
         payload.activated_at = new Date().toISOString();
       }
+      const previousStatus = this.selectedClinic.status;
+      const previousPlan = this.selectedClinic.plan_name;
       const { error } = await supabaseClient.from('clinics').update(payload).eq('id', this.selectedClinic.id);
       this.savingClinic = false;
       if (error) { this.showFeedback('error', 'Erro ao salvar: ' + error.message); return; }
       this.showFeedback('success', 'Alterações salvas.');
+      if (previousStatus !== payload.status || previousPlan !== payload.plan_name) {
+        this.logAudit('clinic.updated', 'clinic', this.selectedClinic.id, this.selectedClinic.name, {
+          status: { de: previousStatus, para: payload.status }, plano: { de: previousPlan, para: payload.plan_name }
+        });
+      }
       Object.assign(this.selectedClinic, payload);
       await this.loadClinics();
     },
@@ -1382,6 +1794,8 @@ function adminClinicasApp() {
       if (error) { this.showFeedback('error', 'Erro ao registrar: ' + error.message); return; }
       this.showPaymentModal = false;
       this.showFeedback('success', 'Pagamento registrado.');
+      const clinicName = (this.clinics.find((c) => c.id === clinicId) || {}).name;
+      this.logAudit('payment.manual_registered', 'payment', null, clinicName, { valor: amount, status: this.newPayment.status });
       if (this.selectedClinic) await this.selectClinic(this.selectedClinic);
       await this.loadAllPayments();
     },
@@ -1389,6 +1803,8 @@ function adminClinicasApp() {
     async markPaid(payment) {
       const { error } = await supabaseClient.from('clinic_payments').update({ status: 'pago', paid_at: new Date().toISOString() }).eq('id', payment.id);
       if (error) { this.showFeedback('error', 'Erro: ' + error.message); return; }
+      const clinicName = payment.clinics ? payment.clinics.name : (this.selectedClinic ? this.selectedClinic.name : null);
+      this.logAudit('payment.marked_paid', 'payment', payment.id, clinicName, { valor: payment.amount });
       if (this.selectedClinic) await this.selectClinic(this.selectedClinic);
       await this.loadAllPayments();
     },
@@ -1450,6 +1866,7 @@ function adminClinicasApp() {
       this.togglingUserId = null;
       if (error) { this.showFeedback('error', 'Erro: ' + error.message); return; }
       this.showFeedback('success', goingActive ? 'Acesso reativado.' : 'Acesso desativado.');
+      this.logAudit(goingActive ? 'user.activated' : 'user.deactivated', 'user', u.id, u.full_name + ' (' + this.selectedClinic.name + ')');
       await this.selectClinic(this.selectedClinic);
     },
 
@@ -1484,6 +1901,7 @@ function adminClinicasApp() {
         }
         this.showResetPasswordModal = false;
         this.showFeedback('success', 'Senha redefinida para ' + this.resettingUser.full_name + '.');
+        this.logAudit('user.password_reset', 'user', this.resettingUser.id, this.resettingUser.full_name + (this.selectedClinic ? ' (' + this.selectedClinic.name + ')' : ''));
       } catch (err) {
         this.resetPasswordError = 'Erro inesperado: ' + err.message;
       } finally {
@@ -1572,6 +1990,267 @@ function adminClinicasApp() {
       this.savingBranding = false;
       if (error) { this.showFeedback('error', 'Erro ao salvar: ' + error.message); return; }
       this.showFeedback('success', 'Personalização salva. A tela de login já reflete as mudanças.');
+    },
+
+    // ---------------------------------------------------------------------
+    // Catálogo de planos
+    // ---------------------------------------------------------------------
+    async loadPlans() {
+      this.loadingPlans = true;
+      const { data, error } = await supabaseClient.from('plans').select('*').order('display_order').order('name');
+      this.plans = error ? [] : (data || []);
+      this.loadingPlans = false;
+    },
+
+    openPlanModal(p) {
+      if (p) {
+        this.editingPlan = {
+          id: p.id, name: p.name, price_input: p.price ? numberToCurrencyInput(p.price) : '',
+          billing_cycle: p.billing_cycle || 'mensal', description: p.description || '',
+          features_text: (p.features || []).join('\n'), is_active: p.is_active !== false,
+          trial_days: p.trial_days || ''
+        };
+      } else {
+        this.editingPlan = { id: null, name: '', price_input: '', billing_cycle: 'mensal', description: '', features_text: '', is_active: true, trial_days: '' };
+      }
+      this.planError = '';
+      this.showPlanModal = true;
+    },
+
+    async savePlan() {
+      const p = this.editingPlan;
+      if (!p.name || !p.name.trim()) { this.planError = 'Informe o nome do plano.'; return; }
+      this.savingPlan = true;
+      this.planError = '';
+      const payload = {
+        name: p.name.trim(), price: p.price_input ? parseCurrencyToNumber(p.price_input) : null,
+        billing_cycle: p.billing_cycle, description: p.description ? p.description.trim() : null,
+        features: (p.features_text || '').split('\n').map((f) => f.trim()).filter((f) => f.length > 0),
+        is_active: p.is_active !== false,
+        trial_days: p.trial_days ? parseInt(p.trial_days, 10) : null
+      };
+      let error;
+      if (p.id) {
+        ({ error } = await supabaseClient.from('plans').update(payload).eq('id', p.id));
+      } else {
+        ({ error } = await supabaseClient.from('plans').insert(payload));
+      }
+      this.savingPlan = false;
+      if (error) { this.planError = 'Erro ao salvar: ' + error.message; return; }
+      this.showPlanModal = false;
+      this.showFeedback('success', 'Plano salvo.');
+      this.logAudit(p.id ? 'plan.updated' : 'plan.created', 'plan', p.id, payload.name, payload);
+      await this.loadPlans();
+    },
+
+    async togglePlanActive(p) {
+      const goingActive = !p.is_active;
+      const { error } = await supabaseClient.from('plans').update({ is_active: goingActive }).eq('id', p.id);
+      if (error) { this.showFeedback('error', 'Erro: ' + error.message); return; }
+      this.showFeedback('success', goingActive ? 'Plano ativado.' : 'Plano desativado.');
+      this.logAudit(goingActive ? 'plan.activated' : 'plan.deactivated', 'plan', p.id, p.name);
+      await this.loadPlans();
+    },
+
+    // Atalho usado no detalhe da clínica e no modal de nova clínica: aplica
+    // nome/valor/ciclo de um plano do catálogo aos campos editáveis, que
+    // continuam podendo ser ajustados manualmente depois (preço
+    // personalizado por clínica).
+    applyPlanToClinic(planId) {
+      if (!planId) return;
+      const p = this.plans.find((pl) => pl.id === planId);
+      if (!p) return;
+      this.editClinic.plan_id = p.id;
+      this.editClinic.plan_name = p.name;
+      this.editClinic.plan_value_input = p.price ? numberToCurrencyInput(p.price) : '';
+      this.editClinic.billing_cycle = p.billing_cycle || 'mensal';
+    },
+
+    // Mesma lógica de atalho, mas para os formulários que ainda não têm uma
+    // clínica salva (nova clínica / aprovar solicitação): além de preencher
+    // nome/valor, sugere o tipo de acesso a partir do trial_days do plano.
+    applyPlanToTarget(target, planId) {
+      target.plan_id = planId || null;
+      if (!planId) return;
+      const p = this.plans.find((pl) => pl.id === planId);
+      if (!p) return;
+      target.plan_name = p.name;
+      if (p.trial_days) {
+        target.access_type = 'trial';
+        target.trial_days = p.trial_days;
+      } else {
+        target.access_type = 'direta';
+      }
+    },
+    applyPlanToNewClinic(planId) {
+      this.applyPlanToTarget(this.newClinic, planId);
+    },
+
+    // Traduz a escolha "teste grátis" x "assinatura direta" (feita na nova
+    // clínica e na aprovação de solicitação) nos campos reais da clínica.
+    // Teste: status=trial + trial_ends_at daqui a N dias. Direta: a clínica
+    // já entra ativa, com o próximo vencimento a partir do ciclo do plano
+    // (cobrança em si continua manual -- ver Planos e pagamentos).
+    buildAccessPayload(accessType, trialDays, planId) {
+      const now = new Date();
+      if (accessType === 'direta') {
+        const plan = this.plans.find((p) => p.id === planId);
+        const cycleDays = plan && plan.billing_cycle === 'anual' ? 365 : 30;
+        const nextDue = new Date(now.getTime() + cycleDays * 24 * 3600 * 1000);
+        return { status: 'ativo', activated_at: now.toISOString(), next_due_date: nextDue.toISOString().slice(0, 10) };
+      }
+      const days = parseInt(trialDays, 10) || 14;
+      const trialEnds = new Date(now.getTime() + days * 24 * 3600 * 1000);
+      return { status: 'trial', trial_ends_at: trialEnds.toISOString() };
+    },
+
+    // ---------------------------------------------------------------------
+    // Central de avisos
+    // ---------------------------------------------------------------------
+    async loadNotices() {
+      this.loadingNotices = true;
+      const { data, error } = await supabaseClient.from('admin_notices').select('*').order('created_at', { ascending: false });
+      this.notices = error ? [] : (data || []);
+      this.loadingNotices = false;
+    },
+
+    openNoticeModal(n) {
+      if (n) {
+        this.editingNotice = {
+          id: n.id, title: n.title, message: n.message, severity: n.severity || 'info',
+          target_status: [...(n.target_status || [])],
+          starts_at: n.starts_at ? n.starts_at.slice(0, 10) : '', ends_at: n.ends_at ? n.ends_at.slice(0, 10) : '',
+          is_active: n.is_active !== false
+        };
+      } else {
+        this.editingNotice = { id: null, title: '', message: '', severity: 'info', target_status: [], starts_at: '', ends_at: '', is_active: true };
+      }
+      this.noticeError = '';
+      this.showNoticeModal = true;
+    },
+
+    toggleNoticeTargetStatus(s) {
+      const idx = this.editingNotice.target_status.indexOf(s);
+      if (idx >= 0) this.editingNotice.target_status.splice(idx, 1);
+      else this.editingNotice.target_status.push(s);
+    },
+
+    async saveNotice() {
+      const n = this.editingNotice;
+      if (!n.title || !n.title.trim() || !n.message || !n.message.trim()) {
+        this.noticeError = 'Preencha título e mensagem.';
+        return;
+      }
+      this.savingNotice = true;
+      this.noticeError = '';
+      const payload = {
+        title: n.title.trim(), message: n.message.trim(), severity: n.severity || 'info',
+        target_status: n.target_status || [],
+        starts_at: n.starts_at ? new Date(n.starts_at + 'T00:00:00').toISOString() : null,
+        ends_at: n.ends_at ? new Date(n.ends_at + 'T23:59:59').toISOString() : null,
+        is_active: n.is_active !== false
+      };
+      let error;
+      if (n.id) {
+        ({ error } = await supabaseClient.from('admin_notices').update(payload).eq('id', n.id));
+      } else {
+        payload.created_by = this.currentUserId;
+        ({ error } = await supabaseClient.from('admin_notices').insert(payload));
+      }
+      this.savingNotice = false;
+      if (error) { this.noticeError = 'Erro ao salvar: ' + error.message; return; }
+      this.showNoticeModal = false;
+      this.showFeedback('success', 'Aviso salvo.');
+      this.logAudit(n.id ? 'notice.updated' : 'notice.created', 'notice', n.id, payload.title);
+      await this.loadNotices();
+    },
+
+    async toggleNoticeActive(n) {
+      const goingActive = !n.is_active;
+      const { error } = await supabaseClient.from('admin_notices').update({ is_active: goingActive }).eq('id', n.id);
+      if (error) { this.showFeedback('error', 'Erro: ' + error.message); return; }
+      this.showFeedback('success', goingActive ? 'Aviso ativado.' : 'Aviso desativado.');
+      this.logAudit(goingActive ? 'notice.activated' : 'notice.deactivated', 'notice', n.id, n.title);
+      await this.loadNotices();
+    },
+
+    noticeSeverityBadgeClass(severity) {
+      const map = { info: 'badge-info', warning: 'badge-warning', urgent: 'badge-danger' };
+      return map[severity] || 'badge-neutral';
+    },
+    noticeSeverityLabel(severity) {
+      const map = { info: 'Informativo', warning: 'Atenção', urgent: 'Urgente' };
+      return map[severity] || severity;
+    },
+    noticeWindowLabel(n) {
+      if (!n.starts_at && !n.ends_at) return 'Sempre';
+      const start = n.starts_at ? this.formatDate(n.starts_at) : '—';
+      const end = n.ends_at ? this.formatDate(n.ends_at) : '—';
+      return start + ' até ' + end;
+    },
+
+    // ---------------------------------------------------------------------
+    // Trilha de auditoria (leitura -- a gravação acontece via logAudit(),
+    // chamado a partir de cada ação sensível já existente neste arquivo)
+    // ---------------------------------------------------------------------
+    async loadAuditLog() {
+      this.loadingAuditLog = true;
+      const { data, error } = await supabaseClient.from('admin_audit_log').select('*').order('created_at', { ascending: false }).limit(200);
+      this.auditLog = error ? [] : (data || []);
+      this.loadingAuditLog = false;
+    },
+
+    auditActionLabel(action) {
+      const map = {
+        'clinic.updated': 'Atualizou dados da clínica',
+        'payment.manual_registered': 'Registrou pagamento manual',
+        'payment.marked_paid': 'Marcou pagamento como pago',
+        'user.activated': 'Reativou acesso de usuário',
+        'user.deactivated': 'Desativou acesso de usuário',
+        'user.password_reset': 'Redefiniu senha de usuário',
+        'plan.created': 'Criou plano no catálogo',
+        'plan.updated': 'Editou plano do catálogo',
+        'plan.activated': 'Ativou plano do catálogo',
+        'plan.deactivated': 'Desativou plano do catálogo',
+        'notice.created': 'Criou aviso',
+        'notice.updated': 'Editou aviso',
+        'notice.activated': 'Ativou aviso',
+        'notice.deactivated': 'Desativou aviso'
+      };
+      return map[action] || action;
+    },
+
+    // ---------------------------------------------------------------------
+    // Usuários (visão global entre clínicas) -- só leitura e navegação; as
+    // ações (ativar/desativar, redefinir senha) continuam só no detalhe da
+    // clínica, pra não duplicar caminho de código.
+    // ---------------------------------------------------------------------
+    async loadAllUsers() {
+      this.loadingUsers = true;
+      const { data, error } = await supabaseClient
+        .from('users')
+        .select('id, full_name, email, role, is_active, clinic_id, clinics ( id, name )')
+        .not('clinic_id', 'is', null)
+        .order('full_name');
+      this.allUsers = error ? [] : (data || []);
+      this.loadingUsers = false;
+    },
+
+    get filteredAllUsers() {
+      const q = this.userSearch.trim().toLowerCase();
+      if (!q) return this.allUsers;
+      return this.allUsers.filter((u) =>
+        (u.full_name || '').toLowerCase().includes(q) ||
+        (u.email || '').toLowerCase().includes(q) ||
+        ((u.clinics && u.clinics.name) || '').toLowerCase().includes(q)
+      );
+    },
+
+    goToUserClinic(u) {
+      const clinic = this.clinics.find((c) => c.id === u.clinic_id);
+      if (!clinic) return;
+      this.activeSection = 'clinicas';
+      this.selectClinic(clinic);
     }
   };
 }
