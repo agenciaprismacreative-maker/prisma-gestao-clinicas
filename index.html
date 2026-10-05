@@ -1,246 +1,1422 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8">
-<title>Entrar · Prisma Gestão de Clínicas</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link rel="stylesheet" href="css/styles.css">
-</head>
-<body data-page="login">
-
-<div class="auth-screen" x-data="loginForm()" x-init="init()" :style="authScreenBackgroundStyle(branding)">
-  <div class="auth-card" :class="branding.card_style === 'escuro' ? 'card-dark' : ''">
-    <div class="auth-logo">
-      <img x-show="branding.logo_url" x-cloak :src="branding.logo_url" alt="" style="width:48px;height:48px;border-radius:var(--radius-md);object-fit:cover;">
-      <div class="logo-mark" x-show="!branding.logo_url" style="background:var(--color-accent);color:var(--color-primary-dark);">P</div>
-      <h1 x-text="branding.login_title || 'Prisma · Gestão de Clínicas'"></h1>
-      <p x-text="branding.login_subtitle || 'Acesse o painel da sua clínica'"></p>
-    </div>
-
-    <div x-show="step === 'login'" x-cloak>
-      <form @submit.prevent="submit()">
-        <div class="form-group">
-          <label class="label" for="email">E-mail</label>
-          <input class="input" type="email" id="email" x-model="email" placeholder="voce@clinica.com.br" required>
-        </div>
-
-        <div class="form-group">
-          <label class="label" for="senha">Senha</label>
-          <div style="position:relative;">
-            <input class="input" :type="showPass ? 'text' : 'password'" id="senha" x-model="password" placeholder="••••••••" required style="padding-right:56px;">
-            <button type="button" @click="showPass = !showPass" class="text-xs text-muted" style="position:absolute;right:14px;top:50%;transform:translateY(-50%);background:none;border:none;">
-              <span x-text="showPass ? 'ocultar' : 'ver'"></span>
-            </button>
-          </div>
-          <div class="flex justify-end mt-1">
-            <a href="#" class="text-xs" style="color:var(--color-text-soft);" @click.prevent="openForgotPassword()">Esqueci minha senha</a>
-          </div>
-        </div>
-
-        <p x-show="errorMsg" x-cloak class="text-sm mb-3" style="color:var(--color-danger);" x-text="errorMsg"></p>
-
-        <button class="btn btn-primary btn-block mt-2" type="submit" :disabled="loading">
-          <span x-show="!loading">Entrar</span>
-          <span x-show="loading" x-cloak>Entrando…</span>
-        </button>
-      </form>
-
-      <div class="flex items-center gap-3 mt-3 mb-3" style="color:var(--color-text-soft);font-size:var(--font-size-3);">
-        <div style="flex:1;height:1px;background:var(--color-border);"></div>
-        ou
-        <div style="flex:1;height:1px;background:var(--color-border);"></div>
-      </div>
-
-      <button type="button" class="btn btn-secondary btn-block" @click="loginWithGoogle()">
-        <svg viewBox="0 0 48 48" style="width:16px;height:16px;margin-right:6px;vertical-align:-3px;"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.9 32.5 29.4 35.5 24 35.5c-6.4 0-11.6-5.2-11.6-11.5S17.6 12.5 24 12.5c3 0 5.6 1.1 7.7 2.9l5.7-5.7C34.1 6.7 29.3 4.5 24 4.5 13.2 4.5 4.5 13.2 4.5 24S13.2 43.5 24 43.5 43.5 34.8 43.5 24c0-1.2-.1-2.4-.3-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 15.9 18.9 12.5 24 12.5c3 0 5.6 1.1 7.7 2.9l5.7-5.7C34.1 6.7 29.3 4.5 24 4.5c-7.7 0-14.4 4.4-17.7 10.2z"/><path fill="#4CAF50" d="M24 43.5c5.2 0 9.9-2 13.5-5.2l-6.2-5.3C29.3 34.6 26.8 35.5 24 35.5c-5.4 0-9.9-3.4-11.6-8.1l-6.5 5C9.5 39 16.2 43.5 24 43.5z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.1-4.1 5.5l6.2 5.3C41 35.6 43.5 30.3 43.5 24c0-1.2-.1-2.4-.3-3.5z"/></svg>
-        Continuar com Google
-      </button>
-
-      <div class="auth-footer">
-        <span x-text="branding.support_message || 'Esqueceu a senha? Fale com a administração da clínica.'"></span><br>
-        <span x-text="branding.footer_text || 'Sistema interno · Prisma Creative'"></span><br>
-        <a href="solicitar-acesso.html" class="text-xs" style="color:var(--color-text-soft);">Ainda não tem acesso? Solicite aqui</a>
-      </div>
-    </div>
-
-    <div x-show="step === 'forgot'" x-cloak>
-      <h2 style="font-size:var(--font-size-7);margin-bottom:4px;">Redefinir senha</h2>
-      <p class="text-sm text-muted mb-4">Informe seu e-mail de acesso. Se ele existir no sistema, você recebe um link para criar uma nova senha.</p>
-      <form @submit.prevent="sendResetLink()">
-        <div class="form-group">
-          <label class="label" for="forgot-email">E-mail</label>
-          <input class="input" type="email" id="forgot-email" x-model="forgotEmail" placeholder="voce@clinica.com.br" required>
-        </div>
-        <p x-show="forgotError" x-cloak class="text-sm mb-3" style="color:var(--color-danger);" x-text="forgotError"></p>
-        <button class="btn btn-primary btn-block mt-2" type="submit" :disabled="forgotLoading">
-          <span x-show="!forgotLoading">Enviar link de redefinição</span>
-          <span x-show="forgotLoading" x-cloak>Enviando…</span>
-        </button>
-      </form>
-      <div class="text-center mt-3">
-        <a href="#" class="text-xs" style="color:var(--color-text-soft);" @click.prevent="backToLogin()">Voltar para o login</a>
-      </div>
-    </div>
-
-    <div x-show="step === 'forgot-sent'" x-cloak class="text-center">
-      <h2 style="font-size:var(--font-size-7);margin-bottom:8px;">Verifique seu e-mail</h2>
-      <p class="text-sm text-muted mb-4">Se <strong x-text="forgotEmail"></strong> tiver uma conta no sistema, um link para redefinir a senha chega em instantes. Confira também a caixa de spam.</p>
-      <button class="btn btn-secondary btn-block" type="button" @click="backToLogin()">Voltar para o login</button>
-    </div>
-  </div>
-
-  <!-- Acesso restrito à equipe Prisma (gestão do SaaS) -- de propósito
-       discreto e fora do cartão de login, pra não competir visualmente com
-       o login da clínica nem sugerir que faz parte do mesmo fluxo. -->
-  <a href="acesso-administrativo.html" class="text-center mt-3" style="display:block;font-size:var(--font-size-2);color:rgba(255,255,255,0.55);text-decoration:none;">Acesso administrativo</a>
-</div>
-
-<script>
-// translateAuthError() agora mora em js/supabase-client.js (compartilhada
-// com acesso-administrativo.html).
-
-function loginForm() {
-  return {
-    email: '',
-    password: '',
-    loading: false,
-    showPass: false,
-    errorMsg: '',
-    branding: {},
-
-    step: 'login', // 'login' | 'forgot' | 'forgot-sent'
-    forgotEmail: '',
-    forgotLoading: false,
-    forgotError: '',
-
-    async init() {
-      const params = new URLSearchParams(window.location.search);
-      if (params.get('desativado') === '1') {
-        this.errorMsg = 'Este acesso foi desativado. Fale com a administração da clínica.';
-      }
-      await this.loadBranding();
-
-      // Se voltou de um redirect do Google já com sessão ativa (login OAuth
-      // de quem já tem acesso aprovado), decide para onde mandar direto,
-      // sem esperar o clique em "Entrar".
-      const { data: { session } } = await supabaseClient.auth.getSession();
-      if (session) await this.routeAfterAuth(session.user);
-      supabaseClient.auth.onAuthStateChange((event, sess) => {
-        if (event === 'SIGNED_IN' && sess) this.routeAfterAuth(sess.user);
-      });
-    },
-
-    async loginWithGoogle() {
-      this.errorMsg = '';
-      const { error } = await supabaseClient.auth.signInWithOAuth({
-        provider: 'google',
-        options: { redirectTo: window.location.href.split('?')[0] }
-      });
-      if (error) this.errorMsg = 'Não foi possível conectar com o Google agora: ' + error.message;
-    },
-
-    // Usado tanto pelo login com Google quanto (indiretamente) pelo login
-    // com senha: busca o papel em public.users e decide a próxima tela.
-    // Conta Google sem linha em public.users ainda = pediu acesso mas
-    // ainda não foi aprovado (ou nunca chegou a solicitar) -- manda para
-    // o formulário de solicitação em vez de deixar a pessoa presa aqui.
-    async routeAfterAuth(user) {
-      if (!user) return;
-      const { data: profile } = await supabaseClient.from('users').select('role, is_active').eq('id', user.id).maybeSingle();
-      if (!profile) {
-        window.location.href = 'solicitar-acesso.html';
-        return;
-      }
-      if (profile.is_active === false) {
-        await supabaseClient.auth.signOut();
-        this.errorMsg = 'Este acesso foi desativado. Fale com a administração da clínica.';
-        return;
-      }
-      // Login de clínica nunca autentica o papel equipe_prisma, nem com a
-      // senha correta -- essa porta é só para clínicas. O acesso
-      // administrativo da Prisma tem entrada própria (botão dedicado no
-      // rodapé desta tela, que leva a acesso-administrativo.html); por
-      // isso aqui a sessão é encerrada em vez de redirecionada.
-      if (profile.role === 'equipe_prisma') {
-        await supabaseClient.auth.signOut();
-        this.errorMsg = 'Este acesso é exclusivo para clínicas. Use o botão "Acesso administrativo" abaixo.';
-        return;
-      }
-      window.location.href = window.homeForRole(profile.role);
-    },
-
-    // Identidade visual da tela de login é definida pela equipe Prisma em
-    // admin-clinicas.html (tabela platform_branding, leitura pública). Se a
-    // consulta falhar por qualquer motivo (ex.: migration 029 ainda não
-    // aplicada nesse ambiente), a tela cai de volta nos valores fixos --
-    // login continua funcionando normalmente.
-    async loadBranding() {
-      try {
-        const { data, error } = await supabaseClient.from('platform_branding').select('*').eq('id', 1).maybeSingle();
-        if (!error && data) {
-          this.branding = data;
-          if (data.primary_color || data.accent_color) {
-            window.applyBrandColors && window.applyBrandColors(data.primary_color, data.accent_color);
-          }
-        }
-      } catch (err) {
-        console.error('[login] erro ao carregar personalização:', err);
-      }
-    },
-
-    async submit() {
-      this.errorMsg = '';
-      this.loading = true;
-      const { data, error } = await supabaseClient.auth.signInWithPassword({
-        email: this.email,
-        password: this.password
-      });
-      if (error) {
-        this.errorMsg = translateAuthError(error);
-        this.loading = false;
-        return;
-      }
-      await this.routeAfterAuth(data.user);
-      this.loading = false;
-    },
-
-    openForgotPassword() {
-      this.forgotEmail = this.email || '';
-      this.forgotError = '';
-      this.step = 'forgot';
-    },
-
-    backToLogin() {
-      this.step = 'login';
-      this.errorMsg = '';
-      this.forgotError = '';
-    },
-
-    // Sempre mostra a mesma tela de "verifique seu e-mail" ao final, exista
-    // ou não uma conta com esse e-mail -- evita que alguém use esse
-    // formulário para descobrir quais e-mails têm cadastro no sistema.
-    async sendResetLink() {
-      if (!this.forgotEmail || !this.forgotEmail.trim()) {
-        this.forgotError = 'Informe seu e-mail.';
-        return;
-      }
-      this.forgotLoading = true;
-      this.forgotError = '';
-      const redirectTo = window.location.href.split('?')[0].replace(/index\.html$/, '') + 'redefinir-senha.html';
-      const { error } = await supabaseClient.auth.resetPasswordForEmail(this.forgotEmail.trim(), { redirectTo });
-      this.forgotLoading = false;
-      if (error && error.status !== 400) {
-        this.forgotError = 'Não foi possível enviar o link agora. Tente novamente em instantes.';
-        return;
-      }
-      this.step = 'forgot-sent';
-    }
-  };
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sua Atualização</title>
+<meta name="description" content="Suas músicas no aparelho, tocando mesmo sem internet.">
+<meta name="theme-color" content="#0E1322">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Sua Atualização">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#EDF0F7; --surface:#FFFFFF; --raised:#E2E7F2; --line:#CDD5E6;
+  --text:#121829; --muted:#555E78;
+  --accent:#F2A100; --on-accent:#1B1400; --accent-ink:#8A5600;
+  --led:#2447D6; --danger:#C3243A; --ok:#0A7F66;
+  --scrim:rgba(10,14,28,.5);
+  color-scheme:light;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
 }
-</script>
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0E1322; --surface:#171E33; --raised:#222B47; --line:#2E3959;
+    --text:#F1F3FA; --muted:#9BA5C2;
+    --accent:#FFB020; --on-accent:#1B1400; --accent-ink:#FFC457;
+    --led:#7A9DFF; --danger:#FF6B7D; --ok:#3ED6B4;
+    --scrim:rgba(4,6,14,.66);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0E1322; --surface:#171E33; --raised:#222B47; --line:#2E3959;
+  --text:#F1F3FA; --muted:#9BA5C2;
+  --accent:#FFB020; --on-accent:#1B1400; --accent-ink:#FFC457;
+  --led:#7A9DFF; --danger:#FF6B7D; --ok:#3ED6B4;
+  --scrim:rgba(4,6,14,.66);
+  color-scheme:dark;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px)}
+body{
+  height:100%;margin:0;background:var(--bg);color:var(--text);
+  font-family:'Archivo','Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;
+  font-size:16px;line-height:1.45;-webkit-text-size-adjust:100%;
+}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+h1,h2,h3,p{margin:0}
+:focus-visible{outline:2px solid var(--led);outline-offset:2px}
+[hidden]{display:none !important}
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="js/supabase-client.js"></script>
-<script src="js/include.js" defer></script>
+.shell{max-width:600px;margin:0 auto;padding:0 16px 190px}
+.cond{font-stretch:62%;font-weight:800;letter-spacing:.01em}
+
+/* topo */
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--bg);
+  display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:60px;padding:8px 0}
+.brand{display:flex;align-items:center;gap:10px;font-size:24px;line-height:1;text-transform:uppercase}
+.brand-mark{display:flex;align-items:flex-end;gap:2px;height:20px}
+.brand-mark i{width:5px;background:var(--accent);border-radius:1px}
+.brand-mark i:nth-child(1){height:8px}.brand-mark i:nth-child(2){height:20px}.brand-mark i:nth-child(3){height:13px}
+.net{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);white-space:nowrap}
+.net::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--ok)}
+.net.off::before{background:var(--accent)}
+.backbtn{display:inline-flex;align-items:center;gap:4px;min-height:44px;padding:0 10px 0 2px;border:0;background:none;font-weight:600}
+
+/* tipografia de tela */
+.h-screen{font-size:30px;line-height:1.05;margin:10px 0 4px}
+.sub{color:var(--muted);font-size:14px}
+.sec{margin-top:28px}
+.sec > h2{font-size:18px;font-weight:700;margin-bottom:10px}
+
+/* botões */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:48px;padding:0 18px;
+  border:0;border-radius:10px;background:var(--accent);color:var(--on-accent);font-weight:700;width:100%;text-align:center}
+.btn svg{width:20px;height:20px;flex:none}
+.btn.ghost{background:transparent;color:var(--text);box-shadow:inset 0 0 0 1.5px var(--line)}
+.btn.danger{background:transparent;color:var(--danger);box-shadow:inset 0 0 0 1.5px var(--line)}
+.btn.sm{min-height:44px;width:auto;padding:0 14px;font-size:14px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.ib{display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;border:0;background:none;border-radius:50%;color:var(--muted);flex:none}
+.ib.on{color:var(--accent-ink)}
+.ib.on svg path{fill:currentColor}
+.link{border:0;background:none;padding:0;min-height:44px;color:var(--led);font-weight:600;text-align:left}
+
+/* capas */
+.cover{position:relative;aspect-ratio:1/1;border-radius:6px;overflow:hidden;container-type:inline-size;width:100%}
+.cv-in{position:absolute;inset:0;padding:16px;padding:8cqw;display:flex;flex-direction:column;justify-content:space-between}
+.cv-tag{font-size:12px;font-size:6.2cqw;font-weight:700;line-height:1.1;max-width:62%}
+.cv-big{font-stretch:62%;font-weight:900;line-height:.84;text-transform:uppercase;font-size:2.4rem}
+.cv-big.xl{font-size:40cqw}.cv-big.lg{font-size:30cqw}.cv-big.md{font-size:22cqw}
+.cv-vu{position:absolute;top:8cqw;right:8cqw;display:flex;align-items:flex-start;gap:1.6cqw;height:26cqw;opacity:.42}
+.cv-vu i{width:3.2cqw;background:currentColor;border-radius:1px}
+@container (max-width: 140px){.cv-tag{display:none}.cv-in{justify-content:flex-end}}
+@container (max-width: 90px){.cv-vu{display:none}}
+.cv-a{background:#F2A100;color:#141B30}
+.cv-b{background:#2447D6;color:#F4F6FC}
+.cv-c{background:#D92B45;color:#FFF3E2}
+.cv-d{background:#0E9C8F;color:#0B1222}
+.cv-e{background:#141B30;color:#FFB020}
+
+/* biblioteca */
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px 14px;margin-top:16px}
+@media (min-width:520px){.grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.card{display:block;border:0;background:none;padding:0;text-align:left;width:100%}
+.card-t{display:block;font-weight:700;margin-top:8px;line-height:1.2}
+.card-s{display:flex;align-items:center;gap:5px;font-size:13px;color:var(--muted);margin-top:3px}
+.card-s svg{width:14px;height:14px}
+.card-s.ok{color:var(--ok)}
+
+/* medidor de segmentos */
+.vu{display:flex;gap:3px;height:16px}
+.vu i{flex:1;background:var(--line);border-radius:2px}
+.vu i.on{background:var(--accent)}
+.dlbox{background:var(--surface);border-radius:12px;padding:14px}
+.dlbox-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:10px;font-size:14px}
+
+/* pacote */
+.pk-head{display:grid;grid-template-columns:128px 1fr;gap:16px;align-items:end;margin:6px 0 18px}
+.pk-head h1{font-size:26px;line-height:1.05}
+.pk-meta{color:var(--muted);font-size:14px;margin-top:6px}
+.pk-extra{display:flex;flex-wrap:wrap;gap:4px 18px;margin-top:8px}
+.note{font-size:13px;color:var(--muted);margin-top:8px}
+
+/* faixas */
+.trks{margin-top:18px}
+.trk{display:grid;grid-template-columns:26px minmax(0,1fr) auto 44px 44px;align-items:center;gap:6px;min-height:58px;
+  border-bottom:1px solid var(--line);cursor:pointer}
+.trk-n{font-size:14px;color:var(--muted);font-variant-numeric:tabular-nums;text-align:center}
+.trk-n svg{width:16px;height:16px;color:var(--accent-ink)}
+.trk-m{min-width:0}
+.trk-t{display:block;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.trk-a{display:flex;align-items:center;gap:5px;font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden}
+.trk-a span{overflow:hidden;text-overflow:ellipsis}
+.trk-a svg{width:13px;height:13px;flex:none}
+.trk-a svg.ok{color:var(--ok)}
+.trk-d{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.trk.is-cur .trk-t{color:var(--accent-ink)}
+.trk.is-off .trk-t{color:var(--muted)}
+
+/* loja */
+.offer{display:grid;grid-template-columns:104px 1fr;gap:14px;padding:14px 0;border-bottom:1px solid var(--line)}
+.offer h3{font-size:17px;line-height:1.2}
+.offer .price{font-weight:800;font-size:18px;margin-top:6px}
+.offer-a{grid-column:1 / -1;display:grid;grid-template-columns:1fr auto;gap:10px}
+.plan{background:var(--surface);border-radius:12px;padding:16px;margin-top:16px}
+.plan h2{font-size:18px}
+.plan p{color:var(--muted);font-size:14px;margin:4px 0 12px}
+
+/* campos */
+.field{display:block;margin-top:14px}
+.field > span{display:block;font-size:14px;font-weight:600;margin-bottom:6px}
+.inp{width:100%;min-height:48px;padding:0 14px;border-radius:10px;border:1.5px solid var(--line);background:var(--surface)}
+.inp:focus{border-color:var(--led);outline:none}
+.err{color:var(--danger);font-size:13px;margin-top:6px}
+.search{position:relative;margin-top:12px}
+.search svg{position:absolute;left:14px;top:13px;color:var(--muted)}
+.search .inp{padding-left:46px}
+.radio{display:flex;align-items:center;gap:10px;min-height:44px}
+.radio input{width:20px;height:20px;accent-color:var(--led)}
+
+/* listas e linhas genéricas */
+.line{display:flex;align-items:center;gap:12px;width:100%;min-height:60px;padding:8px 0;border:0;border-bottom:1px solid var(--line);background:none;text-align:left}
+.line-ic{display:flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:8px;background:var(--raised);flex:none}
+.line-m{flex:1;min-width:0}
+.line-m b{display:block;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.line-m small{color:var(--muted);font-size:13px}
+.pill{display:inline-block;font-size:12px;font-weight:700;padding:3px 9px;border-radius:999px;background:var(--raised)}
+.pill.ok{color:var(--ok)}.pill.bad{color:var(--danger)}
+.empty{padding:36px 8px;text-align:center;color:var(--muted)}
+.empty b{display:block;color:var(--text);font-size:17px;margin-bottom:4px}
+.empty .btn{width:auto;margin-top:14px}
+
+/* conta e painel */
+.panel{background:var(--surface);border-radius:12px;padding:16px;margin-top:14px}
+.kv{display:flex;justify-content:space-between;gap:12px;padding:8px 0;font-size:15px}
+.kv span:first-child{color:var(--muted)}
+.switch{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:48px;width:100%;border:0;background:none;padding:0;text-align:left;font-weight:600}
+.switch i{position:relative;width:46px;height:28px;border-radius:999px;background:var(--line);flex:none;transition:background .15s}
+.switch i::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:var(--surface);transition:transform .15s}
+.switch[aria-checked="true"] i{background:var(--led)}
+.switch[aria-checked="true"] i::after{transform:translateX(18px)}
+.seg{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;background:var(--raised);padding:4px;border-radius:10px;margin-top:14px}
+.seg button{min-height:40px;border:0;border-radius:7px;background:none;font-weight:600;font-size:14px}
+.seg button[aria-selected="true"]{background:var(--surface)}
+.seg.two{grid-template-columns:1fr 1fr}
+a.btn{text-decoration:none}
+.kv span:last-child,.kv b{text-align:right;overflow-wrap:anywhere}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px}
+.stat{background:var(--surface);border-radius:10px;padding:12px}
+.stat b{display:block;font-size:22px;line-height:1.1;font-stretch:75%;font-weight:800}
+.stat small{color:var(--muted);font-size:12px}
+.barrow{margin-top:12px;font-size:14px}
+.barrow-h{display:flex;justify-content:space-between;gap:10px}
+.bar{height:10px;border-radius:2px;background:var(--raised);margin-top:5px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--led)}
+.client{padding:12px 0;border-bottom:1px solid var(--line)}
+.client-h{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.client-a{display:grid;grid-template-columns:auto 1fr;gap:8px;margin-top:8px}
+.client-a select{min-height:44px;min-width:0}
+
+/* barra inferior */
+.dock{position:fixed;left:0;right:0;bottom:0;z-index:40;background:var(--surface);border-top:1px solid var(--line);
+  padding-bottom:env(safe-area-inset-bottom,0px)}
+.dock-in{max-width:600px;margin:0 auto}
+.mini{position:relative;display:grid;grid-template-columns:44px minmax(0,1fr) 44px 44px;align-items:center;gap:10px;padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--line)}
+.mini-bar{position:absolute;left:0;right:0;top:0;height:3px;background:var(--line)}
+.mini-bar i{display:block;height:100%;background:var(--accent);transform-origin:left center;transform:scaleX(0)}
+.mini .ib{color:var(--text)}
+.tabs{display:grid;grid-template-columns:repeat(5,1fr)}
+.tab{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:58px;border:0;background:none;color:var(--muted);font-size:12px;font-weight:600}
+.tab[aria-current="page"]{color:var(--text)}
+.tab[aria-current="page"]::before{content:"";position:absolute;top:0;left:22%;right:22%;height:3px;background:var(--accent);border-radius:0 0 2px 2px}
+.tab .dot{position:absolute;top:9px;left:calc(50% + 8px);width:9px;height:9px;border-radius:50%;background:var(--danger)}
+
+/* folhas */
+.scrim{position:fixed;inset:0;z-index:50;background:var(--scrim);display:none;align-items:flex-end;justify-content:center}
+.scrim.open{display:flex}
+.sheet{background:var(--surface);width:100%;max-width:600px;max-height:calc(100% - env(safe-area-inset-top,0px) - 20px);overflow:auto;
+  border-radius:20px 20px 0 0;padding:16px 20px calc(22px + env(safe-area-inset-bottom,0px))}
+.sheet-h{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px}
+.sheet-h h2{font-size:20px;line-height:1.15}
+.sheet p.lead{color:var(--muted);margin-bottom:14px}
+.sheet .btn + .btn{margin-top:10px}
+
+/* player */
+.pl-head{display:grid;grid-template-columns:44px 1fr 44px;align-items:center;text-align:center}
+.pl-from{font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pl-cover{width:min(52vw,220px);margin:8px auto 14px}
+.pl-vu{display:block;width:100%;height:64px}
+.pl-t{font-size:22px;line-height:1.15;margin-top:12px}
+.pl-a{color:var(--muted)}
+#seek{width:100%;height:44px;margin:4px 0 0;accent-color:var(--accent)}
+.pl-time{display:flex;justify-content:space-between;font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums;margin-top:-6px}
+.pl-ctl{display:flex;align-items:center;justify-content:space-between;margin:10px 0 6px}
+.pl-ctl .ib{position:relative;color:var(--text)}
+.pl-ctl .ib.on{color:var(--accent-ink)}
+.pl-ctl .ib.on svg path{fill:none}
+.pl-ctl .ib sup{position:absolute;top:4px;right:4px;font-size:10px;font-weight:800}
+.pl-main{width:68px;height:68px;border-radius:50%;border:0;background:var(--accent);color:var(--on-accent);display:inline-flex;align-items:center;justify-content:center}
+.pl-main svg{width:30px;height:30px}
+.pl-q{margin-top:14px}
+.pl-q h3{font-size:15px;color:var(--muted);font-weight:600}
+
+/* login */
+.login{min-height:100%;display:flex;flex-direction:column;justify-content:center;padding:32px 0 48px}
+.login h1{font-size:clamp(44px,14.5vw,92px);line-height:.86;text-transform:uppercase;font-stretch:62%;font-weight:900;overflow:hidden}
+.login .vu{height:22px;margin:18px 0 16px}
+.login .vu i.on{animation:seg .28s ease-out both}
+@keyframes seg{from{background:var(--line)}to{background:var(--accent)}}
+.login .lead{font-size:18px;max-width:30ch}
+.login .btn{margin-top:20px}
+
+.toast{position:fixed;left:50%;top:calc(12px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:60;
+  background:var(--text);color:var(--bg);padding:12px 16px;border-radius:10px;font-size:14px;font-weight:600;max-width:min(92vw,520px);
+  opacity:0;pointer-events:none;transition:opacity .2s}
+.toast.show{opacity:1}
+
+@media (prefers-reduced-motion: reduce){
+  *{transition:none !important;animation:none !important}
+}
+</style>
+</head>
+<body>
+<div class="shell" id="shell">
+  <header class="top" id="top"></header>
+  <main id="view"></main>
+</div>
+<div class="dock" id="dock" hidden><div class="dock-in" id="dockIn"></div></div>
+<div class="scrim" id="scrim" data-a="scrim"><div class="sheet" id="sheet" role="dialog" aria-modal="true" tabindex="-1"></div></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="supabase.js"></script>
+<script>
+(function(){
+'use strict';
+
+/* ================= utilidades ================= */
+const $ = (s, r) => (r || document).querySelector(s);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const brl = n => { n = Number(n || 0); try { return 'R$ ' + n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); } catch (e) { return 'R$ ' + n.toFixed(2).replace('.', ','); } };
+const fmt = s => { s = Math.max(0, Math.floor(s || 0)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+const mbs = b => (b / 1048576).toFixed(1).replace('.', ',') + ' MB';
+const norm = s => String(s).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const today = () => new Date().toISOString().slice(0, 10);
+const brDate = iso => iso ? String(iso).slice(0, 10).split('-').reverse().join('/') : '';
+const plural = (n, one, many) => n + ' ' + (n === 1 ? one : many);
+function hash(str){ let h = 2166136261; for (let i = 0; i < str.length; i++){ h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
+function rng(seed){ let a = seed >>> 0; return () => { a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+
+/* ================= ícones ================= */
+const svg = d => '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + d + '</svg>';
+const I = {
+  play: svg('<path d="M7 4.5v15l12-7.5z" fill="currentColor"/>'),
+  pause: svg('<path d="M8 5v14M16 5v14" stroke-width="3"/>'),
+  next: svg('<path d="M5 5v14l10-7z" fill="currentColor"/><path d="M19 5v14"/>'),
+  prev: svg('<path d="M19 5v14L9 12z" fill="currentColor"/><path d="M5 5v14"/>'),
+  shuffle: svg('<path d="M3 7h3c2 0 3.300.900 4.400 2.600l3.200 4.800c1.100 1.700 2.400 2.600 4.400 2.600h3M3 17h3c1.300 0 2.300-.400 3.100-1.200M21 7h-3c-1.300 0-2.300.400-3.100 1.200M18 4l3 3-3 3M18 14l3 3-3 3"/>'),
+  repeat: svg('<path d="M17 2l4 4-4 4M3 11V9a3 3 0 013-3h15M7 22l-4-4 4-4M21 13v2a3 3 0 01-3 3H3"/>'),
+  heart: svg('<path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.060a5.5 5.5 0 000-7.780z"/>'),
+  download: svg('<path d="M12 4v11M7 11l5 5 5-5M5 20h14"/>'),
+  check: svg('<path d="M5 12.5l4.5 4.5L19 7.500"/>'),
+  search: svg('<circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.200-4.200"/>'),
+  disc: svg('<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.5"/>'),
+  bag: svg('<path d="M5 8h14l-1 12H6L5 8zM9 8V6a3 3 0 016 0v2"/>'),
+  list: svg('<path d="M4 6h16M4 12h16M4 18h10"/>'),
+  user: svg('<circle cx="12" cy="8" r="4"/><path d="M4 21c1.200-4 4.200-6 8-6s6.800 2 8 6"/>'),
+  plus: svg('<path d="M12 5v14M5 12h14"/>'),
+  x: svg('<path d="M6 6l12 12M18 6L6 18"/>'),
+  back: svg('<path d="M15 5l-7 7 7 7"/>'),
+  down: svg('<path d="M6 9l6 6 6-6"/>'),
+  dots: svg('<circle cx="5" cy="12" r="1.6" fill="currentColor"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><circle cx="19" cy="12" r="1.6" fill="currentColor"/>'),
+  trash: svg('<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>'),
+  usb: svg('<path d="M9 3h6v5H9zM7 8h10v7a5 5 0 01-10 0V8z"/>'),
+  lock: svg('<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/>'),
+  eq: svg('<path d="M6 20V10M12 20V4M18 20v-7" stroke-width="3"/>')
+};
+
+/* ================= conexão com o servidor ================= */
+// A chave abaixo é a chave pública do projeto (feita para ficar no app). O acesso aos dados é controlado pelas regras do banco.
+const CFG = { url: 'https://rovpprmznzqvobysizqg.supabase.co', key: 'sb_publishable_sMrOA7dgQRMnUSVoHUvy1A_S2icykTM', whatsapp: '', subPrice: 19.9 };
+let sb = null;
+try { if (window.supabase && window.supabase.createClient) sb = window.supabase.createClient(CFG.url, CFG.key, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } }); } catch (e) {}
+
+/* nomes usados só para gerar faixas de demonstração no painel */
+const TITLES = ['Poeira na Estrada','Sanfona Chorou','Rede na Varanda','Coração de Vaqueiro','Piseiro da Feira','Balanço do Litoral','Chão de Barro','Luz de Lamparina','Grave que Treme','Som de Porta-Malas','Madrugada no Posto','Caminhonete Prata','Saudade na BR','Pé na Tábua','Recado no Rádio','Porteira Aberta','Mesa de Bar','Última Rodada','Serenata na Calçada','Fim de Tarde no Rancho'];
+const ARTISTS = ['Banda Maré Cheia','Trio Lamparina','Tico Vaqueiro','Banda Farol do Norte','DJ Graveto','Equipe Trovão Azul','Irmãos Cancela','Zeca Lume e Tonho Brasa','Seu Honório do Violão'];
+function seed(){
+  return { v: 2, user: null, isAdmin: false, blocked: false, admin: false, sub: false, subStatus: '', subUntil: '', owned: [], dl: {}, favs: [], lists: [], plays: {}, seen: [], packs: [], syncedAt: 0 };
+}
+
+/* ================= estado e armazenamento ================= */
+const LS_KEY = 'sua-atualizacao-v2';
+function loadState(){ try { const raw = localStorage.getItem(LS_KEY); if (raw){ const o = JSON.parse(raw); if (o && o.v === 2 && Array.isArray(o.packs)) return o; } } catch (e) {} return null; }
+function save(){ try { localStorage.setItem(LS_KEY, JSON.stringify(S)); } catch (e) {} }
+let S = loadState() || seed();
+const newLogin = () => ({ step: 'form', channel: 'email', name: '', email: '', phone: '', busy: false, redraw: false });
+const UI = { tab: 'biblioteca', stack: [], sheet: null, q: '', adminTab: 'pacotes', seeking: false, login: newLogin(), gate: null, devices: [] };
+const T = new Map();
+function index(){ T.clear(); S.packs.forEach(p => p.tracks.forEach(t => T.set(t.id, Object.assign({}, t, { pack: p })))); }
+index();
+
+const packById = id => S.packs.find(p => p.id === id);
+const released = p => !p.release || new Date(p.release).getTime() <= Date.now();
+const isOwned = p => released(p) && (S.sub || S.owned.indexOf(p.id) >= 0);
+const subActive = () => !!S.sub && S.subStatus === 'active' && !!S.subUntil && new Date(S.subUntil).getTime() > Date.now();
+const subExpired = () => !!S.sub && !subActive();
+const subProblem = () => S.subStatus === 'past_due' ? 'Assinatura com pagamento pendente' : 'Assinatura vencida em ' + brDate(S.subUntil);
+const canPlay = p => !S.blocked && released(p) && (S.owned.indexOf(p.id) >= 0 || subActive());
+const ownedPacks = () => S.packs.filter(isOwned);
+const storePacks = () => S.packs.filter(p => released(p) && !isOwned(p));
+const dlBytes = () => Object.keys(S.dl).reduce((s, k) => s + (S.dl[k] || 0), 0);
+
+/* áudio no aparelho: IndexedDB com reserva em memória */
+const mem = new Map();
+let dbp = null;
+function idb(){
+  if (dbp) return dbp;
+  dbp = new Promise(res => {
+    try {
+      const r = indexedDB.open('sua-atualizacao', 1);
+      r.onupgradeneeded = () => { r.result.createObjectStore('audio'); };
+      r.onsuccess = () => res(r.result);
+      r.onerror = () => res(null);
+      r.onblocked = () => res(null);
+    } catch (e) { res(null); }
+  });
+  return dbp;
+}
+async function audioPut(id, rec){
+  const db = await idb();
+  if (db){
+    try {
+      await new Promise((res, rej) => { const tx = db.transaction('audio', 'readwrite'); tx.objectStore('audio').put(rec, id); tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error); tx.onabort = () => rej(tx.error); });
+      return;
+    } catch (e) {}
+  }
+  mem.set(id, rec);
+}
+async function audioGet(id){
+  if (mem.has(id)) return mem.get(id);
+  const db = await idb(); if (!db) return null;
+  try { return await new Promise(res => { const rq = db.transaction('audio').objectStore('audio').get(id); rq.onsuccess = () => res(rq.result || null); rq.onerror = () => res(null); }); } catch (e) { return null; }
+}
+async function audioDel(id){
+  mem.delete(id);
+  const db = await idb(); if (!db) return;
+  try { await new Promise(res => { const tx = db.transaction('audio', 'readwrite'); tx.objectStore('audio').delete(id); tx.oncomplete = res; tx.onerror = res; tx.onabort = res; }); } catch (e) {}
+}
+async function audioKeys(){
+  const keys = new Set(mem.keys());
+  const db = await idb();
+  if (db){
+    try { const ks = await new Promise(res => { const rq = db.transaction('audio').objectStore('audio').getAllKeys(); rq.onsuccess = () => res(rq.result || []); rq.onerror = () => res([]); }); ks.forEach(k => keys.add(k)); } catch (e) {}
+  }
+  return keys;
+}
+
+/* ================= gerador das faixas de demonstração ================= */
+const SR = 22050;
+function synth(seedN, secs){
+  const r = rng(seedN), nz = rng(seedN ^ 0x9E3779B9);
+  const scales = [[0,2,4,7,9],[0,2,4,5,7,9,10],[0,3,5,7,10],[0,2,3,5,7,8,10]];
+  const sc = scales[Math.floor(r() * scales.length)];
+  const root = 98 * Math.pow(2, Math.floor(r() * 7) / 12);
+  const bpm = 92 + Math.floor(r() * 56);
+  const step = 60 / bpm / 2, stepN = step * SR;
+  const mel = []; let d = Math.floor(r() * sc.length);
+  for (let i = 0; i < 32; i++){ d = clamp(d + Math.floor(r() * 5) - 2, 0, sc.length * 2 - 1); mel.push(r() < 0.22 ? -1 : d); }
+  const chords = [0, 3 % sc.length, r() < 0.5 ? 4 % sc.length : 2, 0];
+  const freq = g => root * Math.pow(2, (sc[g % sc.length] + 12 * Math.floor(g / sc.length)) / 12);
+  const n = Math.floor(secs * SR), out = new Int16Array(n), TAU = Math.PI * 2;
+  for (let i = 0; i < n; i++){
+    const si = Math.floor(i / stepN), ts = (i - si * stepN) / SR, sb = si % 8, bar = Math.floor(si / 8);
+    let v = 0;
+    const m = mel[si % 32];
+    if (m >= 0){ const f = freq(m) * 4; v += (Math.sin(TAU * f * ts) + 0.4 * Math.sin(TAU * 2 * f * ts)) * Math.exp(-ts * 7) * 0.2; }
+    const hb = sb < 3 ? 0 : sb < 6 ? 3 : 6, tb = (sb - hb) * step + ts;
+    v += Math.sin(TAU * freq(chords[bar % 4]) * tb) * Math.exp(-tb * 4) * 0.4;
+    v += Math.sin(TAU * (48 * tb + (82 / 28) * (1 - Math.exp(-tb * 28)))) * Math.exp(-tb * 14) * 0.55;
+    v += (nz() * 2 - 1) * (sb % 2 === 1 ? 0.1 : 0.05) * Math.exp(-ts * 60);
+    const fade = Math.min(1, i / (SR * 0.3), (n - i) / (SR * 1.2));
+    out[i] = Math.tanh(v * 1.3) * fade * 30000;
+  }
+  return out;
+}
+
+/* ================= player (Web Audio) ================= */
+const P = { ctx: null, gain: null, an: null, src: null, buf: null, id: null, playing: false, startedAt: 0, offset: 0, token: 0, loadTk: 0, queue: [], idx: -1, shuffle: false, repeat: 'off' };
+function ensureCtx(){
+  if (!P.ctx){
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return null;
+    P.ctx = new AC();
+    P.gain = P.ctx.createGain();
+    P.an = P.ctx.createAnalyser(); P.an.fftSize = 128; P.an.smoothingTimeConstant = 0.78;
+    P.gain.connect(P.an); P.an.connect(P.ctx.destination);
+  }
+  if (P.ctx.state === 'suspended'){ try { P.ctx.resume(); } catch (e) {} }
+  return P.ctx;
+}
+function decode(buf){
+  const ctx = ensureCtx();
+  return new Promise(res => {
+    if (!ctx) return res(null);
+    let done = false;
+    const ok = b => { if (!done){ done = true; res(b); } }, no = () => { if (!done){ done = true; res(null); } };
+    try { const p = ctx.decodeAudioData(buf, ok, no); if (p && p.then) p.then(ok, no); } catch (e) { no(); }
+  });
+}
+async function bufferFor(id){
+  const rec = await audioGet(id); if (!rec) return null;
+  const ctx = ensureCtx(); if (!ctx) return null;
+  if (rec.kind === 'pcm'){
+    const i16 = new Int16Array(rec.buf), b = ctx.createBuffer(1, i16.length, rec.sr), ch = b.getChannelData(0);
+    for (let i = 0; i < i16.length; i++) ch[i] = i16[i] / 32768;
+    return b;
+  }
+  return decode(rec.buf.slice(0));
+}
+function pos(){ if (!P.buf) return 0; return P.playing ? Math.min(P.buf.duration, P.ctx.currentTime - P.startedAt) : P.offset; }
+function stopSrc(){ if (P.src){ P.src.onended = null; try { P.src.stop(); } catch (e) {} try { P.src.disconnect(); } catch (e) {} P.src = null; } }
+function startSrc(offset){
+  stopSrc();
+  const s = P.ctx.createBufferSource(); s.buffer = P.buf; s.connect(P.gain);
+  const tk = ++P.token;
+  s.onended = () => { if (tk !== P.token || !P.playing) return; next(true); };
+  s.start(0, offset);
+  P.src = s; P.startedAt = P.ctx.currentTime - offset; P.playing = true;
+}
+async function playAt(i){
+  if (i < 0 || i >= P.queue.length) return;
+  if (!ensureCtx()){ toast('Este navegador não consegue tocar áudio.'); return; }
+  P.idx = i;
+  const id = P.queue[i], tk = ++P.loadTk;
+  const b = await bufferFor(id);
+  if (tk !== P.loadTk) return;
+  if (!b){ delete S.dl[id]; save(); toast('Não foi possível abrir esta faixa. Baixe de novo.'); renderView(); return; }
+  P.buf = b; P.id = id; P.offset = 0;
+  startSrc(0);
+  S.plays[id] = (S.plays[id] || 0) + 1; save();
+  playerChanged();
+}
+function playQueue(ids, startId){
+  const ok = ids.filter(id => T.has(id) && canPlay(T.get(id).pack));
+  if (!ok.length && ids.length){ toast('Assinatura vencida. Renove para voltar a ouvir.'); return; }
+  const q = ok.filter(id => S.dl[id]);
+  if (!q.length){ toast('Baixe as faixas para ouvir.'); return; }
+  P.queue = q;
+  let i = startId ? q.indexOf(startId) : 0; if (i < 0) i = 0;
+  playAt(i);
+}
+function next(auto){
+  if (!P.queue.length) return;
+  if (auto && P.repeat === 'one'){ playAt(P.idx); return; }
+  let i;
+  if (P.shuffle && P.queue.length > 1){ do { i = Math.floor(Math.random() * P.queue.length); } while (i === P.idx); }
+  else i = P.idx + 1;
+  if (i >= P.queue.length){
+    if (P.repeat === 'all' || !auto) i = 0;
+    else { stopSrc(); P.playing = false; P.offset = 0; playerChanged(); return; }
+  }
+  playAt(i);
+}
+function prev(){ if (!P.queue.length) return; if (pos() > 3 || P.idx === 0){ seek(0); return; } playAt(P.idx - 1); }
+function toggle(){
+  if (!P.buf) return;
+  if (P.playing){ P.offset = pos(); stopSrc(); P.playing = false; }
+  else { ensureCtx(); startSrc(P.offset >= P.buf.duration - 0.05 ? 0 : P.offset); }
+  playerChanged();
+}
+function seek(t){ if (!P.buf) return; t = clamp(t, 0, Math.max(0, P.buf.duration - 0.05)); if (P.playing) startSrc(t); else P.offset = t; }
+function stopAll(){ stopSrc(); P.playing = false; P.buf = null; P.id = null; P.queue = []; P.idx = -1; P.offset = 0; }
+function playerChanged(){
+  renderDock();
+  if (UI.sheet && UI.sheet.type === 'player') renderSheet();
+  renderView();
+  try {
+    if ('mediaSession' in navigator && P.id){
+      const t = T.get(P.id);
+      if (t) navigator.mediaSession.metadata = new MediaMetadata({ title: t.t, artist: t.a, album: t.pack.title });
+      navigator.mediaSession.playbackState = P.playing ? 'playing' : 'paused';
+    }
+  } catch (e) {}
+}
+try {
+  if ('mediaSession' in navigator){
+    navigator.mediaSession.setActionHandler('play', () => { if (!P.playing) toggle(); });
+    navigator.mediaSession.setActionHandler('pause', () => { if (P.playing) toggle(); });
+    navigator.mediaSession.setActionHandler('nexttrack', () => next(false));
+    navigator.mediaSession.setActionHandler('previoustrack', () => prev());
+  }
+} catch (e) {}
+
+/* ================= downloads ================= */
+const DL = { active: null };
+async function downloadTracks(packId, ids, quiet){
+  if (DL.active){ toast('Já existe um download em andamento.'); return; }
+  const todo = ids.filter(id => !S.dl[id] && T.get(id) && T.get(id).src === 'demo' && canPlay(T.get(id).pack));
+  if (!todo.length) return;
+  try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {}
+  DL.active = { packId: packId, total: todo.length, done: 0, part: 0, cur: null, cancel: false };
+  renderView();
+  for (const id of todo){
+    if (DL.active.cancel) break;
+    const t = T.get(id);
+    DL.active.cur = id;
+    for (let k = 1; k <= 3; k++){ await sleep(70 + Math.random() * 70); if (DL.active.cancel) break; DL.active.part = k / 4; updateDl(); }
+    if (DL.active.cancel) break;
+    const pcm = synth(t.seed, t.d);
+    await audioPut(id, { kind: 'pcm', sr: SR, buf: pcm.buffer });
+    S.dl[id] = pcm.byteLength; save();
+    DL.active.done++; DL.active.part = 0;
+    renderView();
+  }
+  const cancelled = DL.active.cancel, total = DL.active.total;
+  DL.active = null;
+  renderView();
+  if (cancelled) toast('Download cancelado. O que já baixou continua no aparelho.');
+  else if (!quiet) toast(packId === 'all' ? 'Tudo baixado. Seus pacotes já tocam sem internet.' : total > 1 ? 'Pacote baixado. Já dá para ouvir sem internet.' : 'Faixa baixada.');
+}
+function dlInner(){
+  const a = DL.active; if (!a) return '';
+  const frac = (a.done + a.part) / a.total;
+  return vuBar(frac) + '<div class="dlbox-row"><span>Baixando ' + Math.min(a.done + 1, a.total) + ' de ' + a.total + '</span><button class="btn ghost sm" data-a="dl-cancel">Cancelar download</button></div>';
+}
+function updateDl(){ const el = $('#dlBox'); if (el) el.innerHTML = dlInner(); }
+function vuBar(frac, n){
+  n = n || 24; const on = Math.round(frac * n); let h = '';
+  for (let i = 0; i < n; i++) h += '<i class="' + (i < on ? 'on' : '') + '"></i>';
+  return '<div class="vu" role="progressbar" aria-label="Progresso do download" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + Math.round(frac * 100) + '">' + h + '</div>';
+}
+
+/* ================= exportar ZIP (pendrive) ================= */
+let CAP_DL = null, installEvt = null;
+try { if (window.claude && window.claude.use) window.claude.use('downloads').then(d => { CAP_DL = d || null; if (d) renderView(); }).catch(() => {}); } catch (e) {}
+let CRC_T = null;
+function crc32(u8){
+  if (!CRC_T){ CRC_T = new Uint32Array(256); for (let n = 0; n < 256; n++){ let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; CRC_T[n] = c >>> 0; } }
+  let c = 0xFFFFFFFF; for (let i = 0; i < u8.length; i++) c = CRC_T[(c ^ u8[i]) & 0xFF] ^ (c >>> 8);
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+function wavBytes(buf, sr){
+  const len = buf.byteLength, b = new ArrayBuffer(44 + len), v = new DataView(b);
+  const w = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+  w(0, 'RIFF'); v.setUint32(4, 36 + len, true); w(8, 'WAVE'); w(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, sr, true); v.setUint32(28, sr * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); w(36, 'data'); v.setUint32(40, len, true);
+  new Uint8Array(b, 44).set(new Uint8Array(buf));
+  return new Uint8Array(b);
+}
+function zipBlob(files){
+  const enc = new TextEncoder(), parts = [], central = []; let off = 0;
+  files.forEach(f => {
+    const name = enc.encode(f.name), crc = crc32(f.data), size = f.data.length;
+    const lh = new DataView(new ArrayBuffer(30));
+    lh.setUint32(0, 0x04034b50, true); lh.setUint16(4, 20, true); lh.setUint16(6, 0x0800, true); lh.setUint16(8, 0, true); lh.setUint16(10, 0, true); lh.setUint16(12, 0x0021, true);
+    lh.setUint32(14, crc, true); lh.setUint32(18, size, true); lh.setUint32(22, size, true); lh.setUint16(26, name.length, true); lh.setUint16(28, 0, true);
+    parts.push(lh.buffer, name, f.data);
+    const ch = new DataView(new ArrayBuffer(46));
+    ch.setUint32(0, 0x02014b50, true); ch.setUint16(4, 20, true); ch.setUint16(6, 20, true); ch.setUint16(8, 0x0800, true); ch.setUint16(10, 0, true); ch.setUint16(12, 0, true); ch.setUint16(14, 0x0021, true);
+    ch.setUint32(16, crc, true); ch.setUint32(20, size, true); ch.setUint32(24, size, true); ch.setUint16(28, name.length, true); ch.setUint32(42, off, true);
+    central.push(ch.buffer, name);
+    off += 30 + name.length + size;
+  });
+  const cdSize = central.reduce((s, x) => s + (x.byteLength || x.length), 0);
+  const end = new DataView(new ArrayBuffer(22));
+  end.setUint32(0, 0x06054b50, true); end.setUint16(8, files.length, true); end.setUint16(10, files.length, true); end.setUint32(12, cdSize, true); end.setUint32(16, off, true);
+  return new Blob(parts.concat(central, [end.buffer]), { type: 'application/zip' });
+}
+const safeName = s => String(s).replace(/[\\/:*?"<>|]/g, '').replace(/\s+/g, ' ').trim();
+async function exportZip(packId){
+  const p = packById(packId); if (!p) return;
+  if (p.tracks.some(t => !S.dl[t.id])){ toast('Baixe o pacote inteiro antes de exportar.'); return; }
+  toast('Montando o arquivo ZIP...');
+  const files = [];
+  for (let i = 0; i < p.tracks.length; i++){
+    const t = p.tracks[i], rec = await audioGet(t.id); if (!rec) continue;
+    const num = String(i + 1).padStart(2, '0');
+    if (rec.kind === 'pcm') files.push({ name: safeName(num + ' - ' + t.t + ' - ' + t.a) + '.wav', data: wavBytes(rec.buf, rec.sr) });
+    else files.push({ name: safeName(num + ' - ' + t.t) + '.' + (t.ext || 'mp3'), data: new Uint8Array(rec.buf) });
+  }
+  if (!files.length){ toast('Não encontrei as faixas no aparelho.'); return; }
+  const zipName = safeName(p.title).replace(/,/g, '') + '.zip';
+  if (!CAP_DL){
+    try {
+      const a = document.createElement('a'), url = URL.createObjectURL(zipBlob(files));
+      a.href = url; a.download = zipName; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+      toast('ZIP salvo. Descompacte e copie para o pendrive.');
+    } catch (e) { toast('Não foi possível salvar o ZIP neste navegador.'); }
+    return;
+  }
+  try {
+    await CAP_DL.save({ filename: zipName, data: zipBlob(files) });
+    toast('ZIP salvo. Descompacte e copie para o pendrive.');
+  } catch (e) {
+    const code = e && e.code;
+    if (code === 'declined') toast('Exportação cancelada.');
+    else if (code === 'rate_limited') toast('Já existe uma confirmação aberta. Tente de novo em instantes.');
+    else toast('Não foi possível salvar o ZIP nesta visualização.');
+  }
+}
+
+/* ================= componentes ================= */
+function cover(p){
+  const lines = (p.big && p.big.length ? p.big : ['SOM']);
+  const L = Math.max.apply(null, lines.map(x => x.length));
+  const sz = L <= 3 ? 'xl' : L <= 5 ? 'lg' : 'md';
+  const r = rng(hash(p.id)); let bars = '';
+  for (let i = 0; i < 7; i++) bars += '<i style="height:' + Math.round(25 + r() * 75) + '%"></i>';
+  return '<div class="cover cv-' + esc(p.cv || 'a') + '" aria-hidden="true"><div class="cv-in"><span class="cv-tag">' + esc(p.genre) + '</span><span class="cv-vu">' + bars + '</span><span class="cv-big ' + sz + '">' + lines.map(esc).join('<br>') + '</span></div></div>';
+}
+function bigFrom(name){
+  const w = norm(name).toUpperCase().replace(/[^A-Z0-9 ]/g, '').split(/\s+/).filter(x => x.length > 1 && ['DE','DO','DA','DOS','DAS'].indexOf(x) < 0);
+  const out = w.slice(0, 2).map(x => x.slice(0, 7));
+  if (out.length === 2 && (out[0].length > 5 || out[1].length > 5)) return [out[0]];
+  return out.length ? out : ['SOM'];
+}
+function trackRow(t, i, ctx){
+  const dl = !!S.dl[t.id], cur = P.id === t.id, fav = S.favs.indexOf(t.id) >= 0, owned = canPlay(t.pack);
+  const st = !owned ? I.lock : dl ? I.check.replace('<svg', '<svg class="ok"') : I.download;
+  return '<div class="trk' + (cur ? ' is-cur' : '') + (dl ? '' : ' is-off') + '" role="button" tabindex="0" data-a="play-track" data-id="' + t.id + '" data-ctx="' + esc(ctx) + '" aria-label="' + esc(t.t + ', ' + t.a + (dl ? '' : ', não baixada')) + '">' +
+    '<span class="trk-n">' + (cur && P.playing ? I.eq : (i + 1)) + '</span>' +
+    '<span class="trk-m"><span class="trk-t">' + esc(t.t) + '</span><span class="trk-a">' + st + '<span>' + esc(t.a) + '</span></span></span>' +
+    '<span class="trk-d">' + fmt(t.d) + '</span>' +
+    '<button class="ib' + (fav ? ' on' : '') + '" data-a="fav" data-id="' + t.id + '" aria-pressed="' + fav + '" aria-label="Favoritar ' + esc(t.t) + '">' + I.heart + '</button>' +
+    '<button class="ib" data-a="more" data-id="' + t.id + '" data-ctx="' + esc(ctx) + '" aria-label="Mais opções para ' + esc(t.t) + '">' + I.dots + '</button>' +
+  '</div>';
+}
+const empty = (title, text, btn) => '<div class="empty"><b>' + title + '</b>' + text + (btn || '') + '</div>';
+
+/* ================= telas ================= */
+function loginHTML(){
+  const L = UI.login;
+  let segs = ''; for (let i = 0; i < 24; i++) segs += '<i class="on" style="animation-delay:' + (i * 38) + 'ms"></i>';
+  let body;
+  if (!sb) body = '<p class="lead">Suas músicas no aparelho, tocando mesmo sem internet.</p><p class="err">Não foi possível carregar a conexão com o servidor. Abra o app com internet e recarregue a página.</p>';
+  else if (L.step === 'code'){
+    body = '<p class="lead">Enviamos um código para ' + esc(L.channel === 'email' ? L.email : L.phone) + '.</p>' +
+      '<label class="field"><span>Código recebido</span><input class="inp" id="loginCode" inputmode="numeric" autocomplete="one-time-code" maxlength="10"></label><p class="err" id="errCode" hidden></p>' +
+      '<button class="btn" id="loginGo" data-a="login-verify">Entrar</button>' +
+      '<div class="pk-extra"><button class="link" data-a="login-back">' + (L.channel === 'email' ? 'Trocar o e-mail' : 'Trocar o número') + '</button><button class="link" data-a="login-send">Reenviar código</button></div>';
+  } else {
+    body = '<p class="lead">Suas músicas no aparelho, tocando mesmo sem internet.</p>' +
+      '<label class="field"><span>Seu nome</span><input class="inp" id="loginName" autocomplete="name" maxlength="40" value="' + esc(L.name) + '"></label><p class="err" id="errName" hidden></p>' +
+      '<div class="field"><span>Receber o código de acesso por</span><div class="seg two" role="tablist" style="margin-top:0">' +
+        '<button role="tab" aria-selected="' + (L.channel === 'email') + '" data-a="login-channel" data-c="email">E-mail</button>' +
+        '<button role="tab" aria-selected="' + (L.channel === 'whatsapp') + '" data-a="login-channel" data-c="whatsapp">WhatsApp</button></div></div>' +
+      (L.channel === 'email'
+        ? '<label class="field"><span>Seu e-mail</span><input class="inp" id="loginEmail" type="email" inputmode="email" autocomplete="email" maxlength="80" placeholder="voce@exemplo.com" value="' + esc(L.email) + '"></label>'
+        : '<label class="field"><span>WhatsApp com DDD</span><input class="inp" id="loginPhone" inputmode="tel" autocomplete="tel" maxlength="20" placeholder="(84) 90000-0000" value="' + esc(L.phone) + '"></label>') +
+      '<p class="err" id="errTarget" hidden></p>' +
+      '<button class="btn" id="loginGo" data-a="login-send">Receber código</button>' +
+      '<p class="note">Sem senha: a cada acesso em um aparelho novo, você recebe um código e entra com ele.</p>';
+  }
+  return '<section class="login" id="loginBox"><h1>Sua<br>Atualização</h1><div class="vu" aria-hidden="true">' + segs + '</div>' + body + '</section>';
+}
+function gateHTML(){
+  return '<section style="padding-top:40px"><h1 class="h-screen cond">Limite de aparelhos</h1><p class="sub">Esta conta já está em 2 aparelhos. Remova um deles para usar o app neste aqui.</p><div style="margin-top:12px">' +
+    UI.devices.map(d => '<div class="line"><span class="line-ic">' + I.user + '</span><span class="line-m"><b>' + esc(d.label || 'Aparelho') + '</b><small>Último acesso em ' + brDate(d.last_seen_at) + '</small></span><button class="btn ghost sm" data-a="device-remove" data-id="' + esc(d.id) + '">Remover</button></div>').join('') +
+    '</div><div class="sec"><button class="btn ghost" data-a="logout">Sair da conta</button></div></section>';
+}
+function blockedHTML(){
+  return '<section style="padding-top:40px"><h1 class="h-screen cond">Acesso bloqueado</h1><p class="sub">O acesso desta conta foi bloqueado pelo administrador. Fale com quem te vendeu a atualização para regularizar.</p>' +
+    '<div class="sec"><button class="btn" data-a="sync">Já regularizei, atualizar</button><button class="btn ghost" style="margin-top:10px" data-a="logout">Sair da conta</button></div></section>';
+}
+function libraryHTML(){
+  const packs = ownedPacks(), n = Object.keys(S.dl).length;
+  let h = '<h1 class="h-screen cond">Suas atualizações</h1><p class="sub">' + (n ? plural(n, 'faixa baixada', 'faixas baixadas') + ', ' + mbs(dlBytes()) + ' no aparelho' : 'Nenhuma faixa baixada ainda') + '</p>';
+  if (!packs.length) return h + empty('Você ainda não tem pacotes', 'Compre um pacote na loja e ele aparece aqui.', '<button class="btn sm" data-a="tab" data-tab="loja">Ver a loja</button> <button class="btn ghost sm" data-a="sync">Atualizar</button>');
+  if (subExpired()) h += '<div class="panel"><b>' + subProblem() + '</b><p class="note" style="margin:4px 0 12px">As faixas dos pacotes da assinatura continuam no aparelho, mas ficam bloqueadas até a renovação.</p><button class="btn sm" data-a="contact" data-k="sub">Renovar assinatura</button></div>';
+  const pend = [];
+  packs.filter(canPlay).forEach(p => p.tracks.forEach(t => { if (!S.dl[t.id] && t.src === 'demo') pend.push(t); }));
+  if (DL.active && DL.active.packId === 'all') h += '<div class="dlbox" id="dlBox" style="margin-top:14px">' + dlInner() + '</div>';
+  else if (pend.length && !DL.active) h += '<button class="btn" style="margin-top:14px" data-a="dl-all">' + I.download + 'Baixar todos os meus pacotes (' + mbs(pend.reduce((s, t) => s + t.d * SR * 2, 0)) + ')</button>';
+  h += '<div class="grid">';
+  packs.forEach(p => {
+    const tot = p.tracks.length, got = p.tracks.filter(t => S.dl[t.id]).length, lock = !canPlay(p);
+    const busy = !lock && DL.active && (DL.active.packId === p.id || (DL.active.packId === 'all' && got < tot));
+    const st = lock ? '<span class="card-s">' + I.lock + 'Bloqueado</span>' : busy ? '<span class="card-s">Baixando...</span>' : got === tot ? '<span class="card-s ok">' + I.check + 'Baixado</span>' : got ? '<span class="card-s">' + got + ' de ' + tot + ' baixadas</span>' : '<span class="card-s">' + I.download + 'Não baixado</span>';
+    h += '<button class="card" data-a="open-pack" data-id="' + p.id + '">' + cover(p) + '<span class="card-t">' + esc(p.title) + '</span>' + st + '</button>';
+  });
+  return h + '</div>';
+}
+function packHTML(id){
+  const p = packById(id);
+  if (!p) return empty('Pacote não encontrado', 'Ele pode ter sido removido pelo administrador.');
+  const owned = isOwned(p), tot = p.tracks.length, got = p.tracks.filter(t => S.dl[t.id]).length;
+  const secs = p.tracks.reduce((s, t) => s + t.d, 0);
+  const need = p.tracks.filter(t => !S.dl[t.id]).reduce((s, t) => s + t.d * SR * 2, 0);
+  const local = p.tracks.some(t => t.src === 'file');
+  let act;
+  if (!owned) act = '<button class="btn" data-a="buy" data-id="' + p.id + '">Comprar por ' + brl(p.price) + '</button>';
+  else if (!canPlay(p)) act = '<div class="panel" style="margin-top:0"><b>Pacote bloqueado</b><p class="note" style="margin:4px 0 12px">' + subProblem() + '. As faixas baixadas continuam no aparelho e voltam a tocar assim que você renovar.</p><button class="btn" data-a="contact" data-k="sub">Renovar assinatura</button></div>';
+  else if (DL.active && (DL.active.packId === p.id || (DL.active.packId === 'all' && got < tot))) act = '<div class="dlbox" id="dlBox">' + dlInner() + '</div>';
+  else if (got === 0) act = '<button class="btn" data-a="dl-pack" data-id="' + p.id + '">' + I.download + 'Baixar tudo (' + mbs(need) + ')</button>';
+  else if (got < tot) act = '<div class="row2"><button class="btn" data-a="dl-pack" data-id="' + p.id + '">Baixar o restante</button><button class="btn ghost" data-a="play-pack" data-id="' + p.id + '">' + I.play + 'Tocar</button></div>';
+  else act = '<div class="row2"><button class="btn" data-a="play-pack" data-id="' + p.id + '">' + I.play + 'Tocar</button><button class="btn ghost" data-a="play-pack" data-id="' + p.id + '" data-shuffle="1">' + I.shuffle + 'Aleatório</button></div>';
+  let extra = '';
+  if (owned && canPlay(p) && got === tot){
+    extra = '<div class="pk-extra">' +
+      '<button class="link" data-a="export-zip" data-id="' + p.id + '">Exportar ZIP para pendrive</button>' +
+      (local ? '' : '<button class="link" data-a="rm-pack-dl" data-id="' + p.id + '">Remover do aparelho</button>') + '</div>';
+  }
+  return '<div class="pk-head">' + cover(p) + '<div><h1 class="cond">' + esc(p.title) + '</h1><p class="pk-meta">' + plural(tot, 'faixa', 'faixas') + ', ' + Math.max(1, Math.round(secs / 60)) + ' min<br>' + esc(p.genre) + '</p></div></div>' +
+    act + extra +
+    '<div class="trks">' + p.tracks.map((t, i) => trackRow(T.get(t.id), i, 'pack:' + p.id)).join('') + '</div>';
+}
+function storeHTML(){
+  const packs = storePacks();
+  let h = '<h1 class="h-screen cond">Loja</h1><p class="sub">Pacote liberado entra direto na sua biblioteca.</p>';
+  const planTxt = subActive() ? 'Ativa. Licença offline válida até ' + brDate(S.subUntil) + '. Ela se renova quando você abre o app com internet e a mensalidade está em dia.'
+    : subExpired() ? subProblem() + '. Os pacotes da assinatura ficam bloqueados até a renovação.'
+    : 'Todo pacote novo entra na sua biblioteca no dia do lançamento, sem precisar comprar um por um.';
+  const planBtn = subActive() ? '<button class="btn ghost sm" data-a="contact" data-k="sub">Falar sobre a assinatura</button>'
+    : subExpired() ? '<button class="btn sm" data-a="contact" data-k="sub">Renovar assinatura</button>'
+    : '<button class="btn sm" data-a="contact" data-k="sub">Assinar por ' + brl(CFG.subPrice) + ' ao mês</button>';
+  h += '<div class="plan"><h2>Assinatura mensal, ' + brl(CFG.subPrice) + '</h2><p>' + planTxt + '</p>' + planBtn + '</div>';
+  if (!packs.length) return h + empty('Você já tem tudo', 'Quando sair pacote novo, ele aparece aqui.');
+  packs.forEach(p => {
+    h += '<article class="offer">' + cover(p) + '<div><h3>' + esc(p.title) + '</h3><p class="sub">' + plural(p.tracks.length, 'faixa', 'faixas') + ', ' + esc(p.genre) + '</p><p class="price">' + brl(p.price) + '</p></div>' +
+      '<div class="offer-a"><button class="btn" data-a="buy" data-id="' + p.id + '">Comprar por ' + brl(p.price) + '</button><button class="btn ghost sm" data-a="open-pack" data-id="' + p.id + '">Ver faixas</button></div></article>';
+  });
+  return h;
+}
+function searchIds(){
+  const q = norm(UI.q.trim()); if (!q) return [];
+  const out = [];
+  ownedPacks().forEach(p => p.tracks.forEach(t => { if (norm(t.t + ' ' + t.a + ' ' + p.title).indexOf(q) >= 0) out.push(t.id); }));
+  return out;
+}
+function searchResults(){
+  if (!UI.q.trim()) return empty('Procure nos seus pacotes', 'Digite o nome da música, do artista ou do pacote.');
+  const ids = searchIds();
+  if (!ids.length) return empty('Nada encontrado', 'Nenhuma faixa dos seus pacotes combina com “' + esc(UI.q.trim()) + '”.');
+  return '<div class="trks">' + ids.map((id, i) => trackRow(T.get(id), i, 'search')).join('') + '</div>';
+}
+function searchHTML(){
+  return '<h1 class="h-screen cond">Buscar</h1><div class="search">' + I.search + '<input class="inp" id="q" type="search" aria-label="Buscar música, artista ou pacote" placeholder="Música, artista ou pacote" value="' + esc(UI.q) + '"></div><div id="results">' + searchResults() + '</div>';
+}
+function listsHTML(){
+  const favN = S.favs.filter(id => T.has(id)).length;
+  let h = '<h1 class="h-screen cond">Suas listas</h1><p class="sub">Monte seleções com as faixas dos seus pacotes.</p><div style="margin-top:12px">';
+  h += '<button class="line" data-a="open-list" data-id="favs"><span class="line-ic">' + I.heart + '</span><span class="line-m"><b>Favoritas</b><small>' + plural(favN, 'faixa', 'faixas') + '</small></span></button>';
+  S.lists.forEach(l => { h += '<button class="line" data-a="open-list" data-id="' + l.id + '"><span class="line-ic">' + I.list + '</span><span class="line-m"><b>' + esc(l.name) + '</b><small>' + plural(l.tracks.filter(id => T.has(id)).length, 'faixa', 'faixas') + '</small></span></button>'; });
+  return h + '</div><button class="btn ghost" style="margin-top:16px" data-a="new-list">' + I.plus + 'Criar lista</button>';
+}
+function listIds(id){ const src = id === 'favs' ? S.favs : ((S.lists.find(l => l.id === id) || {}).tracks || []); return src.filter(x => T.has(x) && isOwned(T.get(x).pack)); }
+function listHTML(id){
+  const l = id === 'favs' ? { name: 'Favoritas' } : S.lists.find(x => x.id === id);
+  if (!l) return empty('Lista não encontrada', 'Ela pode ter sido apagada.');
+  const ids = listIds(id);
+  let h = '<h1 class="h-screen cond">' + esc(l.name) + '</h1><p class="sub">' + plural(ids.length, 'faixa', 'faixas') + '</p>';
+  if (!ids.length) return h + empty('Lista vazia', id === 'favs' ? 'Toque no coração de uma faixa para guardar aqui.' : 'Abra o menu de uma faixa e escolha “Adicionar a uma lista”.') + (id === 'favs' ? '' : '<button class="btn danger" data-a="del-list" data-id="' + id + '">Apagar lista</button>');
+  h += '<div class="row2" style="margin-top:14px"><button class="btn" data-a="play-list" data-id="' + id + '">' + I.play + 'Tocar</button><button class="btn ghost" data-a="play-list" data-id="' + id + '" data-shuffle="1">' + I.shuffle + 'Aleatório</button></div>';
+  h += '<div class="trks">' + ids.map((x, i) => trackRow(T.get(x), i, id === 'favs' ? 'favs' : 'list:' + id)).join('') + '</div>';
+  if (id !== 'favs') h += '<button class="btn danger" style="margin-top:20px" data-a="del-list" data-id="' + id + '">Apagar lista</button>';
+  return h;
+}
+const kv = (k, v) => '<div class="kv"><span>' + k + '</span><span>' + esc(v) + '</span></div>';
+function accountHTML(){
+  const n = Object.keys(S.dl).length, u = S.user;
+  let when = 'ainda não sincronizado';
+  if (S.syncedAt){ try { when = new Date(S.syncedAt).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); } catch (e) { when = brDate(new Date(S.syncedAt).toISOString()); } }
+  let h = '<h1 class="h-screen cond">Conta</h1>' +
+    '<div class="panel">' + (u.name ? kv('Nome', u.name) : '') + (u.email ? kv('E-mail', u.email) : '') + (u.phone ? kv('WhatsApp', u.phone) : '') +
+    kv('Assinatura', subActive() ? 'Ativa até ' + brDate(S.subUntil) : subExpired() ? subProblem().replace('Assinatura ', '').replace(/^./, c => c.toUpperCase()) : 'Sem assinatura') +
+    kv('Aparelhos', 'Até 2 por conta') + kv('Última sincronização', when) +
+    '<button class="btn ghost" style="margin-top:8px" data-a="sync">Sincronizar agora</button></div>' +
+    installHTML() +
+    '<div class="panel"><div class="kv"><span>Baixadas no aparelho</span><span>' + plural(n, 'faixa', 'faixas') + ', ' + mbs(dlBytes()) + '</span></div>' +
+    '<button class="btn ghost" data-a="clear-dl"' + (n ? '' : ' disabled') + '>Apagar downloads</button></div>';
+  if (S.isAdmin) h += '<div class="panel"><button class="switch" role="switch" aria-checked="' + !!S.admin + '" data-a="admin-toggle"><span>Painel do administrador</span><i></i></button></div>';
+  if (S.isAdmin && S.admin) h += adminHTML();
+  h += '<div class="sec"><button class="btn ghost" data-a="logout">Sair da conta</button></div>';
+  return h;
+}
+function installHTML(){
+  const standalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+  if (standalone) return '';
+  if (installEvt) return '<div class="panel"><b>Instalar no aparelho</b><p class="note" style="margin:4px 0 12px">O app fica na tela inicial e abre mesmo sem internet.</p><button class="btn" data-a="install">Instalar o app</button></div>';
+  if (/iphone|ipad|ipod/i.test(navigator.userAgent)) return '<div class="panel"><b>Instalar no iPhone</b><p class="note" style="margin-top:4px">No Safari, toque em Compartilhar e depois em “Adicionar à Tela de Início”.</p></div>';
+  return '';
+}
+function adminHTML(){
+  const tabs = [['pacotes', 'Pacotes'], ['clientes', 'Clientes'], ['relatorios', 'Relatórios']];
+  let h = '<section class="sec"><h2>Painel do administrador</h2><div class="seg" role="tablist">' +
+    tabs.map(t => '<button role="tab" aria-selected="' + (UI.adminTab === t[0]) + '" data-a="admin-tab" data-t="' + t[0] + '">' + t[1] + '</button>').join('') + '</div>';
+  if (UI.adminTab === 'pacotes'){
+    h += '<button class="btn" style="margin-top:14px" data-a="new-pack">' + I.plus + 'Criar pacote</button>';
+    if (!S.packs.length) h += empty('Nenhum pacote ainda', 'Crie o primeiro pacote para ele aparecer na loja dos clientes.');
+    S.packs.forEach(p => {
+      const st = released(p) ? '<span class="pill ok">Publicado</span>' : '<span class="pill">Agendado para ' + brDate(p.release) + '</span>';
+      h += '<div class="line"><span style="width:48px;flex:none">' + cover(p) + '</span><span class="line-m"><b>' + esc(p.title) + '</b><small>' + plural(p.tracks.length, 'faixa', 'faixas') + ', ' + brl(p.price) + '</small><br>' + st + '</span>' +
+        '<button class="ib" data-a="del-pack-ask" data-id="' + p.id + '" aria-label="Excluir pacote ' + esc(p.title) + '">' + I.trash + '</button></div>';
+    });
+    return h + '</section>';
+  }
+  if (!ADM.loaded) return h + (ADM.err ? '<p class="err" style="margin-top:14px">' + esc(ADM.err) + '</p><button class="btn ghost sm" style="margin-top:10px" data-a="admin-reload">Tentar de novo</button>' : '<p class="note" style="margin-top:14px">Carregando dados dos clientes...</p>') + '</section>';
+  if (UI.adminTab === 'clientes'){
+    if (!ADM.clients.length) h += empty('Nenhum cliente ainda', 'Quem entrar no app com o código de acesso aparece aqui.');
+    ADM.clients.forEach(c => {
+      const mine = ADM.purchases.filter(x => x.user_id === c.id).map(x => x.pack_id);
+      const sub = ADM.subs.find(x => x.user_id === c.id);
+      const subOn = !!sub && sub.status === 'active' && new Date(sub.license_until).getTime() > Date.now();
+      const label = (c.name || c.email || c.phone || 'Cliente sem nome') + (c.is_admin ? ' (administrador)' : '');
+      const contact = [c.email, c.phone].filter(Boolean).join(', ');
+      const subTxt = !sub ? 'sem assinatura' : subOn ? 'assinatura ativa até ' + brDate(sub.license_until) : sub.status === 'canceled' ? 'assinatura cancelada' : 'assinatura vencida';
+      const opts = S.packs.filter(p => mine.indexOf(p.id) < 0).map(p => '<option value="' + p.id + '">' + esc(p.title) + '</option>').join('');
+      h += '<div class="client"><div class="client-h"><span class="line-m"><b>' + esc(label) + '</b><small>' + esc(contact) + '</small><br><small>' + plural(mine.filter(id => packById(id)).length, 'pacote', 'pacotes') + ', ' + subTxt + '</small></span>' +
+        '<span class="pill ' + (c.blocked ? 'bad' : 'ok') + '">' + (c.blocked ? 'Bloqueado' : 'Ativo') + '</span></div>' +
+        '<div class="client-a"><button class="btn ghost sm" data-a="client-block" data-id="' + c.id + '">' + (c.blocked ? 'Liberar acesso' : 'Bloquear acesso') + '</button>' +
+        '<select class="inp" data-grant="' + c.id + '" aria-label="Liberar pacote para ' + esc(label) + '"' + (opts ? '' : ' disabled') + '><option value="">' + (opts ? 'Liberar um pacote' : 'Já tem todos os pacotes') + '</option>' + opts + '</select></div>' +
+        '<div class="client-a" style="grid-template-columns:1fr auto"><button class="btn ghost sm" data-a="client-sub" data-id="' + c.id + '">' + (subOn ? 'Renovar assinatura por 30 dias' : 'Ativar assinatura por 30 dias') + '</button>' +
+        (sub && sub.status !== 'canceled' ? '<button class="btn danger sm" data-a="client-sub-cancel" data-id="' + c.id + '">Cancelar</button>' : '<span></span>') + '</div></div>';
+    });
+  } else {
+    const active = ADM.clients.filter(c => !c.blocked).length, pub = S.packs.filter(released).length;
+    const rev = ADM.purchases.reduce((s, x) => s + (x.amount_cents || 0), 0) / 100;
+    h += '<div class="stats"><div class="stat"><b>' + active + '</b><small>clientes ativos</small></div><div class="stat"><b>' + pub + '</b><small>pacotes publicados</small></div><div class="stat"><b>' + brl(rev).replace(/,00$/, '') + '</b><small>em pacotes vendidos</small></div></div>';
+    const sold = p => ADM.purchases.filter(x => x.pack_id === p.id).length;
+    const max = Math.max.apply(null, S.packs.map(sold).concat([1]));
+    h += '<div class="panel"><h3>Vendas por pacote</h3>' + (S.packs.length ? S.packs.map(p => '<div class="barrow"><div class="barrow-h"><span>' + esc(p.title) + '</span><b>' + sold(p) + '</b></div><div class="bar"><i style="width:' + Math.round(sold(p) / max * 100) + '%"></i></div></div>').join('') : '<p class="note">Nenhum pacote criado ainda.</p>') + '</div>';
+    const top = Object.keys(S.plays).filter(id => T.has(id)).sort((a, b) => S.plays[b] - S.plays[a]).slice(0, 5);
+    const tmax = top.length ? S.plays[top[0]] : 1;
+    h += '<div class="panel"><h3>Mais tocadas neste aparelho</h3>' + (top.length ? top.map(id => '<div class="barrow"><div class="barrow-h"><span>' + esc(T.get(id).t) + '</span><b>' + S.plays[id] + '</b></div><div class="bar"><i style="width:' + Math.round(S.plays[id] / tmax * 100) + '%"></i></div></div>').join('') : '<p class="note">Toque alguma faixa para o ranking aparecer.</p>') + '</div>';
+  }
+  return h + '</section>';
+}
+
+/* ================= folhas ================= */
+function sheetHead(title){ return '<div class="sheet-h"><h2 class="cond">' + title + '</h2><button class="ib" data-a="close-sheet" aria-label="Fechar">' + I.x + '</button></div>'; }
+function sheetHTML(){
+  const s = UI.sheet; if (!s) return '';
+  if (s.type === 'player') return playerHTML();
+  if (s.type === 'contact'){
+    const p = s.id ? packById(s.id) : null;
+    const what = p ? esc(p.title) + ', ' + plural(p.tracks.length, 'faixa', 'faixas') + ', ' + brl(p.price) + '.' : 'Assinatura mensal por ' + brl(CFG.subPrice) + ': todo pacote novo liberado no dia do lançamento.';
+    const msg = p ? 'Olá! Quero comprar o pacote "' + p.title + '" no Sua Atualização.' : 'Olá! Quero assinar o Sua Atualização.';
+    const who = S.user ? ' Minha conta: ' + (S.user.email || S.user.phone || S.user.name) + '.' : '';
+    return sheetHead(p ? 'Comprar pacote' : 'Assinatura mensal') + '<p class="lead">' + what + '</p>' +
+      '<p class="note" style="margin-bottom:14px">O pagamento por Pix dentro do app ainda está sendo ligado. Por enquanto, a compra é combinada pelo WhatsApp e o acesso é liberado na sua conta em seguida.</p>' +
+      (CFG.whatsapp ? '<a class="btn" target="_blank" rel="noopener" href="https://wa.me/' + CFG.whatsapp + '?text=' + encodeURIComponent(msg + who) + '">Chamar no WhatsApp</a>' : '<p class="note" style="margin-bottom:14px">Fale com quem te vendeu a atualização para liberar o acesso.</p>') +
+      '<button class="btn ghost" style="margin-top:10px" data-a="sync">Já paguei, atualizar minha biblioteca</button>';
+  }
+  if (s.type === 'track'){
+    const t = T.get(s.id); if (!t) return '';
+    const dl = !!S.dl[t.id], inList = s.ctx && s.ctx.indexOf('list:') === 0;
+    let h = sheetHead(esc(t.t)) + '<p class="lead">' + esc(t.a) + '</p>';
+    if (canPlay(t.pack)){
+      if (!dl && t.src === 'demo') h += '<button class="line" data-a="dl-track" data-id="' + t.id + '"><span class="line-ic">' + I.download + '</span><span class="line-m"><b>Baixar esta faixa</b></span></button>';
+      if (dl && t.src === 'demo') h += '<button class="line" data-a="rm-track-dl" data-id="' + t.id + '"><span class="line-ic">' + I.trash + '</span><span class="line-m"><b>Remover do aparelho</b></span></button>';
+    }
+    if (inList) h += '<button class="line" data-a="rm-from-list" data-id="' + t.id + '" data-list="' + esc(s.ctx.slice(5)) + '"><span class="line-ic">' + I.x + '</span><span class="line-m"><b>Remover desta lista</b></span></button>';
+    h += '<h3 style="margin:18px 0 4px;font-size:15px">Adicionar a uma lista</h3>';
+    S.lists.forEach(l => { const has = l.tracks.indexOf(t.id) >= 0; h += '<button class="line" data-a="addto-pick" data-id="' + t.id + '" data-list="' + l.id + '"' + (has ? ' disabled' : '') + '><span class="line-ic">' + (has ? I.check : I.list) + '</span><span class="line-m"><b>' + esc(l.name) + '</b><small>' + (has ? 'Já está nesta lista' : plural(l.tracks.length, 'faixa', 'faixas')) + '</small></span></button>'; });
+    h += '<label class="field"><span>Lista nova</span><input class="inp" id="nlName" maxlength="40" placeholder="Ex.: Viagem de sábado"></label><p class="err" id="errList" hidden></p>' +
+      '<button class="btn" style="margin-top:12px" data-a="create-list" data-id="' + t.id + '">Criar lista e adicionar</button>';
+    return h;
+  }
+  if (s.type === 'newlist'){
+    return sheetHead('Criar lista') + '<label class="field"><span>Nome da lista</span><input class="inp" id="nlName" maxlength="40" placeholder="Ex.: Viagem de sábado"></label><p class="err" id="errList" hidden></p>' +
+      '<button class="btn" style="margin-top:16px" data-a="create-list">Criar lista</button>';
+  }
+  if (s.type === 'newpack'){
+    return sheetHead('Criar pacote') +
+      '<label class="field"><span>Nome do pacote</span><input class="inp" id="npName" maxlength="50" placeholder="Ex.: Atualização de novembro"></label><p class="err" id="errNpName" hidden></p>' +
+      '<label class="field"><span>Gênero</span><select class="inp" id="npGenre"><option>Forró e piseiro</option><option>Paredão</option><option>Sertanejo</option><option>Seresta</option><option>Gospel</option><option>Variado</option></select></label>' +
+      '<label class="field"><span>Preço em reais</span><input class="inp" id="npPrice" inputmode="decimal" value="15,00"></label><p class="err" id="errNpPrice" hidden></p>' +
+      '<label class="field"><span>Data de lançamento (em branco publica agora)</span><input class="inp" id="npDate" type="date"></label>' +
+      '<label class="field"><span>Quantidade de faixas de demonstração (3 a 10)</span><input class="inp" id="npQty" inputmode="numeric" value="6"></label>' +
+      '<p class="note">Nesta etapa, os pacotes usam faixas de demonstração geradas pelo próprio app.</p>' +
+      '<button class="btn" style="margin-top:18px" id="npSave" data-a="save-pack">Criar pacote</button>';
+  }
+  if (s.type === 'confirm'){
+    return sheetHead(esc(s.title)) + '<p class="lead">' + esc(s.text) + '</p><button class="btn danger" data-a="' + s.act + '" data-id="' + esc(s.id || '') + '">' + esc(s.yes) + '</button><button class="btn ghost" data-a="close-sheet">Voltar</button>';
+  }
+  return '';
+}
+function playerHTML(){
+  const t = T.get(P.id);
+  if (!t) return sheetHead('Player') + '<p class="lead">Nenhuma faixa tocando.</p>';
+  const fav = S.favs.indexOf(t.id) >= 0, repL = { off: 'desligado', all: 'toda a fila', one: 'só esta faixa' }[P.repeat];
+  return '<div class="pl-head"><button class="ib" data-a="close-sheet" aria-label="Fechar player">' + I.down + '</button><span class="pl-from">' + esc(t.pack.title) + '</span>' +
+    '<button class="ib' + (fav ? ' on' : '') + '" data-a="fav" data-id="' + t.id + '" aria-pressed="' + fav + '" aria-label="Favoritar">' + I.heart + '</button></div>' +
+    '<div class="pl-cover">' + cover(t.pack) + '</div>' +
+    '<canvas id="vu" class="pl-vu" aria-hidden="true"></canvas>' +
+    '<h2 class="pl-t cond">' + esc(t.t) + '</h2><p class="pl-a">' + esc(t.a) + '</p>' +
+    '<input id="seek" type="range" min="0" max="1000" value="0" aria-label="Posição na música">' +
+    '<div class="pl-time"><span id="curT">0:00</span><span>' + fmt(P.buf ? P.buf.duration : t.d) + '</span></div>' +
+    '<div class="pl-ctl">' +
+      '<button class="ib' + (P.shuffle ? ' on' : '') + '" data-a="shuffle" aria-pressed="' + P.shuffle + '" aria-label="Ordem aleatória">' + I.shuffle + '</button>' +
+      '<button class="ib" data-a="prev" aria-label="Faixa anterior">' + I.prev + '</button>' +
+      '<button class="pl-main" data-a="toggle" aria-label="' + (P.playing ? 'Pausar' : 'Tocar') + '">' + (P.playing ? I.pause : I.play) + '</button>' +
+      '<button class="ib" data-a="next" aria-label="Próxima faixa">' + I.next + '</button>' +
+      '<button class="ib' + (P.repeat !== 'off' ? ' on' : '') + '" data-a="repeat" aria-label="Repetir: ' + repL + '">' + I.repeat + (P.repeat === 'one' ? '<sup>1</sup>' : '') + '</button>' +
+    '</div>' +
+    '<div class="pl-q"><h3>Fila, ' + plural(P.queue.length, 'faixa', 'faixas') + '</h3>' +
+      P.queue.map((id, i) => { const q = T.get(id); if (!q) return ''; return '<button class="line" data-a="queue-jump" data-i="' + i + '"><span class="trk-n" style="width:26px">' + (i === P.idx ? I.eq : (i + 1)) + '</span><span class="line-m"><b>' + esc(q.t) + '</b><small>' + esc(q.a) + '</small></span><span class="trk-d">' + fmt(q.d) + '</span></button>'; }).join('') +
+    '</div>';
+}
+
+/* ================= renderização ================= */
+const cur = () => UI.stack.length ? UI.stack[UI.stack.length - 1] : { type: UI.tab };
+function renderTop(){
+  const el = $('#top');
+  if (!S.user || UI.gate || S.blocked){ el.hidden = true; return; }
+  el.hidden = false;
+  const on = navigator.onLine !== false;
+  el.innerHTML = (UI.stack.length ? '<button class="backbtn" data-a="back">' + I.back + 'Voltar</button>' : '<div class="brand cond"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>Sua Atualização</div>') +
+    '<span class="net' + (on ? '' : ' off') + '">' + (on ? 'Online' : 'Sem internet, tocando do aparelho') + '</span>';
+}
+function renderView(){
+  const v = $('#view');
+  if (!S.user){ if (!$('#loginBox') || UI.login.redraw){ UI.login.redraw = false; v.innerHTML = loginHTML(); } return; }
+  if (UI.gate === 'devices'){ v.innerHTML = gateHTML(); return; }
+  if (S.blocked){ v.innerHTML = blockedHTML(); return; }
+  const c = cur();
+  if (c.type === 'buscar' && $('#q')){ $('#results').innerHTML = searchResults(); return; }
+  v.innerHTML = c.type === 'pack' ? packHTML(c.id) : c.type === 'list' ? listHTML(c.id) : c.type === 'loja' ? storeHTML() : c.type === 'buscar' ? searchHTML() : c.type === 'listas' ? listsHTML() : c.type === 'conta' ? accountHTML() : libraryHTML();
+}
+function renderDock(){
+  const d = $('#dock');
+  if (!S.user || UI.gate || S.blocked){ d.hidden = true; return; }
+  d.hidden = false;
+  const t = P.id ? T.get(P.id) : null;
+  let h = '';
+  if (t){
+    h += '<div class="mini" role="button" tabindex="0" data-a="open-player" aria-label="Abrir player: ' + esc(t.t) + '"><div class="mini-bar"><i id="miniBar"></i></div>' +
+      '<span>' + cover(t.pack) + '</span><span class="trk-m"><span class="trk-t">' + esc(t.t) + '</span><span class="trk-a"><span>' + esc(t.a) + '</span></span></span>' +
+      '<button class="ib" data-a="toggle" aria-label="' + (P.playing ? 'Pausar' : 'Tocar') + '">' + (P.playing ? I.pause : I.play) + '</button>' +
+      '<button class="ib" data-a="next" aria-label="Próxima faixa">' + I.next + '</button></div>';
+  }
+  const fresh = storePacks().some(p => S.seen.indexOf(p.id) < 0);
+  const tabs = [['biblioteca', 'Biblioteca', I.disc], ['loja', 'Loja', I.bag], ['buscar', 'Buscar', I.search], ['listas', 'Listas', I.list], ['conta', 'Conta', I.user]];
+  h += '<nav class="tabs" aria-label="Seções do app">' + tabs.map(x => '<button class="tab" data-a="tab" data-tab="' + x[0] + '"' + (UI.tab === x[0] ? ' aria-current="page"' : '') + '>' + x[2] + x[1] + (x[0] === 'loja' && fresh ? '<span class="dot" aria-label="pacote novo"></span>' : '') + '</button>').join('') + '</nav>';
+  $('#dockIn').innerHTML = h;
+}
+function renderSheet(){
+  const sc = $('#scrim'), sh = $('#sheet');
+  if (!UI.sheet){ sc.classList.remove('open'); sh.innerHTML = ''; return; }
+  sh.innerHTML = sheetHTML();
+  sc.classList.add('open');
+}
+function openSheet(s){ UI.sheet = s; renderSheet(); const sh = $('#sheet'); sh.scrollTop = 0; try { sh.focus({ preventScroll: true }); } catch (e) {} }
+function closeSheet(){ UI.sheet = null; UI.seeking = false; renderSheet(); }
+function render(){ renderTop(); renderView(); renderDock(); renderSheet(); }
+let toastT;
+function toast(msg){ const el = $('#toast'); el.textContent = msg; el.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove('show'), 3200); }
+function go(v){ UI.stack.push(v); renderTop(); renderView(); window.scrollTo(0, 0); }
+function showErr(id, msg){ const e = $('#' + id); if (!e) return; if (msg){ e.textContent = msg; e.hidden = false; } else e.hidden = true; }
+
+/* medidor do player */
+let vuColors = null, vuColorsAt = 0, freqArr = null;
+function drawVU(){
+  const cv = $('#vu'); if (!cv) return;
+  const dpr = window.devicePixelRatio || 1, w = cv.clientWidth, hgt = cv.clientHeight; if (!w) return;
+  if (cv.width !== Math.round(w * dpr)){ cv.width = Math.round(w * dpr); cv.height = Math.round(hgt * dpr); }
+  const now = Date.now();
+  if (!vuColors || now - vuColorsAt > 1500){ const cs = getComputedStyle(document.documentElement); vuColors = { on: cs.getPropertyValue('--accent').trim(), hot: cs.getPropertyValue('--danger').trim(), off: cs.getPropertyValue('--line').trim() }; vuColorsAt = now; }
+  const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, w, hgt);
+  const cols = 24, rows = 8, gap = 3, cw = (w - gap * (cols - 1)) / cols, rh = (hgt - gap * (rows - 1)) / rows;
+  let data = null;
+  if (P.an && P.playing){ if (!freqArr) freqArr = new Uint8Array(P.an.frequencyBinCount); P.an.getByteFrequencyData(freqArr); data = freqArr; }
+  for (let c = 0; c < cols; c++){
+    const lvl = data ? data[Math.min(data.length - 1, Math.floor(Math.pow(c / cols, 1.5) * 40))] / 255 : 0;
+    const lit = Math.round(lvl * rows);
+    for (let r = 0; r < rows; r++){
+      g.fillStyle = r < lit ? (r >= rows - 2 ? vuColors.hot : vuColors.on) : vuColors.off;
+      g.fillRect(c * (cw + gap), hgt - (r + 1) * rh - r * gap, cw, rh);
+    }
+  }
+}
+function tick(){
+  const d = P.buf ? P.buf.duration : 0, p = pos(), frac = d ? p / d : 0;
+  const mbEl = $('#miniBar'); if (mbEl) mbEl.style.transform = 'scaleX(' + frac.toFixed(4) + ')';
+  if (UI.sheet && UI.sheet.type === 'player'){
+    if (!UI.seeking){ const sk = $('#seek'); if (sk) sk.value = Math.round(frac * 1000); const ct = $('#curT'); if (ct) ct.textContent = fmt(p); }
+    drawVU();
+  }
+  requestAnimationFrame(tick);
+}
+
+/* ================= ações ================= */
+function ctxIds(ctx){
+  if (!ctx) return [];
+  if (ctx.indexOf('pack:') === 0){ const p = packById(ctx.slice(5)); return p ? p.tracks.map(t => t.id) : []; }
+  if (ctx === 'favs') return listIds('favs');
+  if (ctx.indexOf('list:') === 0) return listIds(ctx.slice(5));
+  if (ctx === 'search') return searchIds();
+  return [];
+}
+/* ----- sincronização com o servidor ----- */
+const SYNC = { busy: false, last: 0, profileName: '' };
+async function pruneAudio(){
+  try {
+    const keys = await audioKeys();
+    for (const k of keys){ if (!T.has(k)){ await audioDel(k); delete S.dl[k]; } }
+    Object.keys(S.dl).forEach(k => { if (!T.has(k)) delete S.dl[k]; });
+    save();
+  } catch (e) {}
+}
+async function syncAll(force){
+  if (!sb || !S.user || !S.user.id || SYNC.busy) return false;
+  if (!force && Date.now() - SYNC.last < 15000) return false;
+  SYNC.busy = true;
+  try {
+    const uid = S.user.id;
+    const r = await Promise.all([
+      sb.from('profiles').select('name,phone,email,is_admin,blocked').eq('id', uid).maybeSingle(),
+      sb.from('packs').select('id,title,genre,price_cents,release_at,cover_variant,cover_label,tracks(id,position,title,artist,duration_seconds,demo_seed)').order('release_at', { ascending: false }),
+      sb.from('purchases').select('pack_id').eq('user_id', uid),
+      sb.from('subscriptions').select('status,license_until').eq('user_id', uid).maybeSingle()
+    ]);
+    const bad = r.find(x => x.error); if (bad) throw bad.error;
+    const pr = r[0].data, sub = r[3].data;
+    if (pr){ SYNC.profileName = pr.name || ''; S.user.name = pr.name || S.user.name || ''; S.user.email = pr.email || S.user.email || ''; S.user.phone = pr.phone ? '+' + String(pr.phone).replace(/^\+/, '') : (S.user.phone || ''); S.isAdmin = !!pr.is_admin; S.blocked = !!pr.blocked; }
+    if (!S.isAdmin) S.admin = false;
+    S.packs = (r[1].data || []).map(p => ({
+      id: p.id, title: p.title, genre: p.genre || '', price: (p.price_cents || 0) / 100, release: p.release_at, cv: p.cover_variant || 'a',
+      big: (p.cover_label && p.cover_label.length) ? p.cover_label : bigFrom(p.title),
+      tracks: (p.tracks || []).slice().sort((a, b) => a.position - b.position).map(t => ({ id: t.id, t: t.title, a: t.artist || '', d: t.duration_seconds || 20, seed: Number(t.demo_seed) || hash(t.id), src: 'demo' }))
+    }));
+    S.owned = (r[2].data || []).map(x => x.pack_id);
+    S.sub = !!sub && sub.status !== 'canceled'; S.subStatus = sub ? sub.status : ''; S.subUntil = sub ? sub.license_until : '';
+    S.syncedAt = Date.now(); SYNC.last = Date.now();
+    index(); enforceAccess(); if (S.blocked) stopAll(); save();
+    await pruneAudio();
+    return true;
+  } catch (e) { return false; }
+  finally { SYNC.busy = false; }
+}
+
+/* ----- aparelhos ----- */
+function deviceKey(){
+  let k = null;
+  try { k = localStorage.getItem('sa-device'); if (!k){ k = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2); localStorage.setItem('sa-device', k); } } catch (e) { k = 'sem-armazenamento'; }
+  return k;
+}
+function deviceLabel(){ const ua = navigator.userAgent; return /iphone/i.test(ua) ? 'iPhone' : /ipad/i.test(ua) ? 'iPad' : /android/i.test(ua) ? 'Celular Android' : /windows/i.test(ua) ? 'Computador Windows' : /mac os/i.test(ua) ? 'Mac' : 'Navegador'; }
+async function registerDevice(){
+  if (!sb || !S.user) return true;
+  try {
+    const res = await sb.from('devices').upsert({ user_id: S.user.id, device_key: deviceKey(), label: deviceLabel(), last_seen_at: new Date().toISOString() }, { onConflict: 'user_id,device_key' });
+    if (res.error && /Limite de 2 aparelhos/.test(res.error.message || '')) return false;
+  } catch (e) {}
+  return true;
+}
+async function loadDevices(){
+  try { const res = await sb.from('devices').select('id,label,last_seen_at').eq('user_id', S.user.id).order('last_seen_at', { ascending: false }); UI.devices = res.data || []; } catch (e) { UI.devices = []; }
+}
+
+/* ----- entrada e saída da conta ----- */
+let ACTIVE_UID = null, signLock = false;
+async function onSignedIn(user){
+  if (!user || signLock || ACTIVE_UID === user.id) return;
+  signLock = true;
+  try {
+    const same = !!S.user && S.user.id === user.id, typed = UI.login.name || '';
+    if (!same){ stopAll(); S.favs = []; S.lists = []; S.plays = {}; S.owned = []; S.packs = []; S.sub = false; S.subStatus = ''; S.subUntil = ''; S.isAdmin = false; S.admin = false; S.blocked = false; index(); }
+    S.user = { id: user.id, name: (same && S.user.name) || (user.user_metadata && user.user_metadata.name) || typed, email: user.email || '', phone: user.phone ? '+' + String(user.phone).replace(/^\+/, '') : '' };
+    save();
+    if (!same){ UI.tab = 'biblioteca'; UI.stack = []; }
+    UI.login = newLogin();
+    const ok = await registerDevice();
+    if (!ok){ UI.gate = 'devices'; await loadDevices(); $('#view').innerHTML = ''; render(); return; }
+    UI.gate = null; ACTIVE_UID = user.id;
+    const synced = await syncAll(true);
+    if (synced && typed && !SYNC.profileName){ S.user.name = typed; save(); sb.from('profiles').update({ name: typed }).eq('id', user.id).then(() => {}, () => {}); }
+    if (!same) $('#view').innerHTML = '';
+    render();
+  } finally { signLock = false; }
+}
+function localSignOut(){
+  stopAll(); ACTIVE_UID = null; UI.gate = null; UI.sheet = null;
+  S.user = null; S.isAdmin = false; S.admin = false; S.blocked = false; S.owned = []; S.packs = []; S.sub = false; S.subStatus = ''; S.subUntil = '';
+  index(); save(); ADM.loaded = false; ADM.clients = []; ADM.purchases = []; ADM.subs = [];
+  UI.stack = []; UI.tab = 'biblioteca'; UI.login = newLogin(); $('#view').innerHTML = ''; render();
+}
+function normPhone(v){ let d = String(v).replace(/\D/g, ''); if (d.length === 10 || d.length === 11) d = '55' + d; return (d.length === 12 || d.length === 13) ? '+' + d : ''; }
+function authMsg(e, fallback){
+  const m = String((e && (e.message || e.code)) || '').toLowerCase(), st = e && e.status;
+  if (m.indexOf('not authorized') >= 0) return 'O envio de e-mail do app ainda está em modo de teste e só entrega para o administrador. Avise quem te vendeu a atualização.';
+  if (st === 429 || m.indexOf('rate limit') >= 0 || m.indexOf('security purposes') >= 0) return 'Muitos pedidos de código em pouco tempo. Aguarde alguns minutos e tente de novo.';
+  if (m.indexOf('phone') >= 0 && (m.indexOf('provider') >= 0 || m.indexOf('disabled') >= 0 || m.indexOf('unsupported') >= 0)) return 'O login por WhatsApp ainda não está ativo. Use o código por e-mail.';
+  if (m.indexOf('expired') >= 0 || m.indexOf('invalid') >= 0) return 'Código inválido ou vencido. Peça um novo código.';
+  if (m.indexOf('fetch') >= 0 || m.indexOf('network') >= 0) return 'Sem conexão com o servidor. Confira a internet e tente de novo.';
+  return fallback || 'Não foi possível concluir. Tente de novo em instantes.';
+}
+
+/* ----- painel do administrador ----- */
+const ADM = { loading: false, loaded: false, err: '', clients: [], purchases: [], subs: [] };
+async function loadAdmin(){
+  if (!sb || !S.isAdmin || ADM.loading) return;
+  ADM.loading = true;
+  try {
+    const r = await Promise.all([
+      sb.from('profiles').select('id,name,email,phone,is_admin,blocked,created_at').order('created_at', { ascending: false }),
+      sb.from('purchases').select('user_id,pack_id,amount_cents'),
+      sb.from('subscriptions').select('user_id,status,license_until')
+    ]);
+    const bad = r.find(x => x.error); if (bad) throw bad.error;
+    ADM.clients = r[0].data || []; ADM.purchases = r[1].data || []; ADM.subs = r[2].data || []; ADM.loaded = true; ADM.err = '';
+  } catch (e) { ADM.err = 'Não foi possível carregar os dados. Confira a internet e tente de novo.'; }
+  ADM.loading = false;
+  if (S.user && cur().type === 'conta') renderView();
+}
+async function adminDone(res, okMsg, uid){
+  if (res && res.error){ toast('Não foi possível salvar. Confira a internet e tente de novo.'); return false; }
+  toast(okMsg);
+  await loadAdmin();
+  if (uid && S.user && uid === S.user.id){ await syncAll(true); render(); }
+  return true;
+}
+async function savePack(){
+  const name = $('#npName').value.trim(), genre = $('#npGenre').value, rel = $('#npDate').value;
+  const price = parseFloat(String($('#npPrice').value).replace(/[^\d.,]/g, '').replace(',', '.'));
+  let bad = false;
+  if (!name){ showErr('errNpName', 'Dê um nome ao pacote.'); bad = true; } else showErr('errNpName');
+  if (!(price >= 0)){ showErr('errNpPrice', 'Informe um preço em reais, por exemplo 15,00.'); bad = true; } else showErr('errNpPrice');
+  if (bad || !sb) return;
+  const btn = $('#npSave'); btn.disabled = true; btn.textContent = 'Criando pacote...';
+  const fail = () => { btn.disabled = false; btn.textContent = 'Criar pacote'; showErr('errNpName', 'Não foi possível criar o pacote. Confira a internet e tente de novo.'); };
+  const releaseAt = rel ? new Date(rel + 'T00:00:00').toISOString() : new Date().toISOString();
+  const ins = await sb.from('packs').insert({ title: name, genre: genre, price_cents: Math.round(price * 100), release_at: releaseAt, cover_variant: 'abcde'[S.packs.length % 5], cover_label: bigFrom(name) }).select('id').single();
+  if (ins.error || !ins.data){ fail(); return; }
+  const id = ins.data.id, n = clamp(parseInt($('#npQty').value, 10) || 6, 3, 10), r = rng(hash(id)), pool = TITLES.slice(), rows = [];
+  for (let i = 0; i < n; i++){
+    const t = pool.splice(Math.floor(r() * pool.length), 1)[0];
+    rows.push({ pack_id: id, position: i + 1, title: t, artist: ARTISTS[Math.floor(r() * ARTISTS.length)], duration_seconds: 17 + Math.floor(r() * 8), demo_seed: hash(id + t) });
+  }
+  const tr = await sb.from('tracks').insert(rows);
+  if (tr.error){ await sb.from('packs').delete().eq('id', id); fail(); return; }
+  await syncAll(true);
+  closeSheet(); render();
+  toast(new Date(releaseAt).getTime() <= Date.now() ? 'Pacote publicado na loja.' : 'Pacote agendado para ' + brDate(releaseAt) + '.');
+}
+async function removePack(id){
+  if (!sb) return false;
+  const res = await sb.from('packs').delete().eq('id', id);
+  if (res.error){ toast('Não foi possível excluir o pacote. Confira a internet e tente de novo.'); return false; }
+  UI.stack = UI.stack.filter(v => !(v.type === 'pack' && v.id === id));
+  await syncAll(true);
+  if (ADM.loaded) loadAdmin();
+  return true;
+}
+function enforceAccess(){
+  const ok = id => T.has(id) && canPlay(T.get(id).pack);
+  if (P.id && !ok(P.id)){ stopAll(); if (UI.sheet && UI.sheet.type === 'player') UI.sheet = null; return; }
+  if (P.id){ P.queue = P.queue.filter(ok); P.idx = P.queue.indexOf(P.id); }
+}
+const A = {
+  'login-channel'(el){ UI.login.channel = el.dataset.c; UI.login.redraw = true; renderView(); },
+  'login-back'(){ UI.login.step = 'form'; UI.login.redraw = true; renderView(); },
+  async 'login-send'(){
+    const L = UI.login; if (L.busy || !sb) return;
+    if (L.step === 'form'){
+      L.name = ($('#loginName') || {}).value ? $('#loginName').value.trim() : L.name;
+      let bad = false;
+      if (L.name.length < 2){ showErr('errName', 'Digite seu nome.'); bad = true; } else showErr('errName');
+      if (L.channel === 'email'){
+        L.email = $('#loginEmail').value.trim().toLowerCase();
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(L.email)){ showErr('errTarget', 'Digite um e-mail válido, por exemplo voce@exemplo.com.'); bad = true; } else showErr('errTarget');
+      } else {
+        L.phone = $('#loginPhone').value.trim();
+        if (!normPhone(L.phone)){ showErr('errTarget', 'Digite o WhatsApp com DDD, por exemplo (84) 90000-0000.'); bad = true; } else showErr('errTarget');
+      }
+      if (bad) return;
+    }
+    const btn = $('#loginGo'), old = btn ? btn.textContent : '';
+    L.busy = true; if (btn && L.step === 'form'){ btn.disabled = true; btn.textContent = 'Enviando código...'; }
+    let res;
+    try {
+      res = L.channel === 'email'
+        ? await sb.auth.signInWithOtp({ email: L.email, options: { shouldCreateUser: true, data: { name: L.name }, emailRedirectTo: location.origin + location.pathname } })
+        : await sb.auth.signInWithOtp({ phone: normPhone(L.phone), options: { channel: 'whatsapp', shouldCreateUser: true, data: { name: L.name } } });
+    } catch (e) { res = { error: e }; }
+    L.busy = false;
+    if (res.error){
+      if (btn && L.step === 'form'){ btn.disabled = false; btn.textContent = old; }
+      if (L.step === 'form') showErr('errTarget', authMsg(res.error)); else toast(authMsg(res.error));
+      return;
+    }
+    const again = L.step === 'code';
+    L.step = 'code'; L.redraw = true; renderView();
+    const c = $('#loginCode'); if (c) c.focus();
+    if (again) toast('Código reenviado.');
+  },
+  async 'login-verify'(){
+    const L = UI.login; if (L.busy || !sb) return;
+    const token = ($('#loginCode').value || '').replace(/\D/g, '');
+    if (token.length < 6){ showErr('errCode', 'Digite o código completo que você recebeu.'); return; }
+    const btn = $('#loginGo'); L.busy = true; if (btn){ btn.disabled = true; btn.textContent = 'Entrando...'; }
+    let res;
+    try {
+      res = L.channel === 'email' ? await sb.auth.verifyOtp({ email: L.email, token: token, type: 'email' }) : await sb.auth.verifyOtp({ phone: normPhone(L.phone), token: token, type: 'sms' });
+    } catch (e) { res = { error: e }; }
+    L.busy = false;
+    const user = res && res.data && (res.data.user || (res.data.session && res.data.session.user));
+    if (res.error || !user){ if (btn){ btn.disabled = false; btn.textContent = 'Entrar'; } showErr('errCode', authMsg(res.error, 'Código inválido ou vencido. Peça um novo código.')); return; }
+    await onSignedIn(user); window.scrollTo(0, 0);
+  },
+  async logout(){ try { if (sb) await sb.auth.signOut({ scope: 'local' }); } catch (e) {} localSignOut(); },
+  async sync(){
+    toast('Sincronizando...');
+    const ok = await syncAll(true);
+    if (UI.sheet && UI.sheet.type !== 'player') closeSheet();
+    $('#view').innerHTML = ''; render();
+    toast(ok ? 'Tudo atualizado.' : 'Não foi possível sincronizar. Confira a internet.');
+  },
+  async 'device-remove'(el){
+    try { await sb.from('devices').delete().eq('id', el.dataset.id); } catch (e) {}
+    const ok = await registerDevice();
+    if (ok){ UI.gate = null; ACTIVE_UID = S.user.id; await syncAll(true); toast('Aparelho removido. Este aparelho foi liberado.'); } else await loadDevices();
+    $('#view').innerHTML = ''; render();
+  },
+  tab(el){
+    UI.tab = el.dataset.tab; UI.stack = [];
+    if (UI.tab === 'loja'){ storePacks().forEach(p => { if (S.seen.indexOf(p.id) < 0) S.seen.push(p.id); }); save(); }
+    $('#view').innerHTML = ''; render(); window.scrollTo(0, 0);
+  },
+  back(){ UI.stack.pop(); $('#view').innerHTML = ''; renderTop(); renderView(); },
+  'open-pack'(el){ go({ type: 'pack', id: el.dataset.id }); },
+  'open-list'(el){ go({ type: 'list', id: el.dataset.id }); },
+  'dl-pack'(el){ const p = packById(el.dataset.id); if (p) downloadTracks(p.id, p.tracks.map(t => t.id)); },
+  'dl-cancel'(){ if (DL.active) DL.active.cancel = true; },
+  'dl-track'(el){ const t = T.get(el.dataset.id); closeSheet(); if (t) downloadTracks(t.pack.id, [t.id]); },
+  async 'rm-track-dl'(el){ const id = el.dataset.id; if (P.id === id) stopAll(); await audioDel(id); delete S.dl[id]; P.queue = P.queue.filter(x => x !== id); save(); closeSheet(); render(); toast('Faixa removida do aparelho.'); },
+  async 'rm-pack-dl'(el){
+    const p = packById(el.dataset.id); if (!p) return;
+    if (P.id && T.get(P.id).pack.id === p.id) stopAll();
+    for (const t of p.tracks){ if (t.src === 'demo'){ await audioDel(t.id); delete S.dl[t.id]; } }
+    save(); render(); toast('Pacote removido do aparelho. Ele continua na sua biblioteca.');
+  },
+  'play-pack'(el){ const p = packById(el.dataset.id); if (!p) return; ensureCtx(); P.shuffle = !!el.dataset.shuffle; const ids = p.tracks.map(t => t.id); playQueue(ids, P.shuffle ? ids[Math.floor(Math.random() * ids.length)] : null); },
+  'play-list'(el){ ensureCtx(); P.shuffle = !!el.dataset.shuffle; const ids = listIds(el.dataset.id); playQueue(ids, P.shuffle ? ids[Math.floor(Math.random() * ids.length)] : null); },
+  async 'play-track'(el){
+    const id = el.dataset.id, t = T.get(id); if (!t) return;
+    ensureCtx();
+    if (!isOwned(t.pack)){ toast('Compre o pacote para ouvir esta faixa.'); return; }
+    if (!canPlay(t.pack)){ toast('Assinatura vencida. Renove para voltar a ouvir.'); return; }
+    if (P.id === id && P.buf){ toggle(); return; }
+    if (!S.dl[id]){
+      if (t.src !== 'demo'){ toast('Este arquivo não está mais no aparelho.'); return; }
+      await downloadTracks(t.pack.id, [id], true);
+      if (!S.dl[id]) return;
+    }
+    playQueue(ctxIds(el.dataset.ctx), id);
+  },
+  toggle(){ toggle(); }, next(){ next(false); }, prev(){ prev(); },
+  shuffle(){ P.shuffle = !P.shuffle; renderSheet(); },
+  repeat(){ P.repeat = P.repeat === 'off' ? 'all' : P.repeat === 'all' ? 'one' : 'off'; renderSheet(); },
+  'queue-jump'(el){ playAt(parseInt(el.dataset.i, 10)); },
+  'open-player'(){ if (P.id) openSheet({ type: 'player' }); },
+  'close-sheet'(){ closeSheet(); },
+  scrim(el, ev){ if (ev.target === el) closeSheet(); },
+  fav(el){ const id = el.dataset.id, i = S.favs.indexOf(id); if (i >= 0) S.favs.splice(i, 1); else S.favs.push(id); save(); renderView(); if (UI.sheet && UI.sheet.type === 'player') renderSheet(); },
+  more(el){ openSheet({ type: 'track', id: el.dataset.id, ctx: el.dataset.ctx }); },
+  'addto-pick'(el){ const l = S.lists.find(x => x.id === el.dataset.list); if (!l) return; if (l.tracks.indexOf(el.dataset.id) < 0) l.tracks.push(el.dataset.id); save(); closeSheet(); renderView(); toast('Adicionada em “' + l.name + '”.'); },
+  'rm-from-list'(el){ const l = S.lists.find(x => x.id === el.dataset.list); if (!l) return; l.tracks = l.tracks.filter(x => x !== el.dataset.id); save(); closeSheet(); renderView(); toast('Removida da lista.'); },
+  'new-list'(){ openSheet({ type: 'newlist' }); const i = $('#nlName'); if (i) i.focus(); },
+  'create-list'(el){
+    const name = $('#nlName').value.trim();
+    if (!name){ showErr('errList', 'Dê um nome à lista.'); return; }
+    const l = { id: 'l' + Date.now().toString(36), name: name, tracks: el.dataset.id ? [el.dataset.id] : [] };
+    S.lists.push(l); save(); closeSheet(); renderView(); toast(el.dataset.id ? 'Lista criada com a faixa adicionada.' : 'Lista criada.');
+  },
+  'del-list'(el){ const l = S.lists.find(x => x.id === el.dataset.id); if (!l) return; openSheet({ type: 'confirm', title: 'Apagar lista', text: 'A lista “' + l.name + '” será apagada. As faixas continuam nos seus pacotes.', yes: 'Apagar lista', act: 'del-list-yes', id: l.id }); },
+  'del-list-yes'(el){ S.lists = S.lists.filter(x => x.id !== el.dataset.id); save(); UI.stack = UI.stack.filter(v => !(v.type === 'list' && v.id === el.dataset.id)); closeSheet(); $('#view').innerHTML = ''; render(); toast('Lista apagada.'); },
+  buy(el){ openSheet({ type: 'contact', id: el.dataset.id }); },
+  contact(){ openSheet({ type: 'contact', id: '' }); },
+  'dl-all'(){ const ids = []; ownedPacks().filter(canPlay).forEach(p => p.tracks.forEach(t => ids.push(t.id))); downloadTracks('all', ids); },
+  'export-zip'(el){ exportZip(el.dataset.id); },
+  'admin-toggle'(){ if (!S.isAdmin) return; S.admin = !S.admin; save(); renderView(); if (S.admin) loadAdmin(); },
+  'admin-tab'(el){ UI.adminTab = el.dataset.t; renderView(); if (!ADM.loaded) loadAdmin(); },
+  'admin-reload'(){ ADM.err = ''; renderView(); loadAdmin(); },
+  'new-pack'(){ openSheet({ type: 'newpack' }); },
+  'save-pack'(){ savePack(); },
+  'del-pack-ask'(el){ const p = packById(el.dataset.id); if (!p) return; openSheet({ type: 'confirm', title: 'Excluir pacote', text: '“' + p.title + '” sai da loja e da biblioteca de todos os clientes. Essa ação não pode ser desfeita.', yes: 'Excluir pacote', act: 'del-pack-yes', id: p.id }); },
+  async 'del-pack-yes'(el){ const ok = await removePack(el.dataset.id); closeSheet(); render(); if (ok) toast('Pacote excluído.'); },
+  async 'client-block'(el){
+    const c = ADM.clients.find(x => x.id === el.dataset.id); if (!c || !sb) return;
+    const who = c.name || c.email || c.phone || 'cliente';
+    const res = await sb.from('profiles').update({ blocked: !c.blocked }).eq('id', c.id);
+    adminDone(res, c.blocked ? 'Acesso de ' + who + ' liberado.' : 'Acesso de ' + who + ' bloqueado.', c.id);
+  },
+  async 'client-sub'(el){
+    const id = el.dataset.id, sub = ADM.subs.find(x => x.user_id === id); if (!sb) return;
+    const on = !!sub && sub.status === 'active' && new Date(sub.license_until).getTime() > Date.now();
+    const until = new Date((on ? new Date(sub.license_until).getTime() : Date.now()) + 30 * 864e5).toISOString();
+    const res = await sb.from('subscriptions').upsert({ user_id: id, status: 'active', license_until: until, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
+    adminDone(res, 'Assinatura ativa até ' + brDate(until) + '.', id);
+  },
+  async 'client-sub-cancel'(el){
+    if (!sb) return;
+    const res = await sb.from('subscriptions').update({ status: 'canceled', updated_at: new Date().toISOString() }).eq('user_id', el.dataset.id);
+    adminDone(res, 'Assinatura cancelada.', el.dataset.id);
+  },
+  async install(){ if (!installEvt) return; const ev = installEvt; installEvt = null; try { ev.prompt(); await ev.userChoice; } catch (e) {} renderView(); },
+  'clear-dl'(){ openSheet({ type: 'confirm', title: 'Apagar downloads', text: 'As faixas baixadas saem deste aparelho. Seus pacotes continuam na biblioteca e podem ser baixados de novo.', yes: 'Apagar downloads', act: 'clear-dl-yes' }); },
+  async 'clear-dl-yes'(){
+    stopAll();
+    for (const id of Object.keys(S.dl)){ await audioDel(id); delete S.dl[id]; }
+    save(); closeSheet(); render(); toast('Downloads apagados.');
+  }
+};
+
+document.addEventListener('click', ev => {
+  const el = ev.target.closest('[data-a]'); if (!el || el.disabled) return;
+  const fn = A[el.dataset.a]; if (fn) fn(el, ev);
+});
+document.addEventListener('keydown', ev => {
+  const t = ev.target;
+  if (ev.key === 'Escape' && UI.sheet){ closeSheet(); return; }
+  if ((ev.key === 'Enter' || ev.key === ' ') && t.matches && t.matches('[role="button"][data-a]')){ ev.preventDefault(); t.click(); return; }
+  if (ev.key === 'Enter' && t.id){
+    if (t.id === 'loginName' || t.id === 'loginPhone' || t.id === 'loginEmail') A['login-send']();
+    else if (t.id === 'loginCode') A['login-verify']();
+    else if (t.id === 'nlName'){ const b = $('#sheet [data-a="create-list"]'); if (b) b.click(); }
+  }
+});
+document.addEventListener('input', ev => {
+  const t = ev.target;
+  if (t.id === 'q'){ UI.q = t.value; $('#results').innerHTML = searchResults(); }
+  else if (t.id === 'loginName') UI.login.name = t.value;
+  else if (t.id === 'loginEmail') UI.login.email = t.value;
+  else if (t.id === 'loginPhone') UI.login.phone = t.value;
+  else if (t.id === 'seek'){ UI.seeking = true; const ct = $('#curT'); if (ct && P.buf) ct.textContent = fmt(t.value / 1000 * P.buf.duration); }
+});
+document.addEventListener('change', ev => {
+  const t = ev.target;
+  if (t.id === 'seek'){ if (P.buf) seek(t.value / 1000 * P.buf.duration); UI.seeking = false; }
+  else if (t.dataset && t.dataset.grant && t.value){
+    const c = ADM.clients.find(x => x.id === t.dataset.grant), p = packById(t.value);
+    if (c && p && sb) sb.from('purchases').insert({ user_id: c.id, pack_id: p.id, amount_cents: Math.round(p.price * 100), source: 'admin' }).then(res => adminDone(res, '“' + p.title + '” liberado para ' + (c.name || c.email || c.phone || 'cliente') + '.', c.id));
+  }
+});
+window.addEventListener('beforeinstallprompt', ev => { ev.preventDefault(); installEvt = ev; if (S.user && cur().type === 'conta') renderView(); });
+window.addEventListener('appinstalled', () => { installEvt = null; renderView(); toast('App instalado na tela inicial.'); });
+if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); });
+window.addEventListener('online', () => { renderTop(); syncAll().then(ok => { if (ok) render(); }); });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') syncAll().then(ok => { if (ok) render(); }); });
+window.addEventListener('offline', renderTop);
+
+/* ================= início ================= */
+(async function boot(){
+  render();
+  requestAnimationFrame(tick);
+  try {
+    const keys = await audioKeys(); let changed = false;
+    Object.keys(S.dl).forEach(id => { if (!keys.has(id)){ delete S.dl[id]; changed = true; } });
+    if (changed){ save(); renderView(); }
+  } catch (e) {}
+  if (!sb) return;
+  sb.auth.onAuthStateChange((ev, ses) => {
+    // as chamadas ao servidor saem deste retorno para não travar a biblioteca de login
+    if (ev === 'SIGNED_OUT') setTimeout(() => { if (S.user) localSignOut(); }, 0);
+    else if ((ev === 'SIGNED_IN' || ev === 'INITIAL_SESSION') && ses && ses.user) setTimeout(() => onSignedIn(ses.user), 0);
+  });
+  try {
+    const res = await sb.auth.getSession();
+    const ses = res && res.data && res.data.session;
+    if (ses && ses.user) await onSignedIn(ses.user);
+    else if (S.user && !(res && res.error)) localSignOut();
+  } catch (e) {}
+})();
+})();
+</script>
 </body>
 </html>
